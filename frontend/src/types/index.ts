@@ -1,0 +1,143 @@
+import { Permiso } from './permisos';
+export type { Permiso };
+
+export interface Usuario {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: {
+    id: number;
+    nombre: string;
+    permisos: Permiso[];
+  };
+  empleado?: {
+    id: number;
+    codigo_empleado: string;
+    nombre: string;
+    apellido: string;
+    departamento: string;
+    centro_costos?: string;
+    cargo: string;
+    foto_perfil?: string;
+    saldo_disponible?: number;
+    limite_credito?: number;
+  };
+}
+
+export interface Empleado {
+  id: number;
+  usuario_id?: number;
+  codigo_empleado: string;
+  nombre: string;
+  apellido: string;
+  salario_base: number;
+  fecha_contrato: Date;
+  departamento: string;
+  centro_costos?: string;
+  cargo: string;
+  tipo_contrato: string;
+  saldo_disponible?: number;
+  limite_credito?: number;
+  foto_perfil?: string;
+  email?: string;
+  departamento_id?: number;
+  centro_costos_id?: number;
+  activo: boolean;
+}
+
+export interface Producto {
+  id: number;
+  codigo_barras: string;
+  nombre: string;
+  descripcion: string;
+  precio_costo: number;
+  precio_venta: number;
+  stock_actual: number;
+  stock_minimo: number;
+  categoria_id: number;
+  proveedor_id: number;
+  activo: boolean;
+  foto?: string;
+  fecha_creacion: Date;
+}
+
+export interface Venta {
+  id: number;
+  empleado_id: number;
+  fecha: Date;
+  total_bruto: number;
+  descuento_total: number;
+  total_neto: number;
+  estado: 'pendiente' | 'completada' | 'anulada';
+  metodo_pago: 'efectivo' | 'nomina' | 'tarjeta';
+  estado_entrega: 'pendiente' | 'en_almacen' | 'entregado' | 'cancelado';
+  entregado_por?: number;
+  fecha_entrega?: Date;
+  empleado?: Empleado;
+  detalles?: DetalleVenta[];
+}
+
+export interface DetalleVenta {
+  id: number;
+  venta_id: number;
+  producto_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  descuento_aplicado: number;
+  subtotal: number;
+  producto?: Producto;
+}
+
+export interface SolicitudEntrega {
+  id: number;
+  venta_id: number;
+  empleado_id: number;
+  producto_id: number;
+  cantidad_solicitada: number;
+  cantidad_entregada: number;
+  estado: 'pendiente' | 'parcial' | 'completada' | 'cancelada' | 'retenida' | 'entregado' | 'no_entregado';
+  fecha_solicitud: Date;
+  fecha_entrega?: Date;
+  entregado_por?: number;
+  observaciones?: string;
+  prioridad?: 'normal' | 'alta' | 'urgente';
+  empleado?: Empleado;
+  producto?: Producto;
+}
+
+export interface VerificacionEntrega {
+  id: number;
+  solicitud_id: number;
+  empleado_verificado_id: number;
+  guardia_id: number;
+  metodo_verificacion: 'documento_fisico' | 'qr_code' | 'huella' | 'validacion_manual';
+  estado_verificacion: 'exitosa' | 'fallida' | 'pendiente';
+  fecha_verificacion: Date;
+  observaciones?: string;
+}
+
+export interface LoginResponse {
+  success: boolean;
+  data: {
+    token: string;
+    usuario: Usuario;
+  };
+  message: string;
+}
+
+export interface CreateVentaRequest {
+  empleado_id: number;
+  productos: Array<{
+    producto_id: number;
+    cantidad: number;
+  }>;
+  metodo_pago: 'efectivo' | 'nomina' | 'tarjeta';
+}
+
+export interface ConfirmarEntregaRequest {
+  solicitud_id: number;
+  guardia_id: number;
+  metodo_verificacion: 'documento_fisico' | 'qr_code' | 'huella' | 'validacion_manual';
+  observaciones?: string;
+  foto_entrega?: string;
+}

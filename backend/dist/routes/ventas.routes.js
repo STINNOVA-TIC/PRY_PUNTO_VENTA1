@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const ventas_controller_1 = require("../controllers/ventas.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const permisos_middleware_1 = require("../middleware/permisos.middleware");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.get('/', (0, permisos_middleware_1.requirePermission)('ventas.ver'), ventas_controller_1.ventasController.getAll);
+router.post('/', (0, permisos_middleware_1.requirePermission)('ventas.realizar'), ventas_controller_1.ventasController.create);
+exports.default = router;

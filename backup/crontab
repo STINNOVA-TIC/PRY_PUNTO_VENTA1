@@ -1,0 +1,4 @@
+# Image backup – first day of each month at 02:00
+0 2 1 * * /scripts/backup_images.sh
+# DB backup – every Sunday at 03:00
+0 3 * * 0 /scripts/backup_db.sh

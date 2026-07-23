@@ -1,0 +1,381 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ordenesController = void 0;
+const db_1 = __importDefault(require("../config/db"));
+const error_middleware_1 = require("../middleware/error.middleware");
+const roles_data_1 = require("../models/roles.data");
+exports.ordenesController = {
+    // Crear una nueva orden de compra (generada por el rol de Stock / Inventario / Admin)
+    crear: async (req, res) => {
+        const client = await db_1.default.connect();
+        try {
+            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, detalles } = req.body;
+            if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
+                throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
+            }
+            await client.query('BEGIN');
+            // 1. Obtener códigos del departamento y empresa para el secuencial
+            const deptRes = await client.query('SELECT departamento_codigo FROM departamento WHERE departamento_id = $1', [departamento_id]);
+            const empRes = await client.query('SELECT empresa_codigo FROM empresa WHERE empresa_id = $1', [empresa_id]);
+            if (deptRes.rows.length === 0 || empRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('Departamento o Empresa no válidos', 400);
+            }
+            const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
+            const empCode = empRes.rows[0].empresa_codigo || 'GEN';
+            const year = new Date().getFullYear();
+            // 2. Calcular secuencial único y progresivo: [num]-DCS-[dept_code]-[empresa_code]-[year]
+            const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+            const seqQuery = await client.query(`SELECT orden_compra_codigo 
+         FROM orden_compra 
+         WHERE orden_compra_codigo LIKE $1`, [pattern]);
+            let maxSeq = 0;
+            seqQuery.rows.forEach(r => {
+                const parts = r.orden_compra_codigo.split('-');
+                const num = parseInt(parts[0], 10);
+                if (!isNaN(num) && num > maxSeq) {
+                    maxSeq = num;
+                }
+            });
+            const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+            const seqStr = String(nextSeqNum).padStart(3, '0');
+            const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+            // Obtener el empleado del usuario actual si no está especificado
+            const userRes = await client.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user?.id]);
+            const empleadoId = userRes.rows[0]?.empleado_id || 1;
+            const usuarioId = req.user?.id && req.user.id !== 0 ? req.user.id : 1;
+            // 3. Insertar la cabecera de la orden de compra
+            const ocRes = await client.query(`INSERT INTO orden_compra (
+           empresa_id, sucursal_id, departamento_id, empleado_id, centro_costos_id, 
+           proveedor_id, usuario_id, orden_compra_codigo, orden_compra_justificacion, 
+           orden_compra_tipo_articulo, orden_compra_negociacion_previa, orden_compra_forma_pago,
+           orden_compra_plazo_pago, orden_compra_tiempo_entrega, orden_compra_lugar_recepcion,
+           orden_compra_requiere_contrato, orden_compra_requiere_seguro, orden_compra_requiere_mantenimiento,
+           orden_compra_asignado_trabajador, orden_compra_trabajador_asignado, orden_compra_caracteristicas,
+           orden_compra_elaborado_por, orden_compra_aprobado_por, orden_compra_recibido_por,
+           orden_compra_estado
+         ) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente') 
+         RETURNING orden_compra_id`, [
+                empresa_id,
+                sucursal_id,
+                departamento_id,
+                empleadoId,
+                centro_costos_id,
+                proveedor_id || null,
+                usuarioId,
+                codigoOC,
+                justificacion.trim(),
+                tipo_articulo || 'OTROS',
+                negociacion_previa || 'NO',
+                forma_pago || null,
+                plazo_pago || null,
+                tiempo_entrega || null,
+                lugar_recepcion || null,
+                requiere_contrato || false,
+                requiere_seguro || false,
+                requiere_mantenimiento || false,
+                asignado_trabajador || false,
+                trabajador_asignado || null,
+                caracteristicas || null,
+                elaborado_por || null,
+                aprobado_por || null,
+                recibido_por || null
+            ]);
+            const ocId = ocRes.rows[0].orden_compra_id;
+            // 4. Insertar los detalles
+            for (const d of detalles) {
+                let productoNombre = d.descripcion;
+                if (d.producto_id) {
+                    const prodRes = await client.query('SELECT producto_nombre FROM producto WHERE producto_id = $1', [d.producto_id]);
+                    if (prodRes.rows.length > 0) {
+                        productoNombre = prodRes.rows[0].producto_nombre;
+                    }
+                }
+                await client.query(`INSERT INTO orden_compra_detalle (
+             orden_compra_id, producto_id, proveedor_id, orden_compra_detalle_descripcion, 
+             orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
+             orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
+             orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
+             orden_compra_detalle_comentario
+           ) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`, [
+                    ocId,
+                    d.producto_id || null,
+                    d.proveedor_id || null,
+                    productoNombre || 'Artículo de Consumo',
+                    d.cantidad,
+                    d.unidad_medida || 'Unidad',
+                    d.precio_unitario || 0,
+                    d.subtotal || 0,
+                    d.foto || null,
+                    d.negociacion_previa || 'NO',
+                    d.comentario || null
+                ]);
+            }
+            await client.query('COMMIT');
+            res.status(201).json({
+                success: true,
+                data: {
+                    id: ocId,
+                    codigo: codigoOC
+                },
+                message: 'Orden de compra generada exitosamente'
+            });
+            return;
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al crear orden de compra', 500);
+        }
+        finally {
+            client.release();
+        }
+    },
+    // Obtener el detalle completo de una orden específica
+    getById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const ocRes = await db_1.default.query(`SELECT oc.*, 
+                emp.empresa_nombre_comercial, emp.empresa_ruc, emp.empresa_logo,
+                suc.sucursal_nombre,
+                dept.departamento_nombre, dept.departamento_codigo,
+                cc.centro_costos_nombre, cc.centro_costos_codigo,
+                p.proveedor_nombre, p.proveedor_codigo,
+                u.usuario_nombre,
+                emp_req.empleado_nombre || ' ' || emp_req.empleado_apellido AS empleado_nombre_completo,
+                emp_req.empleado_cargo
+         FROM orden_compra oc
+         LEFT JOIN empresa emp ON oc.empresa_id = emp.empresa_id
+         LEFT JOIN sucursal suc ON oc.sucursal_id = suc.sucursal_id
+         LEFT JOIN departamento dept ON oc.departamento_id = dept.departamento_id
+         LEFT JOIN centro_costos cc ON oc.centro_costos_id = cc.centro_costos_id
+         LEFT JOIN proveedor p ON oc.proveedor_id = p.proveedor_id
+         LEFT JOIN usuario u ON oc.usuario_id = u.usuario_id
+         LEFT JOIN empleado emp_req ON oc.empleado_id = emp_req.empleado_id
+         WHERE oc.orden_compra_id = $1`, [id]);
+            if (ocRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('Orden de compra no encontrada', 404);
+            }
+            const row = ocRes.rows[0];
+            const detailsRes = await db_1.default.query(`SELECT ocd.*, prod.producto_nombre, prod.producto_codigo, prod.producto_foto
+         FROM orden_compra_detalle ocd
+         LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
+         WHERE ocd.orden_compra_id = $1
+         ORDER BY ocd.orden_compra_detalle_id ASC`, [id]);
+            const facturasRes = await db_1.default.query(`SELECT factura_codigo FROM orden_compra_factura WHERE orden_compra_id = $1`, [id]);
+            res.json({
+                success: true,
+                data: {
+                    ...row,
+                    detalles: detailsRes.rows,
+                    facturas: facturasRes.rows.map((f) => f.factura_codigo)
+                }
+            });
+            return;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al obtener el detalle de la orden de compra', 500);
+        }
+    },
+    // Obtener el siguiente secuencial estimado antes de crear la orden
+    getSiguienteSecuencial: async (req, res) => {
+        try {
+            const { departamento_id, empresa_id } = req.query;
+            if (!departamento_id || !empresa_id) {
+                throw new error_middleware_1.AppError('Faltan departamento_id o empresa_id', 400);
+            }
+            // Obtener códigos
+            const deptRes = await db_1.default.query('SELECT departamento_codigo FROM departamento WHERE departamento_id = $1', [departamento_id]);
+            const empRes = await db_1.default.query('SELECT empresa_codigo FROM empresa WHERE empresa_id = $1', [empresa_id]);
+            if (deptRes.rows.length === 0 || empRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('Departamento o Empresa no encontrados', 404);
+            }
+            const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
+            const empCode = empRes.rows[0].empresa_codigo || 'GEN';
+            const year = new Date().getFullYear();
+            const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+            const seqQuery = await db_1.default.query(`SELECT orden_compra_codigo 
+         FROM orden_compra 
+         WHERE orden_compra_codigo LIKE $1`, [pattern]);
+            let maxSeq = 0;
+            seqQuery.rows.forEach(r => {
+                const parts = r.orden_compra_codigo.split('-');
+                const num = parseInt(parts[0], 10);
+                if (!isNaN(num) && num > maxSeq) {
+                    maxSeq = num;
+                }
+            });
+            const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+            const seqStr = String(nextSeqNum).padStart(3, '0');
+            const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+            res.json({
+                success: true,
+                data: {
+                    codigo: codigoOC,
+                    secuencial: nextSeqNum
+                }
+            });
+            return;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al calcular el siguiente secuencial', 500);
+        }
+    },
+    // Obtener todas las órdenes de compra
+    getAll: async (_req, res) => {
+        try {
+            const ocRes = await db_1.default.query(`SELECT oc.*, p.proveedor_nombre, u.usuario_nombre,
+                emp.empresa_nombre_comercial,
+                dept.departamento_nombre,
+                emp_req.empleado_nombre || ' ' || emp_req.empleado_apellido AS empleado_nombre_completo
+         FROM orden_compra oc
+         LEFT JOIN proveedor p ON oc.proveedor_id = p.proveedor_id
+         LEFT JOIN usuario u ON oc.usuario_id = u.usuario_id
+         LEFT JOIN empresa emp ON oc.empresa_id = emp.empresa_id
+         LEFT JOIN departamento dept ON oc.departamento_id = dept.departamento_id
+         LEFT JOIN empleado emp_req ON oc.empleado_id = emp_req.empleado_id
+         ORDER BY oc.orden_compra_fecha_solicitud DESC`);
+            const items = [];
+            for (const row of ocRes.rows) {
+                const detailsRes = await db_1.default.query(`SELECT ocd.*, prod.producto_nombre, prod.producto_codigo
+           FROM orden_compra_detalle ocd
+           LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
+           WHERE ocd.orden_compra_id = $1`, [row.orden_compra_id]);
+                const facturasRes = await db_1.default.query(`SELECT factura_codigo FROM orden_compra_factura WHERE orden_compra_id = $1`, [row.orden_compra_id]);
+                items.push({
+                    id: row.orden_compra_id,
+                    codigo: row.orden_compra_codigo,
+                    proveedor_nombre: row.proveedor_nombre || 'General/Varios',
+                    usuario_nombre: row.usuario_nombre || 'Sistema',
+                    fecha_solicitud: row.orden_compra_fecha_solicitud,
+                    justificacion: row.orden_compra_justificacion,
+                    estado: row.orden_compra_estado,
+                    empresa_nombre: row.empresa_nombre_comercial,
+                    departamento_nombre: row.departamento_nombre,
+                    empleado_nombre: row.empleado_nombre_completo,
+                    facturas: facturasRes.rows.map((f) => f.factura_codigo),
+                    detalles: detailsRes.rows.map(d => ({
+                        id: d.orden_compra_detalle_id,
+                        producto_id: d.producto_id,
+                        producto_nombre: d.producto_nombre || d.orden_compra_detalle_descripcion,
+                        producto_codigo: d.producto_codigo || 'N/A',
+                        cantidad: d.orden_compra_detalle_cantidad,
+                        precio_unitario: d.orden_compra_detalle_precio_unitario,
+                        subtotal: d.orden_compra_detalle_subtotal
+                    }))
+                });
+            }
+            res.json({
+                success: true,
+                data: items
+            });
+            return;
+        }
+        catch (error) {
+            throw new error_middleware_1.AppError('Error al obtener órdenes de compra', 500);
+        }
+    },
+    // Cambiar estado a entregado y actualizar stock e inventario
+    entregar: async (req, res) => {
+        const client = await db_1.default.connect();
+        try {
+            const { id } = req.params;
+            const { facturas } = req.body;
+            if (!req.user) {
+                throw new error_middleware_1.AppError('No autenticado', 401);
+            }
+            // 1. Validar rol del usuario (ADMIN, GUARDIA, INVENTARIO)
+            const userRole = roles_data_1.rolesData.find(r => r.id === req.user.rol_id);
+            if (!userRole || !['admin', 'guardia', 'inventario'].includes(userRole.nombre)) {
+                throw new error_middleware_1.AppError('No tienes permisos para realizar esta acción. Solo ADMIN, GUARDIA y INVENTARIO están autorizados.', 403);
+            }
+            if (!facturas || !Array.isArray(facturas) || facturas.length === 0) {
+                throw new error_middleware_1.AppError('Debe ingresar al menos un código de factura', 400);
+            }
+            // Validar que las facturas no estén vacías
+            const cleanFacturas = facturas.map((f) => String(f).trim()).filter(f => f.length > 0);
+            if (cleanFacturas.length === 0) {
+                throw new error_middleware_1.AppError('Los códigos de factura no pueden estar vacíos', 400);
+            }
+            await client.query('BEGIN');
+            // 2. Obtener el requerimiento
+            const ocRes = await client.query(`SELECT * FROM orden_compra WHERE orden_compra_id = $1 FOR UPDATE`, [id]);
+            if (ocRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('Requerimiento no encontrado', 404);
+            }
+            const oc = ocRes.rows[0];
+            if (oc.orden_compra_estado === 'entregado') {
+                throw new error_middleware_1.AppError('El requerimiento ya ha sido entregado', 400);
+            }
+            if (oc.orden_compra_estado === 'cancelada') {
+                throw new error_middleware_1.AppError('No se puede entregar un requerimiento cancelado', 400);
+            }
+            // 3. Registrar códigos de factura
+            for (const facCodigo of cleanFacturas) {
+                await client.query(`INSERT INTO orden_compra_factura (orden_compra_id, factura_codigo) VALUES ($1, $2)`, [id, facCodigo]);
+            }
+            // 4. Sumar los productos al stock del sistema y registrar movimientos de inventario
+            const detailsRes = await client.query(`SELECT * FROM orden_compra_detalle WHERE orden_compra_id = $1`, [id]);
+            for (const d of detailsRes.rows) {
+                if (d.producto_id) {
+                    // Obtener el stock actual con bloqueo
+                    const prodRes = await client.query(`SELECT producto_stock FROM producto WHERE producto_id = $1 FOR UPDATE`, [d.producto_id]);
+                    if (prodRes.rows.length > 0) {
+                        const stockAnterior = prodRes.rows[0].producto_stock;
+                        const stockNuevo = stockAnterior + d.orden_compra_detalle_cantidad;
+                        // Actualizar stock del producto
+                        await client.query(`UPDATE producto SET producto_stock = $1, producto_fecha_modificacion = CURRENT_TIMESTAMP WHERE producto_id = $2`, [stockNuevo, d.producto_id]);
+                        // Registrar movimiento de inventario
+                        const obs = `Recepción de requerimiento ${oc.orden_compra_codigo} - Factura: ${cleanFacturas.join(', ')}`;
+                        await client.query(`INSERT INTO movimiento_inventario (
+                producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
+                movimiento_inventario_cantidad, movimiento_inventario_stock_anterior,
+                movimiento_inventario_stock_nuevo, movimiento_inventario_observacion,
+                orden_compra_id
+              ) VALUES ($1, $2, $3, 'orden_compra', $4, $5, $6, $7, $8)`, [
+                            d.producto_id,
+                            oc.sucursal_id,
+                            req.user.id && req.user.id !== 0 ? req.user.id : 1,
+                            d.orden_compra_detalle_cantidad,
+                            stockAnterior,
+                            stockNuevo,
+                            obs,
+                            id
+                        ]);
+                    }
+                }
+            }
+            // 5. Actualizar estado del requerimiento
+            await client.query(`UPDATE orden_compra 
+         SET orden_compra_estado = 'entregado', 
+             orden_compra_fecha_recepcion = CURRENT_TIMESTAMP,
+             usuario_receptor_id = $1,
+             orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE orden_compra_id = $2`, [req.user.id && req.user.id !== 0 ? req.user.id : 1, id]);
+            await client.query('COMMIT');
+            res.json({
+                success: true,
+                message: 'Requerimiento recibido e inventario actualizado con éxito'
+            });
+            return;
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al procesar la entrega del requerimiento', 500);
+        }
+        finally {
+            client.release();
+        }
+    }
+};
