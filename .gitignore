@@ -1,7 +1,45 @@
-backend/node_modules/
-frontend/node_modules/
+# Node modules
+node_modules/
 
-.vscode/
+# Frontend build output
+frontend/dist/
 
+# Backend compiled output
+backend/dist/
+backend/*.tsbuildinfo
+
+# Environment files (secrets)
+.env
+.env.*
+
+# Docker overrides (local only)
+# docker-compose.override.yml
+
+# Backup storage (outside repo)
+/backups/
+
+# Logs
 *.log
+logs/
 
+# IDE / editor settings
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archive files
+*.tgz
+*.zip
+*.7z
+
+# Snapshots / test artefacts
+__snapshots__/
+backend/img/*
