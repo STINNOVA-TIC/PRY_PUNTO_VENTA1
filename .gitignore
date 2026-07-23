@@ -3,7 +3,7 @@ node_modules/
 
 # Frontend build output
 frontend/dist/
-
+# Frontend build output (Vite)
 # Backend compiled output
 backend/dist/
 backend/*.tsbuildinfo
