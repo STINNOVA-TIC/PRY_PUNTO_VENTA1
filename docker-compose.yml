@@ -63,7 +63,7 @@ services:
       - backend
     volumes:
       - ./backend/img:/data/img:ro   # Directorio de imágenes (solo lectura)
-      - C:/backups/pos:/backups      # Almacén de backups en el host
+      - "C:/backups/pos:/backups"      # Almacén de backups en el host
     environment:
       POSTGRES_HOST: db
       POSTGRES_USER: ${POSTGRES_USER}
