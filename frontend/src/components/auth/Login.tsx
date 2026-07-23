@@ -78,11 +78,9 @@ export const Login: React.FC = () => {
         <div className="absolute top-10 right-10 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
         
         <div className="w-full max-w-sm mx-auto space-y-8 z-10">
-          {/* Logo en vista móvil y cabecera en escritorio */}
-          <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-4">
-
-            <div className="space-y-1 mt-2">
-              <img src={logoEmpresa} alt="Logotipo Oficial" className="h-16 w-auto mx-auto object-contain filter drop-shadow-sm select-none" />
+          <div className="flex flex-col items-center space-y-4 w-full">
+            <img src={logoEmpresa} alt="Logotipo Oficial" className="h-16 w-auto object-contain filter drop-shadow-sm select-none" />
+            <div className="space-y-1 mt-2 text-center md:text-left w-full">
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">Iniciar Sesión</h2>
               <p className="text-xs text-slate-500 font-medium">
                 {isEmployee 

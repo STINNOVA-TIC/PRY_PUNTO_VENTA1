@@ -113,7 +113,7 @@ export const authController = {
       // Buscar usuario en PostgreSQL
       const userRes = await pool.query(
         "SELECT * FROM usuario WHERE usuario_email = $1 AND usuario_estado = 'activo'",
-        [email.trim()]
+        [email.trim().toLowerCase()]
       );
       const user = userRes.rows[0];
 
