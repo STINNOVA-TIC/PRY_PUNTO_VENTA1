@@ -3,6 +3,7 @@ import { ordenesAPI } from '../../api/ordenes.api';
 import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { adminAPI } from '../../api/admin.api';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const RecepcionRequerimientos: React.FC = () => {
   const { user } = useAuth();
@@ -144,12 +145,7 @@ export const RecepcionRequerimientos: React.FC = () => {
           <h1 className="text-xl font-bold text-gray-900">Recepción de Requerimientos</h1>
           <p className="text-xs text-gray-500 mt-1">Registra la recepción de productos, asocia facturas de compra e incrementa el stock físico en el inventario.</p>
         </div>
-        <button
-          onClick={cargarDatos}
-          className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-semibold shadow-sm transition shrink-0"
-        >
-          🔄 Actualizar Lista
-        </button>
+        <BotonRecargar onRefresh={cargarDatos} loading={loading} />
       </div>
 
       {/* Alertas */}

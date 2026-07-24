@@ -4,6 +4,8 @@ import { productosAPI } from '../../api/productos.api';
 import { ordenesAPI } from '../../api/ordenes.api';
 import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
+import { ModalImportExport } from '../common/ModalImportExport';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const PanelInventario: React.FC = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -21,6 +23,7 @@ export const PanelInventario: React.FC = () => {
   const [precioVenta, setPrecioVenta] = useState('');
   const [stock, setStock] = useState('');
   const [foto, setFoto] = useState('');
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Estados de subida de fotos
   const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
@@ -127,6 +130,83 @@ export const PanelInventario: React.FC = () => {
     }
   };
 
+  const columnsConfig = [
+    { key: 'codigo_barras', label: 'Código barras' },
+    { key: 'nombre', label: 'Nombre' },
+    { key: 'descripcion', label: 'Descripción' },
+    { key: 'precio_costo', label: 'Precio Compra ($)' },
+    { key: 'precio_venta', label: 'Precio Venta ($)' },
+    { key: 'stock_actual', label: 'Existencia' },
+    { key: 'categoria', label: 'Categoría' },
+    { key: 'proveedor', label: 'Proveedor' },
+    { key: 'foto', label: 'Foto' }
+  ];
+
+  const productosMapeadosParaExportar = productos.map((p) => {
+    const cat = categorias.find((c) => c.id === p.categoria_id);
+    const prov = proveedores.find((pr) => pr.id === p.proveedor_id);
+    return {
+      ...p,
+      categoria: cat ? cat.nombre : 'Sin Categoría',
+      proveedor: prov ? prov.nombre : 'Sin Proveedor',
+    };
+  });
+
+  const handleImportProductos = async (importedRows: any[]) => {
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < importedRows.length; i++) {
+      const row = importedRows[i];
+
+      if (!row.codigo_barras || !row.nombre || !row.precio_venta || !row.stock_actual) {
+        errors.push(`Fila ${i + 1}: Código, Nombre, Precio Venta y Existencia son obligatorios.`);
+        continue;
+      }
+
+      // Buscar categoria_id por nombre
+      const foundCat = categorias.find(
+        (c) => c.nombre.toLowerCase().trim() === String(row.categoria || '').toLowerCase().trim()
+      );
+
+      // Buscar proveedor_id por nombre
+      const foundProv = proveedores.find(
+        (pr) => pr.nombre.toLowerCase().trim() === String(row.proveedor || '').toLowerCase().trim()
+      );
+
+      if (!foundCat) {
+        errors.push(`Fila ${i + 1} (${row.nombre}): Categoría "${row.categoria}" no existe en el sistema.`);
+        continue;
+      }
+
+      if (!foundProv) {
+        errors.push(`Fila ${i + 1} (${row.nombre}): Proveedor "${row.proveedor}" no existe en el sistema.`);
+        continue;
+      }
+
+      try {
+        await productosAPI.create({
+          codigo_barras: String(row.codigo_barras),
+          nombre: String(row.nombre),
+          descripcion: row.descripcion ? String(row.descripcion) : '',
+          precio_costo: row.precio_costo ? parseFloat(row.precio_costo) : 0,
+          precio_venta: parseFloat(row.precio_venta),
+          stock_actual: parseInt(row.stock_actual),
+          categoria_id: foundCat.id,
+          proveedor_id: foundProv.id,
+          foto: row.foto ? String(row.foto) : undefined
+        });
+        successCount++;
+      } catch (err: any) {
+        const msg = err.response?.data?.message || err.message || 'Error desconocido';
+        errors.push(`Fila ${i + 1} (${row.nombre}): ${msg}`);
+      }
+    }
+
+    cargarDatos();
+    return { successCount, errors };
+  };
+
   const handleUpdateStock = async (id: number) => {
     if (!newStockVal || isNaN(parseInt(newStockVal))) return;
 
@@ -191,7 +271,15 @@ export const PanelInventario: React.FC = () => {
           <p className="text-xs text-gray-500 mt-1">Control de existencias y emisión de órdenes de reabastecimiento</p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+          <button
+            type="button"
+            onClick={() => setIsImportExportOpen(true)}
+            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
+          >
+            📂 Importar / Exportar
+          </button>
           <button
             onClick={() => {
               setShowProductForm(!showProductForm);
@@ -612,6 +700,14 @@ export const PanelInventario: React.FC = () => {
         )}
       </div>
 
+      <ModalImportExport
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        title="Productos"
+        columns={columnsConfig}
+        data={productosMapeadosParaExportar}
+        onImport={handleImportProductos}
+      />
     </div>
   );
 };

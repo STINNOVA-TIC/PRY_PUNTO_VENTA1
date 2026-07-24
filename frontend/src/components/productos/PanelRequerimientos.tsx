@@ -4,6 +4,7 @@ import { ordenesAPI } from '../../api/ordenes.api';
 import { adminAPI } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const PanelRequerimientos: React.FC = () => {
   const { user } = useAuth();
@@ -297,9 +298,12 @@ export const PanelRequerimientos: React.FC = () => {
     <div className="font-sans space-y-8 max-w-6xl mx-auto">
       
       {/* CABECERA */}
-      <div>
-        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Requerimiento de Bienes y/o Servicios</h1>
-        <p className="text-sm text-gray-500 mt-1">Generación de órdenes de compra con formato corporativo e impresión de documentos</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Requerimiento de Bienes y/o Servicios</h1>
+          <p className="text-sm text-gray-500 mt-1">Generación de órdenes de compra con formato corporativo e impresión de documentos</p>
+        </div>
+        <BotonRecargar onRefresh={cargarDatos} loading={loading} />
       </div>
 
       {success && (

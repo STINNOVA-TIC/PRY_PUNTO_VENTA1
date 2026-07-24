@@ -5,6 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const PanelTTHH: React.FC = () => {
   const [devoluciones, setDevoluciones] = useState<any[]>([]);
@@ -570,25 +571,10 @@ export const PanelTTHH: React.FC = () => {
                     )}
                   </div>
                 )}
-                <button
-                  onClick={cargarDatos}
-                  disabled={loading}
-                  title="Recargar datos"
-                  className="h-[30px] w-[30px] flex items-center justify-center bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 rounded-lg transition active:scale-95 disabled:opacity-60 disabled:pointer-events-none"
-                >
-                  <svg
-                    className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M23 4v6h-6" />
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                  </svg>
-                </button>
+                <BotonRecargar
+                  onRefresh={cargarDatos}
+                  loading={loading}
+                />
               </div>
             </div>
 

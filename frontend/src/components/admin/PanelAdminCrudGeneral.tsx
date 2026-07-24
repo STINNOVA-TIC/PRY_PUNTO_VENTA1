@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
+import { ModalImportExport } from '../common/ModalImportExport';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 interface FieldConfig {
   key: string;
@@ -165,6 +167,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
   const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
   const [photoUrlInput, setPhotoUrlInput] = useState('');
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   const lastRequestTokenRef = useRef<number>(0);
 
@@ -218,6 +221,41 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         setLoading(false);
       }
     }
+  };
+
+  const columnsConfigCentroCostos = [
+    { key: 'centro_costos_codigo', label: 'Código Centro' },
+    { key: 'centro_costos_nombre', label: 'Nombre Centro' },
+    { key: 'centro_costos_descripcion', label: 'Descripción' }
+  ];
+
+  const handleImportCentroCostos = async (importedRows: any[]) => {
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < importedRows.length; i++) {
+      const row = importedRows[i];
+
+      if (!row.centro_costos_codigo || !row.centro_costos_nombre) {
+        errors.push(`Fila ${i + 1}: Código Centro y Nombre Centro son obligatorios.`);
+        continue;
+      }
+
+      try {
+        await adminAPI.create('centro_costos', {
+          centro_costos_codigo: String(row.centro_costos_codigo),
+          centro_costos_nombre: String(row.centro_costos_nombre),
+          centro_costos_descripcion: row.centro_costos_descripcion ? String(row.centro_costos_descripcion) : ''
+        });
+        successCount++;
+      } catch (err: any) {
+        const msg = err.response?.data?.message || err.message || 'Error desconocido';
+        errors.push(`Fila ${i + 1} (${row.centro_costos_nombre}): ${msg}`);
+      }
+    }
+
+    cargarDatos();
+    return { successCount, errors };
   };
 
   const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -359,12 +397,24 @@ export const PanelAdminCrudGeneral: React.FC = () => {
           </select>
 
           {!showForm && (
-            <button
-              onClick={handleCreateNewClick}
-              className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-            >
-              Registrar nuevo
-            </button>
+            <div className="flex items-center gap-2">
+              <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+              {activeSchema.table === 'centro_costos' && (
+                <button
+                  type="button"
+                  onClick={() => setIsImportExportOpen(true)}
+                  className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-755 rounded-lg text-xs font-semibold shadow-sm transition"
+                >
+                  📂 Importar / Exportar
+                </button>
+              )}
+              <button
+                onClick={handleCreateNewClick}
+                className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                Registrar nuevo
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -596,6 +646,14 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         </div>
       </div>
 
+      <ModalImportExport
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        title="Centros de Costo"
+        columns={columnsConfigCentroCostos}
+        data={rows}
+        onImport={handleImportCentroCostos}
+      />
     </div>
   );
 };

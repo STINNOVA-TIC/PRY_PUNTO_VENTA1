@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usuariosAPI, UsuarioOperador } from '../../api/usuarios.api';
 import { empleadosAPI } from '../../api/empleados.api';
 import { Empleado } from '../../types';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const PanelAdminUsuarios: React.FC = () => {
   const [usuarios, setUsuarios] = useState<UsuarioOperador[]>([]);
@@ -132,12 +133,15 @@ export const PanelAdminUsuarios: React.FC = () => {
           <p className="text-xs text-gray-500 mt-1">Gestión de accesos, perfiles de sistema y asignación de roles</p>
         </div>
         {!showForm && (
-          <button
-            onClick={handleCreateNewClick}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            Nuevo Operador
-          </button>
+          <div className="flex items-center gap-2">
+            <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+            <button
+              onClick={handleCreateNewClick}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+            >
+              Nuevo Operador
+            </button>
+          </div>
         )}
       </div>
 

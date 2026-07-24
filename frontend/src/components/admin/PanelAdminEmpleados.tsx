@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { empleadosAPI } from '../../api/empleados.api';
 import { adminAPI } from '../../api/admin.api';
 import { Empleado } from '../../types';
+import { ModalImportExport } from '../common/ModalImportExport';
+import { BotonRecargar } from '../common/BotonRecargar';
 
 export const PanelAdminEmpleados: React.FC = () => {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -23,10 +25,17 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<number | ''>('');
   const [selectedCC, setSelectedCC] = useState<number | ''>('');
   const [activo, setActivo] = useState(true);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Estados de subida de fotos
   const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  // Estados de búsqueda y filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDept, setFilterDept] = useState<number | ''>('');
+  const [filterCC, setFilterCC] = useState<number | ''>('');
+  const [filterEstado, setFilterEstado] = useState<'activo' | 'inactivo' | ''>('');
 
   const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -156,6 +165,72 @@ export const PanelAdminEmpleados: React.FC = () => {
     }
   };
 
+  const columnsConfig = [
+    { key: 'codigo_empleado', label: 'Cédula' },
+    { key: 'nombre', label: 'Nombre' },
+    { key: 'apellido', label: 'Apellido' },
+    { key: 'email', label: 'Email' },
+    { key: 'cargo', label: 'Cargo' },
+    { key: 'foto_perfil', label: 'Foto Perfil' },
+    { key: 'departamento', label: 'Departamento' },
+    { key: 'centro_costos', label: 'Centro de Costos' },
+    { key: 'activo', label: 'Activo' },
+  ];
+
+  const handleImportColaboradores = async (importedRows: any[]) => {
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < importedRows.length; i++) {
+      const row = importedRows[i];
+      
+      if (!row.codigo_empleado || !row.nombre || !row.apellido) {
+        errors.push(`Fila ${i + 1}: Cédula, Nombre y Apellido son obligatorios.`);
+        continue;
+      }
+
+      // Buscar departamento por nombre
+      const foundDept = departamentos.find(
+        (d) => d.nombre.toLowerCase().trim() === String(row.departamento || '').toLowerCase().trim()
+      );
+
+      // Buscar centro de costos por nombre
+      const foundCC = centrosCostos.find(
+        (cc) => cc.nombre.toLowerCase().trim() === String(row.centro_costos || '').toLowerCase().trim()
+      );
+
+      const isActive = row.activo !== undefined
+        ? (String(row.activo).toLowerCase() === 'activo' ||
+           String(row.activo).toLowerCase() === 'true' ||
+           String(row.activo) === '1' ||
+           row.activo === true ||
+           String(row.activo).toLowerCase() === 'sí' ||
+           String(row.activo).toLowerCase() === 'si')
+        : true;
+
+      try {
+        await empleadosAPI.create({
+          cedula: String(row.codigo_empleado),
+          nombre: String(row.nombre),
+          apellido: String(row.apellido),
+          email: row.email ? String(row.email) : null,
+          cargo: row.cargo ? String(row.cargo) : null,
+          foto_perfil: row.foto_perfil ? String(row.foto_perfil) : null,
+          departamento_id: foundDept ? Number(foundDept.id) : null,
+          centro_costos_id: foundCC ? Number(foundCC.id) : null,
+          activo: isActive
+        });
+        successCount++;
+      } catch (err: any) {
+        const msg = err.response?.data?.message || err.message || 'Error desconocido';
+        errors.push(`Fila ${i + 1} (${row.nombre} ${row.apellido}): ${msg}`);
+      }
+    }
+
+    cargarDatos();
+    return { successCount, errors };
+  };
+
   if (loading && empleados.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-3 font-sans">
@@ -174,12 +249,22 @@ export const PanelAdminEmpleados: React.FC = () => {
           <p className="text-xs text-gray-500 mt-1">Registro de empleados de la empresa y configuración de nómina</p>
         </div>
         {!showForm && (
-          <button
-            onClick={handleCreateNewClick}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            Registrar Colaborador
-          </button>
+          <div className="flex items-center gap-2">
+            <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+            <button
+              type="button"
+              onClick={() => setIsImportExportOpen(true)}
+              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
+            >
+              📂 Importar / Exportar
+            </button>
+            <button
+              onClick={handleCreateNewClick}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+            >
+              Registrar Colaborador
+            </button>
+          </div>
         )}
       </div>
 
@@ -369,6 +454,74 @@ export const PanelAdminEmpleados: React.FC = () => {
         </form>
       )}
 
+      {/* Filtros y Buscador */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {/* Buscador */}
+        <div>
+          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Buscar Colaborador</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400 text-xs">
+              🔍
+            </span>
+            <input
+              type="text"
+              placeholder="Nombre o Cédula..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-7 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs placeholder-gray-400 focus:outline-none focus:border-gray-400"
+            />
+          </div>
+        </div>
+
+        {/* Filtro Departamento */}
+        <div>
+          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Departamento</label>
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value === '' ? '' : Number(e.target.value))}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
+          >
+            <option value="">Todos los Departamentos</option>
+            {departamentos.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro Centro de Costos */}
+        <div>
+          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Centro de Costos</label>
+          <select
+            value={filterCC}
+            onChange={(e) => setFilterCC(e.target.value === '' ? '' : Number(e.target.value))}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
+          >
+            <option value="">Todos los CC</option>
+            {centrosCostos.map((cc) => (
+              <option key={cc.id} value={cc.id}>
+                {cc.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro Estado */}
+        <div>
+          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Estado</label>
+          <select
+            value={filterEstado}
+            onChange={(e) => setFilterEstado(e.target.value as any)}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
+          >
+            <option value="">Todos los Estados</option>
+            <option value="activo">Activos</option>
+            <option value="inactivo">Inactivos</option>
+          </select>
+        </div>
+      </div>
+
       {/* LISTADO */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -383,7 +536,36 @@ export const PanelAdminEmpleados: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {empleados.map((emp) => (
+              {(() => {
+                const filtered = empleados.filter((emp) => {
+                  const query = searchTerm.toLowerCase();
+                  const matchQuery =
+                    emp.nombre.toLowerCase().includes(query) ||
+                    emp.apellido.toLowerCase().includes(query) ||
+                    emp.codigo_empleado.toLowerCase().includes(query) ||
+                    `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(query);
+
+                  const matchDept = filterDept === '' || emp.departamento_id === filterDept;
+                  const matchCC = filterCC === '' || emp.centro_costos_id === filterCC;
+                  const matchEstado =
+                    filterEstado === '' ||
+                    (filterEstado === 'activo' && emp.activo) ||
+                    (filterEstado === 'inactivo' && !emp.activo);
+
+                  return matchQuery && matchDept && matchCC && matchEstado;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-8 text-center text-gray-400 font-medium">
+                        No se encontraron colaboradores que coincidan con los filtros.
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return filtered.map((emp) => (
                 <tr key={emp.id} className="hover:bg-gray-50/50">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -433,12 +615,20 @@ export const PanelAdminEmpleados: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))})()}
             </tbody>
           </table>
         </div>
       </div>
 
+      <ModalImportExport
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        title="Colaboradores"
+        columns={columnsConfig}
+        data={empleados}
+        onImport={handleImportColaboradores}
+      />
     </div>
   );
 };
