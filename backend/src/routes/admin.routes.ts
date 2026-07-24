@@ -24,8 +24,8 @@ const authorizeCrud = async (req: any, _res: any, next: any) => {
       return next();
     }
 
-    // Inventario puede LEER todas las tablas (para llenar desplegables)
-    if (rol === 'inventario' && req.method === 'GET') {
+    // Inventario y Guardia pueden LEER todas las tablas (para llenar desplegables)
+    if ((rol === 'inventario' || rol === 'guardia') && req.method === 'GET') {
       return next();
     }
 
