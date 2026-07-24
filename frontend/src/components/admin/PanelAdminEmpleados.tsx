@@ -4,8 +4,10 @@ import { adminAPI } from '../../api/admin.api';
 import { Empleado } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { useModal } from '../../context/ModalContext';
 
 export const PanelAdminEmpleados: React.FC = () => {
+  const { showConfirm } = useModal();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [departamentos, setDepartamentos] = useState<{ id: number; nombre: string }[]>([]);
   const [centrosCostos, setCentrosCostos] = useState<{ id: number; nombre: string }[]>([]);
@@ -144,7 +146,13 @@ export const PanelAdminEmpleados: React.FC = () => {
 
   const handleToggleActivo = async (emp: Empleado) => {
     const accion = emp.activo ? 'desactivar' : 'activar';
-    if (!confirm(`¿Estás seguro de ${accion} a este colaborador?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Confirmar Acción',
+      message: `¿Estás seguro de ${accion} a este colaborador?`,
+      confirmLabel: emp.activo ? 'Desactivar' : 'Activar',
+      type: emp.activo ? 'danger' : 'warning'
+    });
+    if (!confirmed) return;
 
     try {
       await empleadosAPI.update(emp.id, {
@@ -256,7 +264,7 @@ export const PanelAdminEmpleados: React.FC = () => {
               onClick={() => setIsImportExportOpen(true)}
               className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
             >
-              📂 Importar / Exportar
+              Importar / Exportar
             </button>
             <button
               onClick={handleCreateNewClick}

@@ -24,6 +24,7 @@ export const PanelInventario: React.FC = () => {
   const [stock, setStock] = useState('');
   const [foto, setFoto] = useState('');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
 
   // Estados de subida de fotos
   const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
@@ -97,25 +98,39 @@ export const PanelInventario: React.FC = () => {
     setFormError('');
     setFormSuccess('');
 
-    if (!codigo || !nombre || !precioVenta || !stock || !selectedCategoria || !selectedProveedor) {
-      setFormError('Los campos Código, Nombre, Precio Venta, Stock Inicial, Categoría y Proveedor son requeridos.');
+    if (!codigo || !nombre || !precioVenta || (!editingProductId && !stock) || !selectedCategoria || !selectedProveedor) {
+      setFormError('Los campos Código, Nombre, Precio Venta, Categoría y Proveedor son requeridos.');
       return;
     }
 
     try {
-      await productosAPI.create({
-        codigo_barras: codigo,
-        nombre,
-        descripcion,
-        precio_costo: parseFloat(precioCosto || '0'),
-        precio_venta: parseFloat(precioVenta),
-        stock_actual: parseInt(stock),
-        categoria_id: Number(selectedCategoria),
-        proveedor_id: Number(selectedProveedor),
-        foto: foto || undefined
-      });
+      if (editingProductId) {
+        await adminAPI.update('producto', editingProductId, {
+          categoria_id: Number(selectedCategoria),
+          proveedor_id: Number(selectedProveedor),
+          producto_codigo: codigo,
+          producto_nombre: nombre,
+          producto_descripcion: descripcion,
+          producto_precio: parseFloat(precioVenta),
+          producto_precio_compra: parseFloat(precioCosto || '0'),
+          producto_foto: foto || null
+        });
+        setFormSuccess('Producto actualizado exitosamente.');
+      } else {
+        await productosAPI.create({
+          codigo_barras: codigo,
+          nombre,
+          descripcion,
+          precio_costo: parseFloat(precioCosto || '0'),
+          precio_venta: parseFloat(precioVenta),
+          stock_actual: parseInt(stock),
+          categoria_id: Number(selectedCategoria),
+          proveedor_id: Number(selectedProveedor),
+          foto: foto || undefined
+        });
+        setFormSuccess('Producto creado exitosamente.');
+      }
 
-      setFormSuccess('Producto creado exitosamente.');
       setCodigo('');
       setNombre('');
       setDescripcion('');
@@ -123,11 +138,53 @@ export const PanelInventario: React.FC = () => {
       setPrecioVenta('');
       setStock('');
       setFoto('');
-      setShowProductForm(false);
+      setSelectedCategoria('');
+      setSelectedProveedor('');
+      setEditingProductId(null);
+
+      // Cerrar formulario tras 1.5s
+      setTimeout(() => {
+        setShowProductForm(false);
+        setFormSuccess('');
+      }, 1500);
+
       cargarDatos();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Error al crear producto');
+      setFormError(err.response?.data?.message || 'Error al guardar los datos del producto');
     }
+  };
+
+  const handleEditProductClick = (p: Producto) => {
+    setEditingProductId(p.id);
+    setCodigo(p.codigo_barras);
+    setNombre(p.nombre);
+    setDescripcion(p.descripcion || '');
+    setPrecioCosto(p.precio_costo.toString());
+    setPrecioVenta(p.precio_venta.toString());
+    setSelectedCategoria(p.categoria_id || '');
+    setSelectedProveedor(p.proveedor_id || '');
+    setFoto(p.foto || '');
+    setUrlOption(p.foto ? 'url' : 'file');
+    setShowProductForm(true);
+    setShowOCForm(false);
+    setFormError('');
+    setFormSuccess('');
+  };
+
+  const handleCancelProductForm = () => {
+    setCodigo('');
+    setNombre('');
+    setDescripcion('');
+    setPrecioCosto('');
+    setPrecioVenta('');
+    setStock('');
+    setFoto('');
+    setSelectedCategoria('');
+    setSelectedProveedor('');
+    setEditingProductId(null);
+    setShowProductForm(false);
+    setFormError('');
+    setFormSuccess('');
   };
 
   const columnsConfig = [
@@ -278,12 +335,16 @@ export const PanelInventario: React.FC = () => {
             onClick={() => setIsImportExportOpen(true)}
             className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
           >
-            📂 Importar / Exportar
+            Importar / Exportar
           </button>
           <button
             onClick={() => {
-              setShowProductForm(!showProductForm);
-              setShowOCForm(false);
+              if (showProductForm) {
+                handleCancelProductForm();
+              } else {
+                setShowProductForm(true);
+                setShowOCForm(false);
+              }
             }}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
           >
@@ -303,7 +364,7 @@ export const PanelInventario: React.FC = () => {
       {showProductForm && (
         <form onSubmit={handleCreateProduct} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-            Nuevo Producto en Bodega
+            {editingProductId ? 'Editar Producto' : 'Nuevo Producto en Bodega'}
           </h3>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -401,17 +462,19 @@ export const PanelInventario: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Stock Inicial</label>
-              <input
-                type="number"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                placeholder="50"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                required
-              />
-            </div>
+            {!editingProductId && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Stock Inicial</label>
+                <input
+                  type="number"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  placeholder="50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  required
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -470,11 +533,11 @@ export const PanelInventario: React.FC = () => {
               type="submit"
               className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold transition"
             >
-              Registrar Producto
+              {editingProductId ? 'Guardar Cambios' : 'Registrar Producto'}
             </button>
             <button
               type="button"
-              onClick={() => setShowProductForm(false)}
+              onClick={handleCancelProductForm}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-250 text-gray-650 rounded-lg text-xs font-semibold transition"
             >
               Cancelar
@@ -579,7 +642,7 @@ export const PanelInventario: React.FC = () => {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <img
-                            src={p.foto || 'https://images.unsplash.com/photo-1546241072-48010ad2862c?auto=format&fit=crop&w=80&q=80'}
+                            src={p.foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg'}
                             alt={p.nombre}
                             className="w-12 h-12 rounded-lg border border-gray-200 object-cover"
                           />
@@ -605,39 +668,49 @@ export const PanelInventario: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        {editingStockId === p.id ? (
-                          <div className="flex items-center gap-1.5 justify-end">
-                            <input
-                              type="number"
-                              value={newStockVal}
-                              onChange={(e) => setNewStockVal(e.target.value)}
-                              className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-gray-400"
-                              placeholder="Stock"
-                            />
-                            <button
-                              onClick={() => handleUpdateStock(p.id)}
-                              className="px-2 py-1 bg-gray-800 text-white rounded text-[10px] font-bold"
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              onClick={() => setEditingStockId(null)}
-                              className="text-xs text-gray-400 hover:text-gray-600"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingStockId(p.id);
-                              setNewStockVal(p.stock_actual.toString());
-                            }}
-                            className="px-3 py-1.5 border border-gray-350 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
-                          >
-                            Modificar Stock
-                          </button>
-                        )}
+                        <div className="flex gap-2 justify-end items-center">
+                          {editingStockId === p.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                value={newStockVal}
+                                onChange={(e) => setNewStockVal(e.target.value)}
+                                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-gray-400"
+                                placeholder="Stock"
+                              />
+                              <button
+                                onClick={() => handleUpdateStock(p.id)}
+                                className="px-2 py-1 bg-gray-800 text-white rounded text-[10px] font-bold"
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                onClick={() => setEditingStockId(null)}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEditProductClick(p)}
+                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
+                              >
+                                Editar Detalle
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingStockId(p.id);
+                                  setNewStockVal(p.stock_actual.toString());
+                                }}
+                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
+                              >
+                                Ajustar Stock
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useModal } from '../../context/ModalContext';
 
 interface SolicitudCardProps {
   solicitud: any; 
@@ -13,6 +14,7 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
   onCancelar,
   onSolicitarDevolucion,
 }) => {
+  const { showAlert } = useModal();
   const { user } = useAuth();
   const navigate = useNavigate();
   const esGuardia = user?.rol.nombre === 'guardia' || user?.rol.nombre === 'admin';
@@ -65,7 +67,7 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
     setShowCancelModal(true);
   };
 
-  const handleDevolucionSubmit = () => {
+  const handleDevolucionSubmit = async () => {
     if (!motivoCancelacion.trim() || !onSolicitarDevolucion) return;
 
     const detalles = (solicitud.detalles || []).map((d: any) => ({
@@ -74,7 +76,11 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
     })).filter((d: any) => d.cantidad_devuelta > 0);
 
     if (detalles.length === 0) {
-      alert('Debe devolver al menos una unidad de algún producto.');
+      await showAlert({
+        title: 'Cantidad Requerida',
+        message: 'Debe devolver al menos una unidad de algún producto.',
+        type: 'warning'
+      });
       return;
     }
 

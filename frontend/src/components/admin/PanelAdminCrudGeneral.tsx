@@ -3,6 +3,7 @@ import { adminAPI } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { useModal } from '../../context/ModalContext';
 
 interface FieldConfig {
   key: string;
@@ -131,6 +132,7 @@ const SCHEMAS: TableSchema[] = [
 ];
 
 export const PanelAdminCrudGeneral: React.FC = () => {
+  const { showConfirm } = useModal();
   const { user } = useAuth();
   
   const allowedSchemas = SCHEMAS.filter(s => {
@@ -310,7 +312,13 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     const isActivo = row[statusKey] === 'activo';
     const accion = isActivo ? 'desactivar' : 'activar';
 
-    if (!confirm(`¿Estás seguro de ${accion} este registro por motivos de auditoría?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Confirmar Acción',
+      message: `¿Estás seguro de ${accion} este registro por motivos de auditoría?`,
+      confirmLabel: isActivo ? 'Desactivar' : 'Activar',
+      type: isActivo ? 'danger' : 'warning'
+    });
+    if (!confirmed) return;
 
     try {
       await adminAPI.toggleStatus(activeSchema.table, id, !isActivo);
@@ -349,7 +357,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
       // Subida de imagen si corresponde
       const imageField = activeSchema.fields.find(f => f.type === 'image');
       if (imageField) {
-        payload[imageField.key] = photoUrlInput || 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?q=80&w=300&auto=format&fit=crop';
+        payload[imageField.key] = photoUrlInput || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
       }
 
       // Validar tipos
@@ -405,7 +413,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                   onClick={() => setIsImportExportOpen(true)}
                   className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-755 rounded-lg text-xs font-semibold shadow-sm transition"
                 >
-                  📂 Importar / Exportar
+                  Importar / Exportar
                 </button>
               )}
               <button

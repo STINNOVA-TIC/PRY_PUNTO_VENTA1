@@ -6,8 +6,11 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { BotonDescargar } from '../common/BotonDescargar';
+import { useModal } from '../../context/ModalContext';
 
 export const PanelTTHH: React.FC = () => {
+  const { showAlert } = useModal();
   const [devoluciones, setDevoluciones] = useState<any[]>([]);
   const [reporteConsumo, setReporteConsumo] = useState<any[]>([]);
   const [transacciones, setTransacciones] = useState<any[]>([]);
@@ -16,7 +19,6 @@ export const PanelTTHH: React.FC = () => {
   const [selectedDevId, setSelectedDevId] = useState<number | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [moduloActivo, setModuloActivo] = useState<'reportes' | 'devoluciones'>('reportes');
-  const [showDropdown, setShowDropdown] = useState(false);
 
   // Estados de rango de fechas (calendario)
   const getTodayStr = () => new Date().toISOString().slice(0, 10);
@@ -213,11 +215,130 @@ export const PanelTTHH: React.FC = () => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Exportar Consumo Acumulado (Resumen) a CSV
+  const exportarResumenCSV = async () => {
+    if (reporteConsumo.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay consumos para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const headers = ['Colaborador', 'Cedula', 'Departamento', 'No. Compras', 'Total a Descontar'];
+    const rows = reporteConsumo.map(row => [
+      row.empleado,
+      row.codigo,
+      row.departamento,
+      row.total_compras,
+      row.total_gastado.toFixed(2)
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Nomina_Consumo_Acumulado_${fInicio}_a_${fFin}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Exportar Consumo Acumulado (Resumen) a XLSX
+  const exportarResumenXLSX = async () => {
+    if (reporteConsumo.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay consumos para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const rows = reporteConsumo.map(row => ({
+      'Colaborador': row.empleado,
+      'Cédula': row.codigo,
+      'Departamento': row.departamento,
+      'No. Compras': row.total_compras,
+      'Total a Descontar': row.total_gastado
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resumen_Nomina');
+
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+    XLSX.writeFile(workbook, `Nomina_Consumo_Acumulado_${fInicio}_a_${fFin}.xlsx`);
+  };
+
+  // Exportar Consumo Acumulado (Resumen) a PDF
+  const exportarResumenPDF = async () => {
+    if (reporteConsumo.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay consumos para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    doc.setFontSize(16);
+    doc.text('Resumen de Consumo Acumulado para Nómina', 14, 15);
+    doc.setFontSize(10);
+    
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+    doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
+    doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
+
+    const headers = [['Colaborador', 'Cédula', 'Departamento', 'No. Compras', 'Total a Descontar']];
+    const rows = reporteConsumo.map(row => [
+      row.empleado,
+      row.codigo,
+      row.departamento,
+      row.total_compras,
+      `$${row.total_gastado.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: headers,
+      body: rows,
+      startY: 32,
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59] }, // Slate-800
+      styles: { fontSize: 9, cellPadding: 3 }
+    });
+
+    doc.save(`Nomina_Consumo_Acumulado_${fInicio}_a_${fFin}.pdf`);
+  };
+
   // Exportar a CSV (Registro Detallado)
-  const exportarCSV = () => {
+  const exportarCSV = async () => {
     const listado = transaccionesFiltradas;
     if (listado.length === 0) {
-      alert('No hay transacciones filtradas para exportar.');
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay transacciones filtradas para exportar.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -259,10 +380,14 @@ export const PanelTTHH: React.FC = () => {
   };
 
   // Exportar a Excel (XLSX)
-  const exportarXLSX = () => {
+  const exportarXLSX = async () => {
     const listado = transaccionesFiltradas;
     if (listado.length === 0) {
-      alert('No hay transacciones filtradas para exportar.');
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay transacciones filtradas para exportar.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -291,10 +416,14 @@ export const PanelTTHH: React.FC = () => {
   };
 
   // Exportar a PDF (Landscape A4 con autoTable)
-  const exportarPDF = () => {
+  const exportarPDF = async () => {
     const listado = transaccionesFiltradas;
     if (listado.length === 0) {
-      alert('No hay transacciones filtradas para exportar.');
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay transacciones filtradas para exportar.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -359,7 +488,7 @@ export const PanelTTHH: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-3 font-sans">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
-        <p className="text-sm text-gray-500 font-medium">Cargando bandeja de Talento Humano...</p>
+        <p className="text-sm text-gray-500 font-medium">Cargando módulo de Reportes...</p>
       </div>
     );
   }
@@ -371,8 +500,8 @@ export const PanelTTHH: React.FC = () => {
     <div className="font-sans space-y-8">
 
       <div>
-        <h1 className="text-xl font-bold text-gray-800">Panel de Talento Humano (TTHH)</h1>
-        <p className="text-xs text-gray-500 mt-1">Control de consumos acumulados, nomina y aprobacion de devoluciones</p>
+        <h1 className="text-xl font-bold text-gray-800">Panel de Reportes</h1>
+        <p className="text-xs text-gray-500 mt-1">Control de consumos acumulados, nómina y aprobación de devoluciones</p>
       </div>
 
       {mensaje && (
@@ -521,55 +650,18 @@ export const PanelTTHH: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pb-2 sm:pb-0">
-                {activeTab === 'detalle' && (
-                  <div className="relative inline-block text-left">
-                    <button
-                      onClick={() => setShowDropdown(!showDropdown)}
-                      className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
-                    >
-                      <span>Descargar</span>
-                      <svg
-                        className={`h-3 w-3 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {showDropdown && (
-                      <div className="absolute right-0 mt-1.5 w-40 rounded-lg shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 border border-gray-200 py-1.5 divide-y divide-gray-50">
-                        <button
-                          onClick={() => {
-                            exportarCSV();
-                            setShowDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                        >
-                          <span className="text-gray-400">📄</span> CSV
-                        </button>
-                        <button
-                          onClick={() => {
-                            exportarXLSX();
-                            setShowDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-750 hover:bg-gray-50 flex items-center gap-2 transition"
-                        >
-                          <span className="text-emerald-600">📊</span> Excel
-                        </button>
-                        <button
-                          onClick={() => {
-                            exportarPDF();
-                            setShowDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-750 hover:bg-gray-50 flex items-center gap-2 transition"
-                        >
-                          <span className="text-red-600">📕</span> PDF
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                {activeTab === 'detalle' ? (
+                  <BotonDescargar
+                    onExportCSV={exportarCSV}
+                    onExportXLSX={exportarXLSX}
+                    onExportPDF={exportarPDF}
+                  />
+                ) : (
+                  <BotonDescargar
+                    onExportCSV={exportarResumenCSV}
+                    onExportXLSX={exportarResumenXLSX}
+                    onExportPDF={exportarResumenPDF}
+                  />
                 )}
                 <BotonRecargar
                   onRefresh={cargarDatos}

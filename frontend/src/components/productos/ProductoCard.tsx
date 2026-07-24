@@ -15,7 +15,7 @@ export const ProductoCard: React.FC<ProductoCardProps> = ({ producto, onAgregar 
       <div>
         <div className="flex justify-between items-start mb-3">
           <img
-            src={producto.foto || 'https://images.unsplash.com/photo-1546241072-48010ad2862c?auto=format&fit=crop&w=400&q=80'}
+            src={producto.foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg'}
             alt={producto.nombre}
             className="w-16 h-16 rounded-xl border border-gray-150 object-cover shadow-sm"
           />

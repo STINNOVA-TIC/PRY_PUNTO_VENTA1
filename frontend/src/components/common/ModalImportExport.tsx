@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { useModal } from '../../context/ModalContext';
 
 interface ColumnConfig {
   key: string;
@@ -23,6 +24,7 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
   data,
   onImport,
 }) => {
+  const { showAlert } = useModal();
   const [activeTab, setActiveTab] = useState<'export' | 'import'>('export');
   const [selectedColumns, setSelectedColumns] = useState<string[]>(columns.map((c) => c.key));
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
@@ -51,9 +53,13 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (selectedColumns.length === 0) {
-      alert('Debes seleccionar al menos una columna para exportar.');
+      await showAlert({
+        title: 'Selección Requerida',
+        message: 'Debes seleccionar al menos una columna para exportar.',
+        type: 'warning'
+      });
       return;
     }
 

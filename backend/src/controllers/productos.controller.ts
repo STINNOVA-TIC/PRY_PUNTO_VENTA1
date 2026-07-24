@@ -23,7 +23,7 @@ export const productosController = {
         stock_minimo: 5,
         categoria_id: row.categoria_id,
         proveedor_id: row.proveedor_id,
-        foto: row.producto_foto || 'https://images.unsplash.com/photo-1546241072-48010ad2862c?auto=format&fit=crop&w=400&q=80',
+        foto: row.producto_foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg',
         activo: row.producto_estado === 'activo'
       }));
 
@@ -61,7 +61,7 @@ export const productosController = {
           stock_minimo: 5,
           categoria_id: row.categoria_id,
           proveedor_id: row.proveedor_id,
-          foto: row.producto_foto || 'https://images.unsplash.com/photo-1546241072-48010ad2862c?auto=format&fit=crop&w=400&q=80',
+          foto: row.producto_foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg',
           activo: row.producto_estado === 'activo'
         }
       });
@@ -103,7 +103,7 @@ export const productosController = {
         provId = provRes.rows[0]?.proveedor_id;
       }
 
-      const defaultFoto = foto || 'https://images.unsplash.com/photo-1546241072-48010ad2862c?auto=format&fit=crop&w=400&q=80';
+      const defaultFoto = foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
 
       const insertRes = await pool.query(
         `INSERT INTO producto (categoria_id, proveedor_id, producto_codigo, producto_nombre, producto_descripcion, producto_precio, producto_precio_compra, producto_stock, producto_foto, producto_estado) 

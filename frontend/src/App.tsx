@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { ModalProvider } from './context/ModalContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { Layout } from './components/common/Layout';
 import { Login } from './components/auth/Login';
@@ -300,7 +301,8 @@ function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <SocketProvider>
-          <Routes>
+          <ModalProvider>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={
               <ProtectedRoute>
@@ -420,6 +422,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <PwaInstaller />
+          </ModalProvider>
         </SocketProvider>
       </AuthProvider>
     </BrowserRouter>

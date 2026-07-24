@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import logoEmpresa from '../../assets/logo.png';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useModal } from '../../context/ModalContext';
 
 interface VistaImpresionRequerimientoProps {
   orden: any;
@@ -10,6 +11,7 @@ interface VistaImpresionRequerimientoProps {
 }
 
 export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoProps> = ({ orden, empresas, onClose }) => {
+  const { showAlert } = useModal();
   const [downloading, setDownloading] = useState(false);
 
 
@@ -18,7 +20,11 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
       setDownloading(true);
       const element = document.getElementById('print-area');
       if (!element) {
-        alert('No se encontró el área de impresión.');
+        await showAlert({
+          title: 'Error de Impresión',
+          message: 'No se encontró el área de impresión.',
+          type: 'danger'
+        });
         return;
       }
 
@@ -97,7 +103,11 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
       pdf.save(`Requerimiento-${orden.orden_compra_codigo || '001'}.pdf`);
     } catch (error) {
       console.error('Error generando PDF:', error);
-      alert('Hubo un error al generar el archivo PDF.');
+      await showAlert({
+        title: 'Error de Generación',
+        message: 'Hubo un error al generar el archivo PDF.',
+        type: 'danger'
+      });
     } finally {
       setDownloading(false);
     }

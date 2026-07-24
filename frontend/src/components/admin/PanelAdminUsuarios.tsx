@@ -3,8 +3,10 @@ import { usuariosAPI, UsuarioOperador } from '../../api/usuarios.api';
 import { empleadosAPI } from '../../api/empleados.api';
 import { Empleado } from '../../types';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { useModal } from '../../context/ModalContext';
 
 export const PanelAdminUsuarios: React.FC = () => {
+  const { showConfirm } = useModal();
   const [usuarios, setUsuarios] = useState<UsuarioOperador[]>([]);
   const [roles, setRoles] = useState<{ id: number; nombre: string; descripcion: string }[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -104,7 +106,13 @@ export const PanelAdminUsuarios: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar o inactivar a este operador del sistema?')) return;
+    const confirmed = await showConfirm({
+      title: 'Confirmar Acción',
+      message: '¿Estás seguro de eliminar o inactivar a este operador del sistema?',
+      confirmLabel: 'Inactivar/Eliminar',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       const res = await usuariosAPI.delete(id);
