@@ -9,7 +9,7 @@ export const productosController = {
   getAll: async (_req: AuthRequest, res: Response): Promise<void> => {
     try {
       const prodRes = await pool.query(
-        "SELECT * FROM producto WHERE producto_estado = 'activo' ORDER BY producto_nombre ASC"
+        "SELECT * FROM producto ORDER BY producto_nombre ASC"
       );
 
       const items = prodRes.rows.map(row => ({
@@ -108,8 +108,18 @@ export const productosController = {
       const insertRes = await pool.query(
         `INSERT INTO producto (categoria_id, proveedor_id, producto_codigo, producto_nombre, producto_descripcion, producto_precio, producto_precio_compra, producto_stock, producto_foto, producto_estado) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo') 
+         ON CONFLICT (producto_codigo) DO UPDATE SET
+           categoria_id = EXCLUDED.categoria_id,
+           proveedor_id = EXCLUDED.proveedor_id,
+           producto_nombre = EXCLUDED.producto_nombre,
+           producto_descripcion = EXCLUDED.producto_descripcion,
+           producto_precio = EXCLUDED.producto_precio,
+           producto_precio_compra = EXCLUDED.producto_precio_compra,
+           producto_stock = EXCLUDED.producto_stock,
+           producto_foto = EXCLUDED.producto_foto,
+           producto_estado = 'activo'
          RETURNING *`,
-        [catId, provId, codigo_barras.trim(), nombre.trim(), descripcion || '', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]
+        [catId, provId, String(codigo_barras).trim(), String(nombre).trim(), descripcion || '', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]
       );
 
       res.status(201).json({
@@ -119,6 +129,7 @@ export const productosController = {
       });
       return;
     } catch (error) {
+      console.error('Error en productosController.create:', error);
       if (error instanceof AppError) throw error;
       throw new AppError('Error al crear producto en base de datos', 500);
     }

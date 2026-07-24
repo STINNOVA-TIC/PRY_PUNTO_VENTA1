@@ -92,7 +92,7 @@ exports.authController = {
                 throw new error_middleware_1.AppError('La contraseña debe tener al menos 6 caracteres', 400);
             }
             // Buscar usuario en PostgreSQL
-            const userRes = await db_1.default.query("SELECT * FROM usuario WHERE usuario_email = $1 AND usuario_estado = 'activo'", [email.trim()]);
+            const userRes = await db_1.default.query("SELECT * FROM usuario WHERE usuario_email = $1 AND usuario_estado = 'activo'", [email.trim().toLowerCase()]);
             const user = userRes.rows[0];
             if (!user) {
                 throw new error_middleware_1.AppError('Credenciales incorrectas', 401);

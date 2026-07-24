@@ -39,6 +39,7 @@ exports.empleadosController = {
                 departamento_id: row.departamento_id,
                 departamento: row.departamento_nombre || 'Sin Departamento',
                 centro_costos_id: row.centro_costos_id,
+                centro_costos: row.centro_costos_nombre || 'Sin Centro de Costos',
                 cargo: row.empleado_cargo || 'Empleado',
                 email: row.empleado_email || '',
                 foto_perfil: row.empleado_foto || `https://ui-avatars.com/api/?name=${row.empleado_nombre}+${row.empleado_apellido}&size=128`,

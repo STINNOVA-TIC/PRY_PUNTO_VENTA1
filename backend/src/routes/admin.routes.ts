@@ -44,5 +44,6 @@ router.get('/:table', authorizeCrud, adminController.read);
 router.post('/:table', authorizeCrud, adminController.create);
 router.put('/:table/:id', authorizeCrud, adminController.update);
 router.patch('/:table/:id/status', authorizeCrud, adminController.toggleStatus);
+router.delete('/:table/:id', authorizeCrud, adminController.delete);
 
 export default router;

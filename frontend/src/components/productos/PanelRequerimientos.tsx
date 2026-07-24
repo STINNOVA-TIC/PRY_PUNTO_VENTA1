@@ -481,7 +481,7 @@ export const PanelRequerimientos: React.FC = () => {
                 className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
               >
                 <option value="">-- Servicio o Artículo Personalizado --</option>
-                {productos.map(p => (
+                {productos.filter(p => p.activo).map(p => (
                   <option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock_actual})</option>
                 ))}
               </select>

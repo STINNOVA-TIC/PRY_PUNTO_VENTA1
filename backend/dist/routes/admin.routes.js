@@ -22,8 +22,8 @@ const authorizeCrud = async (req, _res, next) => {
         if (rol === 'admin') {
             return next();
         }
-        // Inventario puede LEER todas las tablas (para llenar desplegables)
-        if (rol === 'inventario' && req.method === 'GET') {
+        // Inventario y Guardia pueden LEER todas las tablas (para llenar desplegables)
+        if ((rol === 'inventario' || rol === 'guardia') && req.method === 'GET') {
             return next();
         }
         // Inventario puede hacer CRUD completo (escribir) a productos, proveedor y categoría

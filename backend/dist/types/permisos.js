@@ -13,7 +13,7 @@ exports.GruposPermisos = {
         'empleados.editar', 'empleados.eliminar', 'empleados.activar',
         'empleados.desactivar', 'empleados.ver_historial_compras',
         'productos.ver', 'productos.crear', 'productos.editar', 'productos.eliminar',
-        'productos.activar', 'productos.desactivar',
+        'productos.activar', 'productos.desactivar', 'productos.importar',
         'inventario.ver', 'inventario.ver_movimientos', 'inventario.ajustar_stock',
         'inventario.ingresar_mercancia', 'inventario.ver_costos',
         'ventas.realizar', 'ventas.ver', 'ventas.anular', 'ventas.cancelar',

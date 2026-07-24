@@ -6,8 +6,13 @@ import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { useModal } from '../../context/ModalContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const PanelInventario: React.FC = () => {
+  const { user } = useAuth();
+  const rol = user?.rol.nombre;
+  const { showConfirm, showAlert } = useModal();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<{ id: number; nombre: string }[]>([]);
@@ -187,8 +192,51 @@ export const PanelInventario: React.FC = () => {
     setFormSuccess('');
   };
 
+  const handleDeleteProduct = async (id: number) => {
+    const confirm = await showConfirm({
+      title: 'Eliminar Producto',
+      message: '¿Está seguro de que desea eliminar permanentemente este producto de la base de datos? Esta acción no se puede deshacer.',
+      type: 'danger'
+    });
+
+    if (confirm) {
+      try {
+        await adminAPI.delete('producto', id);
+        cargarDatos();
+      } catch (err: any) {
+        await showAlert({
+          title: 'Error al Eliminar',
+          message: err.response?.data?.message || 'No se pudo eliminar el producto físicamente de la base de datos.',
+          type: 'danger'
+        });
+      }
+    }
+  };
+
+  const handleToggleProductStatus = async (id: number, currentStatus: boolean) => {
+    const actionText = currentStatus ? 'desactivar' : 'activar';
+    const confirm = await showConfirm({
+      title: `${currentStatus ? 'Desactivar' : 'Activar'} Producto`,
+      message: `¿Está seguro de que desea ${actionText} este producto?`,
+      type: 'warning'
+    });
+
+    if (confirm) {
+      try {
+        await adminAPI.toggleStatus('producto', id, !currentStatus);
+        cargarDatos();
+      } catch (err: any) {
+        await showAlert({
+          title: 'Error',
+          message: err.response?.data?.message || 'No se pudo cambiar el estado del producto',
+          type: 'danger'
+        });
+      }
+    }
+  };
+
   const columnsConfig = [
-    { key: 'codigo_barras', label: 'Código barras' },
+    { key: 'codigo_barras', label: 'Código' },
     { key: 'nombre', label: 'Nombre' },
     { key: 'descripcion', label: 'Descripción' },
     { key: 'precio_costo', label: 'Precio Compra ($)' },
@@ -631,6 +679,7 @@ export const PanelInventario: React.FC = () => {
                   <th className="px-5 py-3.5">Precio Compra</th>
                   <th className="px-5 py-3.5">Precio Venta</th>
                   <th className="px-5 py-3.5">Existencia</th>
+                  <th className="px-5 py-3.5">Estado</th>
                   <th className="px-5 py-3.5 text-right">Acción</th>
                 </tr>
               </thead>
@@ -667,6 +716,15 @@ export const PanelInventario: React.FC = () => {
                           )}
                         </div>
                       </td>
+                      <td className="px-5 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          p.activo 
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                            : 'bg-red-50 text-red-650 border-red-100'
+                        }`}>
+                          {p.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex gap-2 justify-end items-center">
                           {editingStockId === p.id ? (
@@ -695,19 +753,37 @@ export const PanelInventario: React.FC = () => {
                             <>
                               <button
                                 onClick={() => handleEditProductClick(p)}
-                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
+                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-650 rounded-lg font-semibold text-[10px] transition"
                               >
                                 Editar Detalle
+                              </button>
+                              <button
+                                onClick={() => handleToggleProductStatus(p.id, p.activo)}
+                                className={`px-3 py-1.5 border rounded-lg font-semibold text-[10px] transition ${
+                                  p.activo 
+                                    ? 'border-amber-250 hover:bg-amber-50 text-amber-600' 
+                                    : 'border-emerald-250 hover:bg-emerald-50 text-emerald-600'
+                                }`}
+                              >
+                                {p.activo ? 'Desactivar' : 'Activar'}
                               </button>
                               <button
                                 onClick={() => {
                                   setEditingStockId(p.id);
                                   setNewStockVal(p.stock_actual.toString());
                                 }}
-                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
+                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-655 rounded-lg font-semibold text-[10px] transition"
                               >
                                 Ajustar Stock
                               </button>
+                              {rol === 'admin' && (
+                                <button
+                                  onClick={() => handleDeleteProduct(p.id)}
+                                  className="px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg font-semibold text-[10px] transition"
+                                >
+                                  Eliminar
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

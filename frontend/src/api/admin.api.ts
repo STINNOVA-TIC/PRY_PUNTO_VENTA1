@@ -21,6 +21,11 @@ export const adminAPI = {
     return response.data;
   },
 
+  delete: async (table: string, id: number) => {
+    const response = await api.delete(`/admin/crud/${table}/${id}`);
+    return response.data;
+  },
+
   uploadPhoto: async (file: File, type: 'empleado' | 'producto' | 'entrega'): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append('foto', file);
