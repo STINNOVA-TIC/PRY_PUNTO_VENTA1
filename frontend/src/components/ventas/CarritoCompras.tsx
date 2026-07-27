@@ -58,6 +58,11 @@ export const CarritoCompras: React.FC = () => {
     }
   };
 
+  const clearCart = () => {
+    setItems([]);
+    setMensaje('');
+  };
+
   const totalNeto = items.reduce((sum, i) => sum + i.producto.precio_venta * i.cantidad, 0);
 
   const realizarVenta = async () => {
@@ -201,9 +206,16 @@ export const CarritoCompras: React.FC = () => {
 
           {/* Carrito de Compras */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col min-h-0 flex-grow space-y-3">
-            <h2 className="text-base font-semibold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-2 flex-shrink-0">
-              Carrito de Compras
-            </h2>
+            <div className="flex justify-between items-center text-base font-semibold text-gray-800 border-b border-gray-100 pb-2 flex-shrink-0">
+              <h2 className="flex items-center gap-2">
+                Carrito de Compras
+              </h2>
+              <button onClick={clearCart} title="Vaciar carrito" className="text-gray-600 hover:text-red-600 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M9 6v12m6-12v12M5 6l1 14a2 2 0 002 2h8a2 2 0 002-2l1-14" />
+                </svg>
+              </button>
+            </div>
 
             {items.length === 0 ? (
               <div className="flex-grow flex items-center justify-center text-center text-gray-400 text-xs py-4">
@@ -302,15 +314,27 @@ export const CarritoCompras: React.FC = () => {
               El cobro será descontado de tu nómina a fin de mes.
             </p>
 
-            <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                setCodigoRetiroResult('');
-              }}
-              className="w-full bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-xs font-semibold shadow-sm transition active:scale-95"
-            >
-              Entendido / Cerrar
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setCodigoRetiroResult('');
+                }}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-xs font-semibold shadow-sm transition active:scale-95"
+              >
+                Continuar Comprando
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setCodigoRetiroResult('');
+                  handleSalir();
+                }}
+                className="w-full bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 py-2.5 rounded-lg text-xs font-bold transition active:scale-95"
+              >
+                Salir
+              </button>
+            </div>
           </div>
         </div>
       )}
