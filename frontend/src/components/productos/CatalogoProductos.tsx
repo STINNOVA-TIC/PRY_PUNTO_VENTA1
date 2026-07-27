@@ -67,7 +67,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarP
 
   const filtered = productos.filter(p => {
     if (!p.activo) return false;
-    const matchesSearch = p.nombre.toLowerCase().includes(search.toLowerCase()) || p.codigo_barras.includes(search);
+    const matchesSearch = 
+      p.nombre.toLowerCase().includes(search.toLowerCase()) || 
+      (p.descripcion && p.descripcion.toLowerCase().includes(search.toLowerCase())) ||
+      p.codigo_barras.includes(search);
     if (!matchesSearch) return false;
     
     if (selectedCategoryId === 'ALL') return true;
