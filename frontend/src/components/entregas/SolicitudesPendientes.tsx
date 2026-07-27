@@ -81,7 +81,10 @@ export const SolicitudesPendientes: React.FC = () => {
   // Filtrado de solicitudes en base a pestaña y buscador
   const solicitudesFiltradas = useMemo(() => {
     return solicitudes.filter((sol) => {
-      const matchEstado = activeTab === 'pendientes' ? sol.estado === 'pendiente' : sol.estado === 'entregado';
+      const estadoStr = sol.estado as string;
+      const matchEstado = activeTab === 'pendientes' 
+        ? estadoStr === 'pendiente' 
+        : (estadoStr === 'entregado' || estadoStr === 'no_entregado' || estadoStr === 'cancelado' || estadoStr === 'cancelada' || estadoStr === 'completada');
       if (!matchEstado) return false;
 
       const query = searchQuery.toLowerCase().trim();
@@ -95,7 +98,12 @@ export const SolicitudesPendientes: React.FC = () => {
   }, [solicitudes, activeTab, searchQuery]);
 
   const currentCount = useMemo(() => {
-    return solicitudes.filter((sol) => activeTab === 'pendientes' ? sol.estado === 'pendiente' : sol.estado === 'entregado').length;
+    return solicitudes.filter((sol) => {
+      const estadoStr = sol.estado as string;
+      return activeTab === 'pendientes' 
+        ? estadoStr === 'pendiente' 
+        : (estadoStr === 'entregado' || estadoStr === 'no_entregado' || estadoStr === 'cancelado' || estadoStr === 'cancelada' || estadoStr === 'completada');
+    }).length;
   }, [solicitudes, activeTab]);
 
   if (loading) {

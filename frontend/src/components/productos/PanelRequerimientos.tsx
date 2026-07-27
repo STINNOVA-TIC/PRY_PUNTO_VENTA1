@@ -6,8 +6,11 @@ import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
 
+import { useModal } from '../../context/ModalContext';
+
 export const PanelRequerimientos: React.FC = () => {
   const { user } = useAuth();
+  const { showConfirm } = useModal();
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -274,6 +277,30 @@ export const PanelRequerimientos: React.FC = () => {
       setError(err.response?.data?.message || 'Error al guardar el requerimiento en el servidor.');
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleEliminarOrden = async (ordenId: number) => {
+    const confirmed = await showConfirm({
+      title: 'Confirmar Eliminación',
+      message: '¿Estás seguro de que deseas eliminar esta orden de reabastecimiento? Esta acción es irreversible.',
+      confirmLabel: 'Sí, eliminar',
+      cancelLabel: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setSuccess('');
+      const res = await ordenesAPI.eliminar(ordenId);
+      if (res.success) {
+        setSuccess('Orden de reabastecimiento eliminada con éxito.');
+        setOrdenes(prev => prev.filter(o => o.id !== ordenId));
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al intentar eliminar la orden.');
     }
   };
 
@@ -925,13 +952,24 @@ export const PanelRequerimientos: React.FC = () => {
                           {oc.estado}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleOpenPrintPreview(oc.id)}
                           className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-[10px] font-bold transition shadow-sm"
                         >
                           Ver / Imprimir PDF
                         </button>
+                        {user?.rol.nombre === 'admin' && (
+                          <button
+                            onClick={() => handleEliminarOrden(oc.id)}
+                            title="Eliminar Orden"
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition active:scale-95"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

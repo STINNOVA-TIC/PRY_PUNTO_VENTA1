@@ -12,5 +12,6 @@ router.get('/', ordenesController.getAll);
 router.get('/secuencial/siguiente', ordenesController.getSiguienteSecuencial);
 router.get('/:id', ordenesController.getById);
 router.put('/:id/entregar', ordenesController.entregar);
+router.delete('/:id', ordenesController.eliminar);
 
 export default router;

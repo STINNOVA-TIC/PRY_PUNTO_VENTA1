@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ventasAPI } from '../../api/ventas.api';
 import { Producto, CreateVentaRequest } from '../../types';
@@ -18,12 +18,35 @@ export const CarritoCompras: React.FC = () => {
   const [codigoRetiroResult, setCodigoRetiroResult] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'productos' | 'carrito'>('productos');
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    let timer: any;
+    if (showSuccessModal) {
+      setCountdown(5);
+      timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleSalir();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showSuccessModal]);
 
   const agregarProducto = (producto: Producto) => {
     setMensaje('');
     setCodigoRetiroResult('');
 
+    // Siempre buscamos el producto en la lista original de items para saber qué cantidad ya hay en el carrito
     const existing = items.find(i => i.producto.id === producto.id);
+    
     if (existing) {
       if (existing.cantidad < producto.stock_actual) {
         setItems(items.map(i =>
@@ -288,7 +311,24 @@ export const CarritoCompras: React.FC = () => {
         {/* PANEL DERECHO: Catalogo de Productos */}
         <div className={`${activeTab === 'productos' ? 'flex' : 'hidden'} md:flex md:col-span-2 lg:col-span-3 flex-col min-h-0 bg-white border border-gray-200 rounded-xl p-5 shadow-sm`}>
           <div className="overflow-y-auto flex-grow pr-1">
-            <CatalogoProductos onAgregarProducto={agregarProducto} />
+            <CatalogoProductos 
+              onAgregarProducto={agregarProducto} 
+              onProductosLoaded={(prods) => {
+                // Sincronizar los items del carrito con el stock_actual fresco del catálogo al cargar/actualizar
+                setItems(prevItems => prevItems.map(item => {
+                  const match = prods.find(p => p.id === item.producto.id);
+                  if (match) {
+                    return {
+                      ...item,
+                      producto: { ...item.producto, stock_actual: match.stock_actual },
+                      // Limitar la cantidad al stock real disponible en caso de desfase
+                      cantidad: Math.min(item.cantidad, match.stock_actual)
+                    };
+                  }
+                  return item;
+                }).filter(item => item.producto.stock_actual > 0)); // Eliminar del carrito si ya no existe stock disponible
+              }}
+            />
           </div>
         </div>
       </div>
@@ -332,7 +372,7 @@ export const CarritoCompras: React.FC = () => {
                 }}
                 className="w-full bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 py-2.5 rounded-lg text-xs font-bold transition active:scale-95"
               >
-                Salir
+                Salir ({countdown}s)
               </button>
             </div>
           </div>

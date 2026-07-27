@@ -24,5 +24,10 @@ export const ordenesAPI = {
   entregar: async (id: number | string, facturas: string[]) => {
     const response = await api.put(`/ordenes-compra/${id}/entregar`, { facturas });
     return response.data;
+  },
+
+  eliminar: async (id: number | string) => {
+    const response = await api.delete(`/ordenes-compra/${id}`);
+    return response.data;
   }
 };

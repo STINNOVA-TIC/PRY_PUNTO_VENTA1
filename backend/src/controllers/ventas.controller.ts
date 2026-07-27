@@ -201,7 +201,13 @@ export const ventasController = {
 
       if (req.io) {
         req.io.emit('entrega-pendiente', { id: solId, codigo_entrega: codigoRetiro });
-        console.log('📡 WebSocket: Emitido entrega-pendiente para', codigoRetiro);
+        req.io.emit('stock-actualizado', {
+          productos: calculatedDetails.map(d => ({
+            producto_id: d.producto_id,
+            cantidad: d.cantidad
+          }))
+        });
+        console.log('📡 WebSocket: Emitido entrega-pendiente y stock-actualizado para', codigoRetiro);
       }
 
       res.status(201).json({

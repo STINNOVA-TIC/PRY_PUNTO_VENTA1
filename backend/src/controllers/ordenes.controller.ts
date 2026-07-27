@@ -496,5 +496,44 @@ export const ordenesController = {
     } finally {
       client.release();
     }
+  },
+
+  // Eliminar orden de reabastecimiento (Solo para rol Admin)
+  eliminar: async (req: AuthRequest, res: Response): Promise<void> => {
+    // El rol_id de admin en base de datos/rolesData es 1
+    if (req.user?.rol_id !== 1) {
+      throw new AppError('Acceso denegado. Solo administradores pueden eliminar órdenes.', 403);
+    }
+
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Validar que la orden existe
+      const ocRes = await client.query('SELECT * FROM orden_compra WHERE orden_compra_id = $1', [id]);
+      if (ocRes.rows.length === 0) {
+        throw new AppError('La orden de reabastecimiento no existe', 404);
+      }
+
+      // 2. Eliminar detalles de la orden
+      await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
+
+      // 3. Eliminar cabecera de la orden
+      await client.query('DELETE FROM orden_compra WHERE orden_compra_id = $1', [id]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Orden de reabastecimiento eliminada correctamente.'
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error instanceof AppError) throw error;
+      throw new AppError('Error al eliminar la orden de reabastecimiento', 500);
+    } finally {
+      client.release();
+    }
   }
 };

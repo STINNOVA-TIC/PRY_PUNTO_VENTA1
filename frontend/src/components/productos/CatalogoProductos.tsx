@@ -3,20 +3,51 @@ import { productosAPI } from '../../api/productos.api';
 import { Producto } from '../../types';
 import { ProductoCard } from './ProductoCard';
 
+import { useSocket } from '../../context/SocketContext';
+
 interface CatalogoProductosProps {
   onAgregarProducto?: (producto: Producto) => void;
+  onProductosLoaded?: (productos: Producto[]) => void;
 }
 
-export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarProducto }) => {
+export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarProducto, onProductosLoaded }) => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<{ id: number; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | 'ALL'>('ALL');
+  const { socket } = useSocket();
 
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  useEffect(() => {
+    if (onProductosLoaded && productos.length > 0) {
+      onProductosLoaded(productos);
+    }
+  }, [productos, onProductosLoaded]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('stock-actualizado', (data: { productos: { producto_id: number; cantidad: number }[] }) => {
+      setProductos((prev) =>
+        prev.map((prod) => {
+          const updated = data.productos.find((p) => p.producto_id === prod.id);
+          if (updated) {
+            const nuevoStock = Math.max(0, prod.stock_actual - updated.cantidad);
+            return { ...prod, stock_actual: nuevoStock };
+          }
+          return prod;
+        })
+      );
+    });
+
+    return () => {
+      socket.off('stock-actualizado');
+    };
+  }, [socket]);
 
   const cargarDatos = async () => {
     try {
