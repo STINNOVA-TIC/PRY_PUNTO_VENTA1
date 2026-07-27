@@ -292,6 +292,30 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     N/A
                   </td>
                 </tr>
+                <tr className="border-b border-gray-400">
+                  <td className="border-r border-gray-400 bg-gray-50 px-2 py-1 font-bold" colSpan={2}></td>
+                  <td className="border-r border-gray-400 bg-gray-50 px-2 py-1 font-bold">Tipo de Compra:</td>
+                  <td className="px-2 py-1">
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1.5 select-none">
+                        <span className={`inline-block w-3 h-3 border border-gray-600 flex-shrink-0 flex items-center justify-center ${
+                          (orden.orden_compra_tipo_compra || 'LOCAL').toUpperCase() === 'LOCAL' ? 'bg-amber-500 font-extrabold text-[8px]' : 'bg-white'
+                        }`}>
+                          {(orden.orden_compra_tipo_compra || 'LOCAL').toUpperCase() === 'LOCAL' ? 'X' : ''}
+                        </span>
+                        <span className="font-semibold text-gray-700 uppercase">LOCAL</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 select-none">
+                        <span className={`inline-block w-3 h-3 border border-gray-600 flex-shrink-0 flex items-center justify-center ${
+                          orden.orden_compra_tipo_compra?.toUpperCase() === 'INTERNACIONAL' ? 'bg-amber-500 font-extrabold text-[8px]' : 'bg-white'
+                        }`}>
+                          {orden.orden_compra_tipo_compra?.toUpperCase() === 'INTERNACIONAL' ? 'X' : ''}
+                        </span>
+                        <span className="font-semibold text-gray-700 uppercase">INTERNACIONAL</span>
+                      </label>
+                    </div>
+                  </td>
+                </tr>
                 <tr>
                   <td className="border-r border-gray-400 bg-gray-50 px-2 py-1 font-bold">Justificacion de Necesidad:</td>
                   <td className="px-2 py-1 font-medium text-gray-700" colSpan={3}>

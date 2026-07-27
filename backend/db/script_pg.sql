@@ -299,6 +299,7 @@ CREATE TABLE orden_compra (
     orden_compra_plazo_pago VARCHAR(50) NULL,
     orden_compra_tiempo_entrega VARCHAR(50) NULL,
     orden_compra_lugar_recepcion VARCHAR(255) NULL,
+    orden_compra_tipo_compra VARCHAR(20) NOT NULL DEFAULT 'LOCAL' CHECK (orden_compra_tipo_compra IN ('LOCAL', 'INTERNACIONAL')),
 
     -- Características específicas
     orden_compra_requiere_contrato BOOLEAN DEFAULT FALSE,

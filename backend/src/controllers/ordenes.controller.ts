@@ -33,7 +33,8 @@ export const ordenesController = {
         elaborado_por,
         aprobado_por,
         recibido_por,
-        detalles
+        detalles,
+        tipo_compra
       } = req.body;
 
       if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
@@ -92,9 +93,9 @@ export const ordenesController = {
            orden_compra_requiere_contrato, orden_compra_requiere_seguro, orden_compra_requiere_mantenimiento,
            orden_compra_asignado_trabajador, orden_compra_trabajador_asignado, orden_compra_caracteristicas,
            orden_compra_elaborado_por, orden_compra_aprobado_por, orden_compra_recibido_por,
-           orden_compra_estado
+           orden_compra_estado, orden_compra_tipo_compra
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente') 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente', $25) 
          RETURNING orden_compra_id`,
         [
           empresa_id,
@@ -120,7 +121,8 @@ export const ordenesController = {
           caracteristicas || null,
           elaborado_por || null,
           aprobado_por || null,
-          recibido_por || null
+          recibido_por || null,
+          tipo_compra || 'LOCAL'
         ]
       );
       const ocId = ocRes.rows[0].orden_compra_id;

@@ -31,6 +31,7 @@ export const PanelRequerimientos: React.FC = () => {
   const [justificacion, setJustificacion] = useState('');
   const [tipoArticulo, setTipoArticulo] = useState('OTROS');
   const [secuencialPreview, setSecuencialPreview] = useState('Cargando...');
+  const [tipoCompra, setTipoCompra] = useState('LOCAL');
 
   // Formulario de ítem local
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('');
@@ -251,7 +252,8 @@ export const PanelRequerimientos: React.FC = () => {
         elaborado_por: elaboradoPor,
         aprobado_por: aprobadoPor,
         recibido_por: recibidoPor,
-        detalles: detallesLocales
+        detalles: detallesLocales,
+        tipo_compra: tipoCompra
       };
 
       const res = await ordenesAPI.crear(payload);
@@ -262,6 +264,7 @@ export const PanelRequerimientos: React.FC = () => {
         setCaracteristicas('');
         setAsignadoTrabajador(false);
         setTrabajadorAsignado('');
+        setTipoCompra('LOCAL');
         
         // Recargar el historial
         const ordRes = await ordenesAPI.getAll();
@@ -410,6 +413,20 @@ export const PanelRequerimientos: React.FC = () => {
               <div className="w-full px-3.5 py-2 border border-amber-250 bg-amber-50/50 text-amber-800 font-mono font-bold rounded-xl text-sm">
                 {secuencialPreview}
               </div>
+            </div>
+
+            {/* Tipo de Compra */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo de Compra</label>
+              <select
+                value={tipoCompra}
+                onChange={(e) => setTipoCompra(e.target.value)}
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
+                required
+              >
+                <option value="LOCAL">LOCAL</option>
+                <option value="INTERNACIONAL">INTERNACIONAL</option>
+              </select>
             </div>
 
           </div>
