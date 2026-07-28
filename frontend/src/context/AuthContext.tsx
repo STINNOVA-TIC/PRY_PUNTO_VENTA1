@@ -7,6 +7,7 @@ import { Usuario } from '../types';
 interface AuthContextType {
   user: Usuario | null;
   loading: boolean;
+  isShopSession: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginByCedula: (cedula: string) => Promise<void>;
   logout: () => void;
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isShopSession, setIsShopSession] = useState<boolean>(false);
   const lastActivity = useRef<number>(Date.now());
 
   const hasPermission = (permiso: Permiso): boolean => {
@@ -49,7 +51,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(usuario));
+      localStorage.setItem('isShopSession', 'false');
       setUser(usuario);
+      setIsShopSession(false);
       lastActivity.current = Date.now();
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
@@ -64,7 +68,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(usuario));
+      localStorage.setItem('isShopSession', 'true');
       setUser(usuario);
+      setIsShopSession(true);
       lastActivity.current = Date.now();
     } catch (error) {
       console.error('Error al iniciar sesión de empleado:', error);
@@ -75,7 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('isShopSession');
     setUser(null);
+    setIsShopSession(false);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
@@ -86,12 +94,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const token = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
+      const storedIsShop = localStorage.getItem('isShopSession');
       
       if (token && storedUser) {
         const userData = JSON.parse(storedUser);
         // Pasar el token en la petición para validar en backend
         await authAPI.verifyToken(token);
         setUser(userData);
+        setIsShopSession(storedIsShop === 'true');
         lastActivity.current = Date.now();
       } else {
         logout();
@@ -152,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       loading,
+      isShopSession,
       login,
       loginByCedula,
       logout,

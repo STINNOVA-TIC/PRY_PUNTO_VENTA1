@@ -19,14 +19,12 @@ router.get(
 // GET /api/empleados/departamentos
 router.get(
   '/departamentos',
-  requirePermission('empleados.ver'),
   empleadosController.getDepartamentos
 );
 
 // GET /api/empleados/centros-costos
 router.get(
   '/centros-costos',
-  requirePermission('empleados.ver'),
   empleadosController.getCentrosCostos
 );
 

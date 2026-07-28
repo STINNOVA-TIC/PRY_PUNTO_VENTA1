@@ -46,12 +46,48 @@ export const authController = {
         throw new AppError('Cédula no registrada o empleado inactivo', 401);
       }
 
-      // Generar Token JWT con rol_id = 3 (empleado) y el ID del empleado
+      // Buscar si el empleado tiene un usuario asociado para obtener sus permisos reales
+      const userRolesRes = await pool.query(
+        `SELECT ur.rol_id, u.usuario_id 
+         FROM usuario u
+         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+         WHERE u.empleado_id = $1 AND u.usuario_estado = 'activo'`,
+        [empleado.empleado_id]
+      );
+
+      let rolId = 3; // Por defecto rol de empleado
+      let userId = 0;
+
+      if (userRolesRes.rows.length > 0) {
+        userId = userRolesRes.rows[0].usuario_id;
+        const rolesList = userRolesRes.rows.map(r => r.rol_id);
+        const matchedRoles = rolesData.filter(r => rolesList.includes(r.id));
+        matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
+        if (matchedRoles.length > 0) {
+          rolId = matchedRoles[0].id;
+        }
+      }
+
+      const staticRole = rolesData.find(r => r.id === rolId);
+      const rolNombre = staticRole?.nombre || 'empleado';
+      const permisos = staticRole?.permisos || GruposPermisos.EMPLEADO;
+
+      // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
+      const autoconsumoCheck = await pool.query(
+        `SELECT 1 FROM usuario u
+         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+         WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+         LIMIT 1`,
+        [empleado.empleado_id]
+      );
+      const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+
+      // Generar Token JWT con el rol y el ID real/virtual
       const token = jwt.sign(
         { 
-          id: 0,
+          id: userId,
           empleado_id: empleado.empleado_id, 
-          rol_id: 3 
+          rol_id: rolId 
         },
         process.env.JWT_SECRET || 'secret',
         { expiresIn: '8h' }
@@ -62,14 +98,15 @@ export const authController = {
         data: {
           token,
           usuario: {
-            id: 0,
+            id: userId,
             nombre: `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
             email: empleado.empleado_email || '',
             rol: {
-              id: 3,
-              nombre: 'empleado',
-              permisos: GruposPermisos.EMPLEADO
+              id: rolId,
+              nombre: rolNombre,
+              permisos
             },
+            permitir_autoconsumo: permitirAutoconsumo,
             empleado: {
               id: empleado.empleado_id,
               codigo_empleado: empleado.empleado_cedula,
@@ -169,6 +206,14 @@ export const authController = {
         }
       }
 
+      // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
+      const autoconsumoCheck = await pool.query(
+        `SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 8`,
+        [user.usuario_id]
+      );
+      const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+
       // Generar Token JWT
       const token = jwt.sign(
         { 
@@ -192,6 +237,7 @@ export const authController = {
               nombre: rolNombre,
               permisos
             },
+            permitir_autoconsumo: permitirAutoconsumo,
             empleado
           }
         }
@@ -258,6 +304,23 @@ export const authController = {
         }
       }
 
+      // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
+      let permitirAutoconsumo = false;
+      const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0 
+        ? (await pool.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id 
+        : null);
+      
+      if (targetEmpId) {
+        const autoconsumoCheck = await pool.query(
+          `SELECT 1 FROM usuario u
+           JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+           WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+           LIMIT 1`,
+          [targetEmpId]
+        );
+        permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+      }
+
       res.json({
         success: true,
         data: {
@@ -269,6 +332,7 @@ export const authController = {
             nombre: rolNombre,
             permisos
           },
+          permitir_autoconsumo: permitirAutoconsumo,
           empleado
         }
       });
@@ -300,38 +364,75 @@ export const authController = {
            WHERE e.empleado_id = $1 AND e.empleado_estado = 'activo'`,
           [decoded.empleado_id]
         );
-        if (empRes.rows.length === 0) {
-          throw new AppError('Empleado inactivo', 401);
-        }
-        const empleado = empRes.rows[0];
+         if (empRes.rows.length === 0) {
+           throw new AppError('Empleado inactivo', 401);
+         }
+         const empleado = empRes.rows[0];
 
-        res.json({
-          success: true,
-          data: {
-            valid: true,
-            user: {
-              id: 0,
-              nombre: `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
-              email: empleado.empleado_email || '',
-              rol: {
-                id: 3,
-                nombre: 'empleado',
-                permisos: GruposPermisos.EMPLEADO
-              },
-              empleado: {
-                id: empleado.empleado_id,
-                codigo_empleado: empleado.empleado_cedula,
-                nombre: empleado.empleado_nombre,
-                apellido: empleado.empleado_apellido,
-                cargo: empleado.empleado_cargo,
-                foto_perfil: empleado.empleado_foto,
-                departamento: empleado.departamento_nombre || 'General',
-                centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
-              }
+          // Buscar si el empleado tiene un usuario asociado para obtener sus permisos reales
+          const userRolesRes = await pool.query(
+            `SELECT ur.rol_id, u.usuario_id 
+             FROM usuario u
+             JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+             WHERE u.empleado_id = $1 AND u.usuario_estado = 'activo'`,
+            [empleado.empleado_id]
+          );
+
+          let rolId = 3; // Por defecto rol de empleado
+          let userId = 0;
+
+          if (userRolesRes.rows.length > 0) {
+            userId = userRolesRes.rows[0].usuario_id;
+            const rolesList = userRolesRes.rows.map(r => r.rol_id);
+            const matchedRoles = rolesData.filter(r => rolesList.includes(r.id));
+            matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
+            if (matchedRoles.length > 0) {
+              rolId = matchedRoles[0].id;
             }
           }
-        });
-        return;
+
+         const staticRole = rolesData.find(r => r.id === rolId);
+         const rolNombre = staticRole?.nombre || 'empleado';
+         const permisos = staticRole?.permisos || GruposPermisos.EMPLEADO;
+
+         // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
+         const autoconsumoCheck = await pool.query(
+           `SELECT 1 FROM usuario u
+            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+            WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+            LIMIT 1`,
+           [empleado.empleado_id]
+         );
+         const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+
+         res.json({
+           success: true,
+           data: {
+             valid: true,
+             user: {
+               id: userId,
+               nombre: `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
+               email: empleado.empleado_email || '',
+               rol: {
+                 id: rolId,
+                 nombre: rolNombre,
+                 permisos: permisos
+               },
+               permitir_autoconsumo: permitirAutoconsumo,
+               empleado: {
+                 id: empleado.empleado_id,
+                 codigo_empleado: empleado.empleado_cedula,
+                 nombre: empleado.empleado_nombre,
+                 apellido: empleado.empleado_apellido,
+                 cargo: empleado.empleado_cargo,
+                 foto_perfil: empleado.empleado_foto,
+                 departamento: empleado.departamento_nombre || 'General',
+                 centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
+               }
+             }
+           }
+         });
+         return;
       }
 
       const userRes = await pool.query('SELECT * FROM usuario WHERE usuario_id = $1 AND usuario_estado = \'activo\'', [decoded.id]);
@@ -343,6 +444,14 @@ export const authController = {
       const staticRole = rolesData.find(r => r.id === decoded.rol_id);
       const rolNombre = staticRole?.nombre || 'empleado';
       const permisos = staticRole?.permisos || GruposPermisos.EMPLEADO;
+
+      // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
+      const autoconsumoCheck = await pool.query(
+        `SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 8`,
+        [user.usuario_id]
+      );
+      const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
 
       res.json({
         success: true,
@@ -356,7 +465,8 @@ export const authController = {
               id: decoded.rol_id,
               nombre: rolNombre,
               permisos
-            }
+            },
+            permitir_autoconsumo: permitirAutoconsumo
           }
         }
       });

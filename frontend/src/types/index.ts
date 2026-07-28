@@ -10,6 +10,7 @@ export interface Usuario {
     nombre: string;
     permisos: Permiso[];
   };
+  permitir_autoconsumo?: boolean;
   empleado?: {
     id: number;
     codigo_empleado: string;
@@ -43,6 +44,7 @@ export interface Empleado {
   departamento_id?: number;
   centro_costos_id?: number;
   activo: boolean;
+  permitir_autoconsumo?: boolean;
 }
 
 export interface Producto {
@@ -141,3 +143,43 @@ export interface ConfirmarEntregaRequest {
   observaciones?: string;
   foto_entrega?: string;
 }
+
+export interface AutoconsumoDetalle {
+  id: number;
+  producto_id: number;
+  producto_nombre: string;
+  producto_codigo: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+export interface Autoconsumo {
+  id: number;
+  codigo: string;
+  justificacion: string;
+  estado: 'pendiente' | 'aprobado' | 'entregado' | 'rechazado' | 'cancelado';
+  fecha_solicitud: string;
+  fecha_entrega?: string;
+  fecha_aprobacion?: string;
+  observacion?: string;
+  foto_entrega?: string;
+  aprobador?: string;
+  despachador?: string;
+  empleado: {
+    id: number;
+    nombre: string;
+    cedula: string;
+  };
+  departamento: {
+    id: number;
+    nombre: string;
+  };
+  centro_costos: {
+    id: number;
+    nombre: string;
+    codigo: string;
+  };
+  detalles: AutoconsumoDetalle[];
+}
+

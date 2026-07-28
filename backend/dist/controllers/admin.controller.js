@@ -157,5 +157,36 @@ exports.adminController = {
                 throw error;
             throw new error_middleware_1.AppError('Error al cambiar el estado del registro', 500);
         }
+    },
+    // Eliminar físicamente un registro
+    delete: async (req, res) => {
+        try {
+            const { table, id } = req.params;
+            if (!TABLE_WHITELIST.includes(table)) {
+                throw new error_middleware_1.AppError('Tabla no permitida para administración dinámica', 400);
+            }
+            const pkCol = `${table}_id`;
+            const query = `DELETE FROM ${table} WHERE ${pkCol} = $1 RETURNING *`;
+            const result = await db_1.default.query(query, [parseInt(id)]);
+            if (result.rows.length === 0) {
+                throw new error_middleware_1.AppError('Registro no encontrado', 404);
+            }
+            if (table === 'producto') {
+                req.io?.emit('producto-eliminado', id);
+            }
+            res.json({
+                success: true,
+                message: 'Registro eliminado físicamente de la base de datos'
+            });
+            return;
+        }
+        catch (error) {
+            if (error.code === '23503') {
+                throw new error_middleware_1.AppError('No se puede eliminar físicamente este producto porque tiene transacciones, requerimientos o solicitudes vinculadas. Utilice la opción "Desactivar" en su lugar.', 400);
+            }
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al eliminar el registro administrativo', 500);
+        }
     }
 };

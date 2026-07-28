@@ -12,5 +12,5 @@ router.get('/categorias', (0, permisos_middleware_1.requirePermission)('producto
 router.get('/proveedores', (0, permisos_middleware_1.requirePermission)('productos.ver'), productos_controller_1.productosController.getProveedores);
 router.get('/:id', (0, permisos_middleware_1.requirePermission)('productos.ver'), productos_controller_1.productosController.getById);
 router.post('/', (0, permisos_middleware_1.requirePermission)('productos.crear'), productos_controller_1.productosController.create);
-router.post('/import', (0, permisos_middleware_1.requirePermission)('productos.importar'), productos_controller_1.productosController.importBulk);
+router.patch('/:id/stock', (0, permisos_middleware_1.requirePermission)('inventario.ajustar_stock'), productos_controller_1.productosController.updateStock);
 exports.default = router;

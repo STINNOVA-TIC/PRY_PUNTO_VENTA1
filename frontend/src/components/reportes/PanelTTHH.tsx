@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { devolucionesAPI } from '../../api/devoluciones.api';
 import { reportesAPI } from '../../api/reportes.api';
+import { autoconsumoAPI } from '../../api/autoconsumo.api';
+import { Autoconsumo } from '../../types';
 import { useSocket } from '../../context/SocketContext';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -18,7 +20,14 @@ export const PanelTTHH: React.FC = () => {
   const [showRechazoModal, setShowRechazoModal] = useState(false);
   const [selectedDevId, setSelectedDevId] = useState<number | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState('');
-  const [moduloActivo, setModuloActivo] = useState<'reportes' | 'devoluciones'>('reportes');
+  const [moduloActivo, setModuloActivo] = useState<'reportes' | 'devoluciones' | 'autoconsumos'>('reportes');
+  
+  // Estados de Autoconsumo
+  const [autoconsumos, setAutoconsumos] = useState<Autoconsumo[]>([]);
+  const [autoconsumoObservacion, setAutoconsumoObservacion] = useState('');
+  const [showRechazoAutoModal, setShowRechazoAutoModal] = useState(false);
+  const [selectedAutoId, setSelectedAutoId] = useState<number | null>(null);
+  const [motivoRechazoAuto, setMotivoRechazoAuto] = useState('');
 
   // Estados de rango de fechas (calendario)
   const getTodayStr = () => new Date().toISOString().slice(0, 10);
@@ -62,6 +71,16 @@ export const PanelTTHH: React.FC = () => {
         console.log('[WS] Entrega confirmada. Recargando...');
         cargarDatos();
       });
+
+      socket.on('autoconsumo-pendiente', () => {
+        console.log('[WS] Nuevo autoconsumo pendiente. Recargando...');
+        cargarDatos();
+      });
+
+      socket.on('autoconsumo-actualizado', () => {
+        console.log('[WS] Autoconsumo actualizado. Recargando...');
+        cargarDatos();
+      });
     }
 
     return () => {
@@ -69,6 +88,8 @@ export const PanelTTHH: React.FC = () => {
         socket.off('devolucion-actualizada');
         socket.off('entrega-pendiente');
         socket.off('entrega-realizada');
+        socket.off('autoconsumo-pendiente');
+        socket.off('autoconsumo-actualizado');
       }
     };
   }, [socket, fechaInicio, fechaFin]);
@@ -93,6 +114,13 @@ export const PanelTTHH: React.FC = () => {
         fechaFin || undefined
       );
       setTransacciones(transRes.data);
+
+      try {
+        const autoRes = await autoconsumoAPI.getAll();
+        setAutoconsumos(autoRes.data);
+      } catch (err) {
+        console.error('Error al cargar autoconsumos:', err);
+      }
     } catch (err: any) {
       console.error('Error al cargar datos de Talento Humano:', err);
       setError('No se pudieron cargar los datos de Talento Humano.');
@@ -157,6 +185,38 @@ export const PanelTTHH: React.FC = () => {
       cargarDatos();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al rechazar devolucion');
+    }
+  };
+
+  const handleAprobarAutoconsumo = async (id: number) => {
+    try {
+      await autoconsumoAPI.aprobar(id, autoconsumoObservacion || 'Aprobado por Talento Humano');
+      setMensaje('Solicitud de autoconsumo aprobada con éxito. El guardia/despachador ya puede realizar la entrega.');
+      setAutoconsumoObservacion('');
+      cargarDatos();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al aprobar el autoconsumo');
+    }
+  };
+
+  const openRechazoAutoModal = (id: number) => {
+    setSelectedAutoId(id);
+    setShowRechazoAutoModal(true);
+    setMotivoRechazoAuto('');
+  };
+
+  const handleRechazarAutoSubmit = async () => {
+    if (!selectedAutoId || !motivoRechazoAuto.trim()) return;
+
+    try {
+      await autoconsumoAPI.cancelar(selectedAutoId, { observacion: motivoRechazoAuto.trim(), esRechazo: true });
+      setMensaje('Solicitud de autoconsumo rechazada.');
+      setShowRechazoAutoModal(false);
+      setSelectedAutoId(null);
+      setMotivoRechazoAuto('');
+      cargarDatos();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al rechazar autoconsumo');
     }
   };
 
@@ -540,6 +600,21 @@ export const PanelTTHH: React.FC = () => {
           {pendientes.length > 0 && (
             <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
               {pendientes.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setModuloActivo('autoconsumos')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+            moduloActivo === 'autoconsumos'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Autoconsumos
+          {autoconsumos.filter(a => a.estado === 'pendiente').length > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+              {autoconsumos.filter(a => a.estado === 'pendiente').length}
             </span>
           )}
         </button>
@@ -1007,6 +1082,210 @@ export const PanelTTHH: React.FC = () => {
         </div>
       )}
 
+      {moduloActivo === 'autoconsumos' && (
+        <div className="space-y-6">
+          {/* SECCIÓN DE SOLICITUDES PENDIENTES */}
+          <div className="space-y-4">
+            <h2 className="text-base font-bold text-gray-800">Solicitudes de Autoconsumo Pendientes</h2>
+
+            {autoconsumos.filter((a) => a.estado === 'pendiente').length === 0 ? (
+              <div className="text-center py-12 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-400 text-xs font-semibold">
+                No hay solicitudes de autoconsumo pendientes de aprobación.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {autoconsumos
+                  .filter((a) => a.estado === 'pendiente')
+                  .map((a) => (
+                    <div key={a.id} className="bg-white border border-gray-250/70 rounded-xl p-5 shadow-xs space-y-4 text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-mono text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">
+                            {a.codigo}
+                          </span>
+                          <h4 className="font-bold text-gray-800 mt-1.5 text-sm">{a.empleado.nombre}</h4>
+                          <span className="text-[10px] text-gray-400 block font-mono">C.I. {a.empleado.cedula}</span>
+                        </div>
+                        <span className="text-gray-400 text-[10px] font-medium">
+                          {new Date(a.fecha_solicitud).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-2 text-gray-600">
+                        <div>
+                          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                            Justificación de Consumo
+                          </span>
+                          <p className="text-gray-700 font-medium text-xs mt-0.5">{a.justificacion}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 pt-1 border-t border-gray-150/40 text-[10px]">
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                              Departamento
+                            </span>
+                            <span className="font-semibold text-gray-700">{a.departamento.nombre}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                              Centro de Costos
+                            </span>
+                            <span className="font-semibold text-gray-700">
+                              {a.centro_costos.codigo} - {a.centro_costos.nombre}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Productos */}
+                      <div>
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                          Productos Solicitados
+                        </span>
+                        <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-white">
+                          {a.detalles.map((d) => (
+                            <div key={d.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
+                              <div>
+                                <span className="font-semibold text-gray-800">{d.producto_nombre}</span>
+                                <span className="text-[10px] text-gray-400 font-mono block">Cód: {d.producto_codigo}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold text-gray-700 block">Cant: {d.cantidad}</span>
+                                <span className="text-[10px] text-gray-400">${d.precio_unitario.toFixed(2)} c/u</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-3 font-bold text-gray-800 text-[13px] border-t border-gray-100 pt-2">
+                          <span>Costo total a ser asumido por la empresa:</span>
+                          <span className="text-emerald-700">
+                            ${a.detalles.reduce((sum, d) => sum + d.subtotal, 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Observación para aprobar */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          Observación / Comentario TTHH (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={autoconsumoObservacion}
+                          onChange={(e) => setAutoconsumoObservacion(e.target.value)}
+                          placeholder="Ej: Aprobado para reunión anual..."
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-gray-400"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end pt-2">
+                        <button
+                          onClick={() => openRechazoAutoModal(a.id)}
+                          className="px-3.5 py-1.5 border border-red-200 hover:bg-red-50 text-red-650 rounded-lg text-xs font-semibold transition"
+                        >
+                          Rechazar
+                        </button>
+                        <button
+                          onClick={() => handleAprobarAutoconsumo(a.id)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                        >
+                          Aprobar Solicitud
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* HISTÓRICO DE AUTOCONSUMOS */}
+          <div className="space-y-4 pt-6 border-t border-gray-200">
+            <h2 className="text-base font-bold text-gray-800">Historial de Autoconsumos Procesados</h2>
+
+            {autoconsumos.filter((a) => a.estado !== 'pendiente').length === 0 ? (
+              <div className="text-center py-12 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-400 text-xs font-semibold">
+                No hay registros históricos de autoconsumo.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {autoconsumos
+                  .filter((a) => a.estado !== 'pendiente')
+                  .map((a) => (
+                    <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3.5 text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-mono text-[9px] text-gray-400 block">{a.codigo}</span>
+                          <h4 className="font-bold text-gray-800 text-xs mt-0.5">{a.empleado.nombre}</h4>
+                        </div>
+                        <span
+                          className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                            a.estado === 'entregado'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : a.estado === 'aprobado'
+                              ? 'bg-amber-50 text-amber-700 border-amber-100'
+                              : 'bg-red-50 text-red-700 border-red-100'
+                          }`}
+                        >
+                          {a.estado}
+                        </span>
+                      </div>
+
+                      <div className="text-gray-500 space-y-1">
+                        <div>
+                          <span className="font-semibold text-gray-400">Justificación:</span> {a.justificacion}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-400">Dpto / CC:</span> {a.departamento.nombre} •{' '}
+                          {a.centro_costos.nombre}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-400">Total:</span> $
+                          {a.detalles.reduce((sum, d) => sum + d.subtotal, 0).toFixed(2)}
+                        </div>
+                      </div>
+
+                      {/* Auditoría de Flujo */}
+                      <div className="p-2.5 bg-gray-50 border border-gray-100 rounded space-y-1.5 text-[10px] text-gray-550">
+                        {a.aprobador && (
+                          <div>
+                            <span className="font-bold">Aprobado por:</span> {a.aprobador}{' '}
+                            {a.fecha_aprobacion && `(${new Date(a.fecha_aprobacion).toLocaleDateString()})`}
+                          </div>
+                        )}
+                        {a.despachador && (
+                          <div>
+                            <span className="font-bold">Despachado por:</span> {a.despachador}{' '}
+                            {a.fecha_entrega && `(${new Date(a.fecha_entrega).toLocaleDateString()})`}
+                          </div>
+                        )}
+                        {a.observacion && (
+                          <div className="text-gray-700 italic border-t border-gray-200/50 pt-1 mt-1">
+                            <span className="font-bold text-[9px] text-gray-400 uppercase not-italic block">Comentario TTHH / Guardia</span>
+                            "{a.observacion}"
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Foto de Entrega */}
+                      {a.foto_entrega && a.estado === 'entregado' && (
+                        <div className="pt-1">
+                          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                            Evidencia de Despacho
+                          </span>
+                          <img
+                            src={a.foto_entrega}
+                            alt="Evidencia entrega"
+                            className="w-full h-32 object-cover rounded-lg border border-gray-250 shadow-inner"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE RECHAZO DE DEVOLUCION */}
       {showRechazoModal && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1045,6 +1324,50 @@ export const PanelTTHH: React.FC = () => {
                 className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
               >
                 Rechazar Devolucion
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE RECHAZO DE AUTOCONSUMO */}
+      {showRechazoAutoModal && (
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 text-left">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-800">Rechazar Solicitud de Autoconsumo</h3>
+              <button
+                onClick={() => { setShowRechazoAutoModal(false); setMotivoRechazoAuto(''); setSelectedAutoId(null); }}
+                className="text-gray-400 hover:text-gray-600 text-lg"
+              >
+                x
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Ingresa la justificación o razón por la cual rechazas esta solicitud de autoconsumo. El empleado podrá ver esta observación.
+            </p>
+
+            <textarea
+              value={motivoRechazoAuto}
+              onChange={(e) => setMotivoRechazoAuto(e.target.value)}
+              placeholder="Escribe la justificación del rechazo aquí..."
+              className="w-full h-24 border border-gray-300 rounded-xl p-3 text-xs focus:ring-1 focus:ring-gray-400 focus:outline-none resize-none font-sans"
+            />
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setShowRechazoAutoModal(false); setMotivoRechazoAuto(''); setSelectedAutoId(null); }}
+                className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-xs font-semibold transition"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={handleRechazarAutoSubmit}
+                disabled={!motivoRechazoAuto.trim()}
+                className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
+              >
+                Rechazar Autoconsumo
               </button>
             </div>
           </div>

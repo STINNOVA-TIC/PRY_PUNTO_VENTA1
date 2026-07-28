@@ -37,11 +37,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
       // Crear usuario virtual para cumplir con req.user
       req.user = {
-        id: 0, // ID virtual
+        id: decoded.id || 0, 
         nombre: `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
         email: empleado.empleado_email || '',
         password_hash: '',
-        rol_id: 3, // Rol empleado
+        rol_id: decoded.rol_id || 3, 
         activo: true,
         fecha_creacion: empleado.empleado_fecha_creacion,
       };

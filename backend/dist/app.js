@@ -24,8 +24,10 @@ const ordenes_routes_1 = __importDefault(require("./routes/ordenes.routes"));
 const usuarios_routes_1 = __importDefault(require("./routes/usuarios.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
+const autoconsumo_routes_1 = __importDefault(require("./routes/autoconsumo.routes"));
 const error_middleware_1 = require("./middleware/error.middleware");
 const index_1 = require("./sockets/index");
+const initDb_1 = require("./config/initDb");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.set('trust proxy', true); // Confiar en proxies para rate limiter (ej: VS Code Ports, Cloudflare)
@@ -102,6 +104,7 @@ app.use('/api/ordenes-compra', ordenes_routes_1.default);
 app.use('/api/usuarios', usuarios_routes_1.default);
 app.use('/api/admin/crud', admin_routes_1.default);
 app.use('/api/upload', upload_routes_1.default);
+app.use('/api/autoconsumos', autoconsumo_routes_1.default);
 // Health check
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });
@@ -109,7 +112,9 @@ app.get('/api/health', (_req, res) => {
 // Error handler
 app.use(error_middleware_1.errorHandler);
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📡 WebSocket habilitado en ws://localhost:${PORT}/socket.io`);
+(0, initDb_1.initDb)().then(() => {
+    httpServer.listen(PORT, () => {
+        console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+        console.log(`📡 WebSocket habilitado en ws://localhost:${PORT}/socket.io`);
+    });
 });

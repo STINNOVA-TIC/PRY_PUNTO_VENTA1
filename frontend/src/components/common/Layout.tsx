@@ -7,13 +7,13 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user } = useAuth();
-  const isEmployee = user?.rol.nombre === 'empleado';
+  const { user, isShopSession } = useAuth();
+  const hideNavbar = isShopSession || user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado';
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {!isEmployee && <Navbar />}
-      <main className={`container mx-auto px-4 ${isEmployee ? 'py-6' : 'py-8'}`}>
+      {!hideNavbar && <Navbar />}
+      <main className={`container mx-auto px-4 ${hideNavbar ? 'py-6' : 'py-8'}`}>
         {children}
       </main>
     </div>

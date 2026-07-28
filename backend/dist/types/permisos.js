@@ -13,7 +13,7 @@ exports.GruposPermisos = {
         'empleados.editar', 'empleados.eliminar', 'empleados.activar',
         'empleados.desactivar', 'empleados.ver_historial_compras',
         'productos.ver', 'productos.crear', 'productos.editar', 'productos.eliminar',
-        'productos.activar', 'productos.desactivar', 'productos.importar',
+        'productos.activar', 'productos.desactivar',
         'inventario.ver', 'inventario.ver_movimientos', 'inventario.ajustar_stock',
         'inventario.ingresar_mercancia', 'inventario.ver_costos',
         'ventas.realizar', 'ventas.ver', 'ventas.anular', 'ventas.cancelar',
@@ -23,7 +23,8 @@ exports.GruposPermisos = {
         'reportes.ver_inventario', 'reportes.exportar',
         'nomina.ver', 'nomina.ver_todos', 'nomina.aplicar_descuento',
         'nomina.configurar_descuentos',
-        'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs'
+        'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
+        'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar'
     ],
     // GUARDIA: Solo entregas y verificación
     GUARDIA: [
@@ -37,7 +38,8 @@ exports.GruposPermisos = {
         'reportes.ver',
         'reportes.ver_consumo_empleados',
         'inventario.ver', // Para ubicar productos en stock
-        'productos.ver' // Para ver detalles del producto a entregar
+        'productos.ver', // Para ver detalles del producto a entregar
+        'autoconsumo.ver', 'autoconsumo.entregar'
     ],
     // EMPLEADO: Compras y ver propio consumo
     EMPLEADO: [
@@ -58,7 +60,8 @@ exports.GruposPermisos = {
         'inventario.ingresar_mercancia', 'inventario.ver_costos',
         'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
         'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
-        'categorias.ver', 'categorias.crear', 'categorias.editar'
+        'categorias.ver', 'categorias.crear', 'categorias.editar',
+        'autoconsumo.ver'
     ],
     // TTHH: Gestión de nómina, devoluciones y gastos de empleados
     TTHH: [
@@ -69,6 +72,7 @@ exports.GruposPermisos = {
         'nomina.aplicar_descuento',
         'nomina.configurar_descuentos',
         'empleados.ver',
-        'empleados.ver_datos_sensibles'
+        'empleados.ver_datos_sensibles',
+        'autoconsumo.ver', 'autoconsumo.aprobar'
     ]
 };

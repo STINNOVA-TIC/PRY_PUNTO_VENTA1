@@ -71,7 +71,14 @@ export type Permiso =
   // ============ CONFIGURACIÓN ============
   | 'configuracion.ver'
   | 'configuracion.editar'
-  | 'configuracion.ver_logs';
+  | 'configuracion.ver_logs'
+  
+  // ============ AUTOCONSUMO ============
+  | 'autoconsumo.ver'
+  | 'autoconsumo.crear'
+  | 'autoconsumo.aprobar'
+  | 'autoconsumo.entregar'
+  | 'autoconsumo.eliminar';
 
 // Grupos de permisos para facilitar la asignación
 export const GruposPermisos = {
@@ -94,7 +101,8 @@ export const GruposPermisos = {
     'reportes.ver_inventario', 'reportes.exportar',
     'nomina.ver', 'nomina.ver_todos', 'nomina.aplicar_descuento',
     'nomina.configurar_descuentos',
-    'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs'
+    'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
+    'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar'
   ] as Permiso[],
 
   // GUARDIA: Solo entregas y verificación
@@ -109,7 +117,8 @@ export const GruposPermisos = {
     'reportes.ver',
     'reportes.ver_consumo_empleados',
     'inventario.ver',  // Para ubicar productos en stock
-    'productos.ver'    // Para ver detalles del producto a entregar
+    'productos.ver',    // Para ver detalles del producto a entregar
+    'autoconsumo.ver', 'autoconsumo.entregar'
   ] as Permiso[],
 
   // EMPLEADO: Compras y ver propio consumo
@@ -132,7 +141,8 @@ export const GruposPermisos = {
     'inventario.ingresar_mercancia', 'inventario.ver_costos',
     'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
     'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
-    'categorias.ver', 'categorias.crear', 'categorias.editar'
+    'categorias.ver', 'categorias.crear', 'categorias.editar',
+    'autoconsumo.ver'
   ] as Permiso[],
 
   // TTHH: Gestión de nómina, devoluciones y gastos de empleados
@@ -144,6 +154,7 @@ export const GruposPermisos = {
     'nomina.aplicar_descuento',
     'nomina.configurar_descuentos',
     'empleados.ver',
-    'empleados.ver_datos_sensibles'
+    'empleados.ver_datos_sensibles',
+    'autoconsumo.ver', 'autoconsumo.aprobar'
   ] as Permiso[]
 };

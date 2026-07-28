@@ -3,7 +3,7 @@ import { Permiso, GruposPermisos } from '../types/permisos';
 
 export interface IRol {
   id: number;
-  nombre: 'admin' | 'guardia' | 'empleado' | 'inventario' | 'contador' | 'gerente' | 'tthh';
+  nombre: 'admin' | 'guardia' | 'empleado' | 'inventario' | 'contador' | 'gerente' | 'tthh' | 'empleado_autorizado';
   descripcion: string;
   permisos: Permiso[];
   nivel: number; // Para jerarquía (mayor = más permisos)
@@ -77,5 +77,15 @@ export const rolesData: IRol[] = [
     descripcion: 'Talento Humano: Gestión de devoluciones, nómina y consumo de empleados',
     permisos: GruposPermisos.TTHH,
     nivel: 50
+  },
+  {
+    id: 8,
+    nombre: 'empleado_autorizado',
+    descripcion: 'Empleado autorizado para realizar autoconsumos para la empresa',
+    permisos: [
+      ...GruposPermisos.EMPLEADO,
+      'autoconsumo.crear'
+    ],
+    nivel: 25
   }
 ];

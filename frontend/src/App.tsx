@@ -24,9 +24,13 @@ import { RecepcionRequerimientos } from './components/productos/RecepcionRequeri
 import { useAuth } from './context/AuthContext';
 
 function Home() {
-  const { user } = useAuth();
+  const { user, isShopSession } = useAuth();
 
-  if (user?.rol.nombre === 'empleado') {
+  if (isShopSession) {
+    return <CarritoCompras />;
+  }
+
+  if (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado') {
     return <CarritoCompras />;
   }
   if (user?.rol.nombre === 'admin') {

@@ -6,6 +6,7 @@ import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -57,6 +58,14 @@ export const PanelInventario: React.FC = () => {
   // Formulario de Ajuste de Stock
   const [editingStockId, setEditingStockId] = useState<number | null>(null);
   const [newStockVal, setNewStockVal] = useState('');
+
+  // Filtros y Ordenamiento del Inventario
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<number | 'ALL'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'active' | 'inactive'>('ALL');
+  const [filterStock, setFilterStock] = useState<'ALL' | 'low' | 'normal'>('ALL');
+  const [sortBy, setSortBy] = useState<'codigo' | 'nombre' | 'precio_venta' | 'precio_costo' | 'stock_actual'>('nombre');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Formulario de Orden de Compra
   const [showOCForm, setShowOCForm] = useState(false);
@@ -356,6 +365,62 @@ export const PanelInventario: React.FC = () => {
       setOcError(err.response?.data?.message || 'Error al generar la orden de compra');
     }
   };
+
+  // Filtrado y ordenamiento de productos
+  const productosFiltrados = React.useMemo(() => {
+    return productos
+      .filter((p) => {
+        // 1. Buscador (Código, Nombre, Descripción)
+        const query = searchTerm.toLowerCase().trim();
+        if (query) {
+          const matchNombre = p.nombre.toLowerCase().includes(query);
+          const matchDesc = (p.descripcion || '').toLowerCase().includes(query);
+          const matchCodigo = p.codigo_barras.toLowerCase().includes(query);
+          if (!matchNombre && !matchDesc && !matchCodigo) return false;
+        }
+
+        // 2. Filtro de Categoría
+        if (filterCategory !== 'ALL' && p.categoria_id !== filterCategory) {
+          return false;
+        }
+
+        // 3. Filtro de Estado
+        if (filterStatus === 'active' && !p.activo) return false;
+        if (filterStatus === 'inactive' && p.activo) return false;
+
+        // 4. Filtro de Stock
+        const isLow = p.stock_actual <= 5;
+        if (filterStock === 'low' && !isLow) return false;
+        if (filterStock === 'normal' && isLow) return false;
+
+        return true;
+      })
+      .sort((a, b) => {
+        let fieldA: any = '';
+        let fieldB: any = '';
+
+        if (sortBy === 'codigo') {
+          fieldA = a.codigo_barras;
+          fieldB = b.codigo_barras;
+        } else if (sortBy === 'nombre') {
+          fieldA = a.nombre.toLowerCase();
+          fieldB = b.nombre.toLowerCase();
+        } else if (sortBy === 'precio_venta') {
+          fieldA = a.precio_venta;
+          fieldB = b.precio_venta;
+        } else if (sortBy === 'precio_costo') {
+          fieldA = a.precio_costo;
+          fieldB = b.precio_costo;
+        } else if (sortBy === 'stock_actual') {
+          fieldA = a.stock_actual;
+          fieldB = b.stock_actual;
+        }
+
+        if (fieldA < fieldB) return sortOrder === 'asc' ? -1 : 1;
+        if (fieldA > fieldB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+  }, [productos, searchTerm, filterCategory, filterStatus, filterStock, sortBy, sortOrder]);
 
   if (loading) {
     return (
@@ -668,7 +733,56 @@ export const PanelInventario: React.FC = () => {
       {/* SECCIÓN 2: LISTADO DE PRODUCTOS EN BODEGA */}
       <div className="space-y-4">
         <h2 className="text-base font-bold text-gray-800">Catálogo Físico en Bodega</h2>
-        
+
+        <SearchAndFilterBar
+          searchPlaceholder="Buscar por nombre, código..."
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          totalResults={productosFiltrados.length}
+          totalCount={productos.length}
+          resultsLabel="productos"
+          selectFilters={[
+            {
+              id: 'categoria',
+              placeholder: 'Todas las Categorías',
+              value: filterCategory,
+              onChange: (val) => setFilterCategory(val === 'ALL' ? 'ALL' : Number(val)),
+              options: categorias.map((cat) => ({ label: cat.nombre, value: cat.id }))
+            },
+            {
+              id: 'estado',
+              placeholder: 'Todos los Estados',
+              value: filterStatus,
+              onChange: (val) => setFilterStatus(val as any),
+              options: [
+                { label: 'Activo', value: 'active' },
+                { label: 'Inactivo', value: 'inactive' }
+              ]
+            },
+            {
+              id: 'stock',
+              placeholder: 'Todo el Inventario',
+              value: filterStock,
+              onChange: (val) => setFilterStock(val as any),
+              options: [
+                { label: 'Bajo Stock (≤ 5)', value: 'low' },
+                { label: 'Stock Normal (> 5)', value: 'normal' }
+              ]
+            }
+          ]}
+          sortOptions={[
+            { label: 'Ordenar por: Nombre', value: 'nombre' },
+            { label: 'Ordenar por: Código', value: 'codigo' },
+            { label: 'Ordenar por: Precio Venta', value: 'precio_venta' },
+            { label: 'Ordenar por: Precio Compra', value: 'precio_costo' },
+            { label: 'Ordenar por: Existencia', value: 'stock_actual' }
+          ]}
+          sortValue={sortBy}
+          onSortValueChange={(val) => setSortBy(val as any)}
+          sortOrder={sortOrder}
+          onSortOrderChange={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+        />
+
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -684,7 +798,7 @@ export const PanelInventario: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {productos.map((p) => {
+                {productosFiltrados.map((p) => {
                   const isLow = p.stock_actual <= 5;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50/50">

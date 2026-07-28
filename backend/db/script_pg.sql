@@ -432,6 +432,42 @@ CREATE TABLE reporte (
     reporte_parametros JSONB NULL
 );
 
+CREATE TABLE autoconsumo (
+    autoconsumo_id SERIAL PRIMARY KEY,
+    empleado_id INTEGER NOT NULL REFERENCES empleado(empleado_id) ON DELETE RESTRICT,
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(sucursal_id) ON DELETE RESTRICT,
+    departamento_id INTEGER NOT NULL REFERENCES departamento(departamento_id) ON DELETE RESTRICT,
+    centro_costos_id INTEGER NOT NULL REFERENCES centro_costos(centro_costos_id) ON DELETE RESTRICT,
+    
+    -- Datos de la solicitud
+    autoconsumo_codigo VARCHAR(50) UNIQUE NOT NULL,         -- Ej: AUTO-2026-001
+    autoconsumo_justificacion TEXT NOT NULL,                -- Ej: "Compra de refrigerios para reunión de TTHH"
+    autoconsumo_fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    autoconsumo_fecha_entrega TIMESTAMP NULL,
+    autoconsumo_estado VARCHAR(20) DEFAULT 'pendiente' CHECK (autoconsumo_estado IN ('pendiente', 'aprobado', 'entregado', 'rechazado', 'cancelado')),
+    autoconsumo_observacion TEXT NULL,
+    
+    -- Aprobaciones (si aplica)
+    usuario_aprobador_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+    autoconsumo_fecha_aprobacion TIMESTAMP NULL,
+    
+    -- Usuario que entrega (Encargado de bodega)
+    usuario_entrega_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+    autoconsumo_foto_entrega VARCHAR(255) NULL,
+    
+    -- Auditoría
+    autoconsumo_fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    autoconsumo_fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE autoconsumo_detalle (
+    autoconsumo_detalle_id SERIAL PRIMARY KEY,
+    autoconsumo_id INTEGER NOT NULL REFERENCES autoconsumo(autoconsumo_id) ON DELETE CASCADE,
+    producto_id INTEGER NOT NULL REFERENCES producto(producto_id) ON DELETE RESTRICT,
+    autoconsumo_detalle_cantidad INTEGER NOT NULL CHECK (autoconsumo_detalle_cantidad > 0),
+    autoconsumo_detalle_precio_unitario NUMERIC(10,2) NOT NULL DEFAULT 0,
+    autoconsumo_detalle_subtotal NUMERIC(10,2) NOT NULL DEFAULT 0
+);
 
 -- =============================================
 -- 5. ÍNDICES RECOMENDADOS (PARA RENDIMIENTO)

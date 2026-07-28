@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ventasAPI } from '../../api/ventas.api';
+import { empleadosAPI } from '../../api/empleados.api';
+import { autoconsumoAPI } from '../../api/autoconsumo.api';
 import { Producto, CreateVentaRequest } from '../../types';
 import { CatalogoProductos } from '../productos/CatalogoProductos';
 import logoEmpresa from '../../assets/logo.png';
@@ -19,6 +21,12 @@ export const CarritoCompras: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'productos' | 'carrito'>('productos');
   const [countdown, setCountdown] = useState(5);
+
+  // Estados de Autoconsumo
+  const [isAutoconsumoMode, setIsAutoconsumoMode] = useState(false);
+  const [justificacion, setJustificacion] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState<string | number>('');
+  const [departamentos, setDepartamentos] = useState<any[]>([]);
 
   useEffect(() => {
     let timer: any;
@@ -127,6 +135,71 @@ export const CarritoCompras: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (isAutoconsumoMode) {
+      const fetchMetadata = async () => {
+        try {
+          const deptoRes = await empleadosAPI.getDepartamentos();
+          setDepartamentos(deptoRes.data || []);
+        } catch (err) {
+          console.error('Error fetching metadata for autoconsumo:', err);
+        }
+      };
+      fetchMetadata();
+    }
+  }, [isAutoconsumoMode]);
+
+  const canCreateAutoconsumo = !!user?.permitir_autoconsumo;
+
+  const realizarAutoconsumo = async () => {
+    if (items.length === 0) {
+      setMensaje('El carrito está vacío. Agrega productos del menú.');
+      return;
+    }
+
+    if (!user?.empleado) {
+      setMensaje('Solo empleados autorizados pueden registrar autoconsumo.');
+      return;
+    }
+
+    if (!justificacion.trim()) {
+      setMensaje('Por favor, ingresa una justificación para el autoconsumo.');
+      return;
+    }
+
+    if (!selectedDeptId) {
+      setMensaje('Por favor, selecciona el departamento.');
+      return;
+    }
+
+    setLoading(true);
+    setMensaje('');
+    setCodigoRetiroResult('');
+
+    try {
+      const res = await autoconsumoAPI.crear({
+        empleado_id: user.empleado.id,
+        departamento_id: Number(selectedDeptId),
+        justificacion: justificacion.trim(),
+        productos: items.map(i => ({
+          producto_id: i.producto.id,
+          cantidad: i.cantidad,
+        })),
+      });
+
+      setItems([]);
+      setJustificacion('');
+      const codRetiro = res.data?.codigo || 'AUTO-NUEVA-SOLICITUD';
+      setCodigoRetiroResult(codRetiro);
+      setMensaje('✅ Solicitud de autoconsumo registrada con éxito. Debe ser aprobada por Talento Humano.');
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      setMensaje(error.response?.data?.message || 'Error al procesar el autoconsumo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSalir = () => {
     logout();
   };
@@ -144,12 +217,30 @@ export const CarritoCompras: React.FC = () => {
           />
         </div>
 
-        <button
-          onClick={handleSalir}
-          className="bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95"
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          {canCreateAutoconsumo && (
+            <button
+              onClick={() => {
+                setIsAutoconsumoMode(!isAutoconsumoMode);
+                setItems([]); // Limpiar carrito al cambiar de modo
+                setMensaje('');
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95 border ${
+                isAutoconsumoMode
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-650 shadow-sm'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {isAutoconsumoMode ? 'Volver a Compras' : 'Modo Autoconsumo'}
+            </button>
+          )}
+          <button
+            onClick={handleSalir}
+            className="bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95"
+          >
+            Salir
+          </button>
+        </div>
       </div>
 
       {/* PESTAÑAS PARA DISPOSITIVOS MÓVILES (Oculto en md y superior) */}
@@ -283,19 +374,68 @@ export const CarritoCompras: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="pt-2.5 border-t border-gray-100 space-y-1.5 text-xs flex-shrink-0">
-                  <div className="flex justify-between font-bold text-gray-800 text-sm pt-1.5">
-                    <span>Total:</span>
+                <div className="pt-2.5 border-t border-gray-100 space-y-2 text-xs flex-shrink-0">
+                  {isAutoconsumoMode && (
+                    <div className="space-y-2.5 py-1">
+                      {/* Departamento Destino */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          Departamento Destino
+                        </label>
+                        <select
+                          value={selectedDeptId}
+                          onChange={(e) => setSelectedDeptId(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-[11px] bg-white focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="">Selecciona Departamento</option>
+                          {departamentos.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+
+
+                      {/* Justificación */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          Justificación
+                        </label>
+                        <textarea
+                          value={justificacion}
+                          onChange={(e) => setJustificacion(e.target.value)}
+                          placeholder="Reunión de departamento, refrigerio, etc..."
+                          rows={2}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-[11px] focus:outline-none focus:border-emerald-500 resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between font-bold text-gray-800 text-sm pt-1 border-t border-gray-100/60">
+                    <span>{isAutoconsumoMode ? 'Costo Empresa:' : 'Total:'}</span>
                     <span>${totalNeto.toFixed(2)}</span>
                   </div>
+                  
+                  {isAutoconsumoMode && (
+                    <span className="text-[10px] font-semibold text-emerald-600 block leading-tight">
+                      * Asumido por la empresa (no se descuenta del salario).
+                    </span>
+                  )}
                 </div>
 
                 <button
-                  onClick={realizarVenta}
+                  onClick={isAutoconsumoMode ? realizarAutoconsumo : realizarVenta}
                   disabled={loading || items.length === 0}
-                  className="w-full bg-gray-800 text-white py-2.5 rounded-lg hover:bg-gray-700 font-medium transition disabled:opacity-50 text-xs mt-2 flex-shrink-0"
+                  className={`w-full py-2.5 rounded-lg font-semibold transition disabled:opacity-50 text-xs mt-2 flex-shrink-0 ${
+                    isAutoconsumoMode
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                      : 'bg-gray-800 hover:bg-gray-700 text-white'
+                  }`}
                 >
-                  {loading ? 'Procesando...' : 'Confirmar Pedido'}
+                  {loading ? 'Procesando...' : isAutoconsumoMode ? 'Confirmar Autoconsumo' : 'Confirmar Pedido'}
                 </button>
               </div>
             )}

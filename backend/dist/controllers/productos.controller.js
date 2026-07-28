@@ -10,7 +10,7 @@ exports.productosController = {
     // Obtener todos los productos
     getAll: async (_req, res) => {
         try {
-            const prodRes = await db_1.default.query("SELECT * FROM producto WHERE producto_estado = 'activo' ORDER BY producto_nombre ASC");
+            const prodRes = await db_1.default.query("SELECT * FROM producto ORDER BY producto_nombre ASC");
             const items = prodRes.rows.map(row => ({
                 id: row.producto_id,
                 codigo_barras: row.producto_codigo,
@@ -90,7 +90,17 @@ exports.productosController = {
             const defaultFoto = foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
             const insertRes = await db_1.default.query(`INSERT INTO producto (categoria_id, proveedor_id, producto_codigo, producto_nombre, producto_descripcion, producto_precio, producto_precio_compra, producto_stock, producto_foto, producto_estado) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo') 
-         RETURNING *`, [catId, provId, codigo_barras.trim(), nombre.trim(), descripcion || '', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]);
+         ON CONFLICT (producto_codigo) DO UPDATE SET
+           categoria_id = EXCLUDED.categoria_id,
+           proveedor_id = EXCLUDED.proveedor_id,
+           producto_nombre = EXCLUDED.producto_nombre,
+           producto_descripcion = EXCLUDED.producto_descripcion,
+           producto_precio = EXCLUDED.producto_precio,
+           producto_precio_compra = EXCLUDED.producto_precio_compra,
+           producto_stock = EXCLUDED.producto_stock,
+           producto_foto = EXCLUDED.producto_foto,
+           producto_estado = 'activo'
+         RETURNING *`, [catId, provId, String(codigo_barras).trim(), String(nombre).trim(), descripcion || '', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]);
             res.status(201).json({
                 success: true,
                 data: insertRes.rows[0],
@@ -99,89 +109,10 @@ exports.productosController = {
             return;
         }
         catch (error) {
+            console.error('Error en productosController.create:', error);
             if (error instanceof error_middleware_1.AppError)
                 throw error;
             throw new error_middleware_1.AppError('Error al crear producto en base de datos', 500);
-        }
-    },
-    // Importar varios productos desde Excel/CSV
-    importBulk: async (req, res) => {
-        try {
-            const rows = req.body;
-            if (!Array.isArray(rows) || rows.length === 0) {
-                throw new error_middleware_1.AppError('No se recibieron filas para importar.', 400);
-            }
-            const client = await db_1.default.connect();
-            try {
-                await client.query('BEGIN');
-                const insertSQL = `
-          INSERT INTO producto (
-            categoria_id,
-            proveedor_id,
-            producto_codigo,
-            producto_nombre,
-            producto_descripcion,
-            producto_precio,
-            producto_precio_compra,
-            producto_stock,
-            producto_foto,
-            producto_estado
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo'
-          ) ON CONFLICT (producto_codigo) DO UPDATE SET
-            categoria_id = EXCLUDED.categoria_id,
-            proveedor_id = EXCLUDED.proveedor_id,
-            producto_nombre = EXCLUDED.producto_nombre,
-            producto_descripcion = EXCLUDED.producto_descripcion,
-            producto_precio = EXCLUDED.producto_precio,
-            producto_precio_compra = EXCLUDED.producto_precio_compra,
-            producto_stock = EXCLUDED.producto_stock,
-            producto_foto = EXCLUDED.producto_foto,
-            producto_estado = EXCLUDED.producto_estado;
-        `;
-                let successCount = 0;
-                const errors = [];
-                for (const [index, row] of rows.entries()) {
-                    const { codigo_barras, nombre, descripcion = '', precio_venta, precio_costo = 0, stock_actual = 0, categoria_id, proveedor_id, foto = 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg' } = row;
-                    if (!codigo_barras || !nombre) {
-                        errors.push(`Fila ${index + 1}: código o nombre faltante`);
-                        continue;
-                    }
-                    try {
-                        await client.query(insertSQL, [
-                            categoria_id,
-                            proveedor_id,
-                            String(codigo_barras).trim(),
-                            String(nombre).trim(),
-                            String(descripcion),
-                            parseFloat(precio_venta),
-                            parseFloat(precio_costo),
-                            parseInt(stock_actual),
-                            foto
-                        ]);
-                        successCount++;
-                    }
-                    catch (e) {
-                        errors.push(`Fila ${index + 1} (${nombre}): ${e.message}`);
-                    }
-                }
-                await client.query('COMMIT');
-                res.json({ success: true, data: { successCount, errors } });
-            }
-            catch (e) {
-                await client.query('ROLLBACK');
-                console.error('Import transaction error:', e);
-                throw new error_middleware_1.AppError('Error interno al procesar la importación.', 500);
-            }
-            finally {
-                client.release();
-            }
-        }
-        catch (error) {
-            if (error instanceof error_middleware_1.AppError)
-                throw error;
-            console.error('Import handler error:', error);
-            throw new error_middleware_1.AppError('Error al importar productos.', 500);
         }
     },
     // Modificar stock de un producto

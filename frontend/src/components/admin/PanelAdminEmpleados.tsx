@@ -6,6 +6,8 @@ import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { useModal } from '../../context/ModalContext';
 
+import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
+
 export const PanelAdminEmpleados: React.FC = () => {
   const { showConfirm } = useModal();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -27,6 +29,7 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<number | ''>('');
   const [selectedCC, setSelectedCC] = useState<number | ''>('');
   const [activo, setActivo] = useState(true);
+  const [permitirAutoconsumo, setPermitirAutoconsumo] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Estados de subida de fotos
@@ -35,9 +38,11 @@ export const PanelAdminEmpleados: React.FC = () => {
 
   // Estados de búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDept, setFilterDept] = useState<number | ''>('');
-  const [filterCC, setFilterCC] = useState<number | ''>('');
-  const [filterEstado, setFilterEstado] = useState<'activo' | 'inactivo' | ''>('');
+  const [filterDept, setFilterDept] = useState<number | 'ALL'>('ALL');
+  const [filterCC, setFilterCC] = useState<number | 'ALL'>('ALL');
+  const [filterEstado, setFilterEstado] = useState<'ALL' | 'activo' | 'inactivo'>('ALL');
+  const [sortBy, setSortBy] = useState<'nombre' | 'codigo' | 'departamento' | 'cargo'>('nombre');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -90,6 +95,7 @@ export const PanelAdminEmpleados: React.FC = () => {
     setSelectedDept(emp.departamento_id || '');
     setSelectedCC(emp.centro_costos_id || '');
     setActivo(emp.activo);
+    setPermitirAutoconsumo(emp.permitir_autoconsumo || false);
     setShowForm(true);
   };
 
@@ -104,6 +110,7 @@ export const PanelAdminEmpleados: React.FC = () => {
     setSelectedDept(departamentos.length > 0 ? departamentos[0].id : '');
     setSelectedCC(centrosCostos.length > 0 ? centrosCostos[0].id : '');
     setActivo(true);
+    setPermitirAutoconsumo(false);
     setShowForm(true);
   };
 
@@ -126,7 +133,8 @@ export const PanelAdminEmpleados: React.FC = () => {
       foto_perfil: fotoPerfil || null,
       departamento_id: selectedDept ? Number(selectedDept) : null,
       centro_costos_id: selectedCC ? Number(selectedCC) : null,
-      activo
+      activo,
+      permitir_autoconsumo: permitirAutoconsumo
     };
 
     try {
@@ -431,17 +439,32 @@ export const PanelAdminEmpleados: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="colaborador_activo"
-              checked={activo}
-              onChange={(e) => setActivo(e.target.checked)}
-              className="rounded text-gray-800"
-            />
-            <label htmlFor="colaborador_activo" className="text-xs text-gray-600 font-semibold select-none">
-              Colaborador Activo
-            </label>
+          <div className="flex items-center gap-6 pt-1 flex-wrap">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="colaborador_activo"
+                checked={activo}
+                onChange={(e) => setActivo(e.target.checked)}
+                className="rounded text-gray-800"
+              />
+              <label htmlFor="colaborador_activo" className="text-xs text-gray-600 font-semibold select-none">
+                Colaborador Activo
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="permitir_autoconsumo"
+                checked={permitirAutoconsumo}
+                onChange={(e) => setPermitirAutoconsumo(e.target.checked)}
+                className="rounded text-emerald-600"
+              />
+              <label htmlFor="permitir_autoconsumo" className="text-xs text-emerald-700 font-semibold select-none">
+                Autorizar Autoconsumo (Consumo Interno)
+              </label>
+            </div>
           </div>
 
           <div className="flex gap-2 justify-end pt-2">
@@ -462,172 +485,184 @@ export const PanelAdminEmpleados: React.FC = () => {
         </form>
       )}
 
-      {/* Filtros y Buscador */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-4">
-        {/* Buscador */}
-        <div>
-          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Buscar Colaborador</label>
-          <div className="relative">
-            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400 text-xs">
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Nombre o Cédula..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-7 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs placeholder-gray-400 focus:outline-none focus:border-gray-400"
-            />
-          </div>
-        </div>
+      {/* Filtros y Buscador usando SearchAndFilterBar */}
+      {(() => {
+        const filtered = empleados
+          .filter((emp) => {
+            const query = searchTerm.toLowerCase().trim();
+            if (query) {
+              const matchQuery =
+                emp.nombre.toLowerCase().includes(query) ||
+                emp.apellido.toLowerCase().includes(query) ||
+                emp.codigo_empleado.toLowerCase().includes(query) ||
+                `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(query) ||
+                (emp.cargo && emp.cargo.toLowerCase().includes(query));
+              if (!matchQuery) return false;
+            }
 
-        {/* Filtro Departamento */}
-        <div>
-          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Departamento</label>
-          <select
-            value={filterDept}
-            onChange={(e) => setFilterDept(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
-          >
-            <option value="">Todos los Departamentos</option>
-            {departamentos.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+            if (filterDept !== 'ALL' && emp.departamento_id !== filterDept) return false;
+            if (filterCC !== 'ALL' && emp.centro_costos_id !== filterCC) return false;
+            if (filterEstado === 'activo' && !emp.activo) return false;
+            if (filterEstado === 'inactivo' && emp.activo) return false;
 
-        {/* Filtro Centro de Costos */}
-        <div>
-          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Centro de Costos</label>
-          <select
-            value={filterCC}
-            onChange={(e) => setFilterCC(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
-          >
-            <option value="">Todos los CC</option>
-            {centrosCostos.map((cc) => (
-              <option key={cc.id} value={cc.id}>
-                {cc.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+            return true;
+          })
+          .sort((a, b) => {
+            let valA = '';
+            let valB = '';
 
-        {/* Filtro Estado */}
-        <div>
-          <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Estado</label>
-          <select
-            value={filterEstado}
-            onChange={(e) => setFilterEstado(e.target.value as any)}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-gray-400 text-gray-700"
-          >
-            <option value="">Todos los Estados</option>
-            <option value="activo">Activos</option>
-            <option value="inactivo">Inactivos</option>
-          </select>
-        </div>
-      </div>
+            if (sortBy === 'nombre') {
+              valA = `${a.nombre} ${a.apellido}`.toLowerCase();
+              valB = `${b.nombre} ${b.apellido}`.toLowerCase();
+            } else if (sortBy === 'codigo') {
+              valA = a.codigo_empleado.toLowerCase();
+              valB = b.codigo_empleado.toLowerCase();
+            } else if (sortBy === 'departamento') {
+              valA = (a.departamento || '').toLowerCase();
+              valB = (b.departamento || '').toLowerCase();
+            } else if (sortBy === 'cargo') {
+              valA = (a.cargo || '').toLowerCase();
+              valB = (b.cargo || '').toLowerCase();
+            }
 
-      {/* LISTADO */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
-                <th className="px-5 py-3.5">Detalle</th>
-                <th className="px-5 py-3.5">Cédula</th>
-                <th className="px-5 py-3.5">Cargo / Dpto</th>
-                <th className="px-5 py-3.5">Estado</th>
-                <th className="px-5 py-3.5 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(() => {
-                const filtered = empleados.filter((emp) => {
-                  const query = searchTerm.toLowerCase();
-                  const matchQuery =
-                    emp.nombre.toLowerCase().includes(query) ||
-                    emp.apellido.toLowerCase().includes(query) ||
-                    emp.codigo_empleado.toLowerCase().includes(query) ||
-                    `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(query);
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+          });
 
-                  const matchDept = filterDept === '' || emp.departamento_id === filterDept;
-                  const matchCC = filterCC === '' || emp.centro_costos_id === filterCC;
-                  const matchEstado =
-                    filterEstado === '' ||
-                    (filterEstado === 'activo' && emp.activo) ||
-                    (filterEstado === 'inactivo' && !emp.activo);
-
-                  return matchQuery && matchDept && matchCC && matchEstado;
-                });
-
-                if (filtered.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-gray-400 font-medium">
-                        No se encontraron colaboradores que coincidan con los filtros.
-                      </td>
-                    </tr>
-                  );
+        return (
+          <>
+            <SearchAndFilterBar
+              searchPlaceholder="Buscar por nombre, cédula, cargo..."
+              searchValue={searchTerm}
+              onSearchChange={setSearchTerm}
+              totalResults={filtered.length}
+              totalCount={empleados.length}
+              resultsLabel="colaboradores"
+              selectFilters={[
+                {
+                  id: 'departamento',
+                  placeholder: 'Todos los Departamentos',
+                  value: filterDept,
+                  onChange: (val) => setFilterDept(val === 'ALL' ? 'ALL' : Number(val)),
+                  options: departamentos.map((d) => ({ label: d.nombre, value: d.id }))
+                },
+                {
+                  id: 'centro_costos',
+                  placeholder: 'Todos los CC',
+                  value: filterCC,
+                  onChange: (val) => setFilterCC(val === 'ALL' ? 'ALL' : Number(val)),
+                  options: centrosCostos.map((cc) => ({ label: cc.nombre, value: cc.id }))
+                },
+                {
+                  id: 'estado',
+                  placeholder: 'Todos los Estados',
+                  value: filterEstado,
+                  onChange: (val) => setFilterEstado(val as any),
+                  options: [
+                    { label: 'Activos', value: 'activo' },
+                    { label: 'Inactivos', value: 'inactivo' }
+                  ]
                 }
+              ]}
+              sortOptions={[
+                { label: 'Ordenar por: Nombre', value: 'nombre' },
+                { label: 'Ordenar por: Cédula', value: 'codigo' },
+                { label: 'Ordenar por: Departamento', value: 'departamento' },
+                { label: 'Ordenar por: Cargo', value: 'cargo' }
+              ]}
+              sortValue={sortBy}
+              onSortValueChange={(val) => setSortBy(val as any)}
+              sortOrder={sortOrder}
+              onSortOrderChange={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+            />
 
-                return filtered.map((emp) => (
-                <tr key={emp.id} className="hover:bg-gray-50/50">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={emp.foto_perfil}
-                        alt={`${emp.nombre} ${emp.apellido}`}
-                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
-                      />
-                      <div>
-                        <span className="font-bold text-gray-800 block">{emp.nombre} {emp.apellido}</span>
-                        <span className="text-[10px] text-gray-400 block">{emp.email || 'Sin correo'}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-gray-400">{emp.codigo_empleado}</td>
-                  <td className="px-5 py-4">
-                    <span className="text-gray-700 font-medium block">{emp.cargo}</span>
-                    <span className="text-[10px] text-gray-400 block">{emp.departamento}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                      emp.activo
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        : 'bg-rose-50 text-rose-700 border-rose-100'
-                    }`}>
-                      {emp.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => handleEditClick(emp)}
-                        className="px-2.5 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleToggleActivo(emp)}
-                        className={`px-2.5 py-1.5 border rounded-lg font-semibold text-[10px] transition ${
-                          emp.activo
-                            ? 'border-red-200 hover:bg-red-50 text-red-600'
-                            : 'border-emerald-200 hover:bg-emerald-50 text-emerald-600'
-                        }`}
-                      >
-                        {emp.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))})()}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            {/* LISTADO */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                      <th className="px-5 py-3.5">Detalle</th>
+                      <th className="px-5 py-3.5">Cédula</th>
+                      <th className="px-5 py-3.5">Cargo / Dpto</th>
+                      <th className="px-5 py-3.5">Estado</th>
+                      <th className="px-5 py-3.5 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-5 py-8 text-center text-gray-400 font-medium">
+                          No se encontraron colaboradores que coincidan con los filtros.
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.map((emp) => (
+                        <tr key={emp.id} className="hover:bg-gray-50/50">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={emp.foto_perfil}
+                                alt={`${emp.nombre} ${emp.apellido}`}
+                                className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                              />
+                              <div>
+                                <span className="font-semibold text-gray-800 block">
+                                  {emp.nombre} {emp.apellido}
+                                </span>
+                                <span className="text-[10px] text-gray-400 block">{emp.email || 'Sin correo asignado'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 font-mono font-bold text-gray-700">{emp.codigo_empleado}</td>
+                          <td className="px-5 py-4">
+                            <span className="font-medium text-gray-800 block">{emp.cargo || 'Colaborador'}</span>
+                            <span className="text-[10px] text-gray-400 block">
+                              {emp.departamento || 'Sin Dpto'} {emp.centro_costos ? `• ${emp.centro_costos}` : ''}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                emp.activo
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                  : 'bg-red-50 text-red-650 border-red-100'
+                              }`}
+                            >
+                              {emp.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleEditClick(emp)}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleToggleActivo(emp)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                                  emp.activo
+                                    ? 'bg-red-50 hover:bg-red-100 text-red-650'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                                }`}
+                              >
+                                {emp.activo ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       <ModalImportExport
         isOpen={isImportExportOpen}

@@ -22,8 +22,8 @@ const authorizeCrud = async (req, _res, next) => {
         if (rol === 'admin') {
             return next();
         }
-        // Inventario y Guardia pueden LEER todas las tablas (para llenar desplegables)
-        if ((rol === 'inventario' || rol === 'guardia') && req.method === 'GET') {
+        // Cualquier usuario autenticado puede LEER todas las tablas (para llenar desplegables)
+        if (req.method === 'GET') {
             return next();
         }
         // Inventario puede hacer CRUD completo (escribir) a productos, proveedor y categoría
@@ -40,4 +40,5 @@ router.get('/:table', authorizeCrud, admin_controller_1.adminController.read);
 router.post('/:table', authorizeCrud, admin_controller_1.adminController.create);
 router.put('/:table/:id', authorizeCrud, admin_controller_1.adminController.update);
 router.patch('/:table/:id/status', authorizeCrud, admin_controller_1.adminController.toggleStatus);
+router.delete('/:table/:id', authorizeCrud, admin_controller_1.adminController.delete);
 exports.default = router;

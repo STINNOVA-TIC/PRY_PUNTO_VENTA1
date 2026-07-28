@@ -12,7 +12,7 @@ exports.ordenesController = {
     crear: async (req, res) => {
         const client = await db_1.default.connect();
         try {
-            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, detalles } = req.body;
+            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, detalles, tipo_compra } = req.body;
             if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
                 throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
             }
@@ -55,9 +55,9 @@ exports.ordenesController = {
            orden_compra_requiere_contrato, orden_compra_requiere_seguro, orden_compra_requiere_mantenimiento,
            orden_compra_asignado_trabajador, orden_compra_trabajador_asignado, orden_compra_caracteristicas,
            orden_compra_elaborado_por, orden_compra_aprobado_por, orden_compra_recibido_por,
-           orden_compra_estado
+           orden_compra_estado, orden_compra_tipo_compra
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente') 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente', $25) 
          RETURNING orden_compra_id`, [
                 empresa_id,
                 sucursal_id,
@@ -82,7 +82,8 @@ exports.ordenesController = {
                 caracteristicas || null,
                 elaborado_por || null,
                 aprobado_por || null,
-                recibido_por || null
+                recibido_por || null,
+                tipo_compra || 'LOCAL'
             ]);
             const ocId = ocRes.rows[0].orden_compra_id;
             // 4. Insertar los detalles
@@ -373,6 +374,41 @@ exports.ordenesController = {
             if (error instanceof error_middleware_1.AppError)
                 throw error;
             throw new error_middleware_1.AppError('Error al procesar la entrega del requerimiento', 500);
+        }
+        finally {
+            client.release();
+        }
+    },
+    // Eliminar orden de reabastecimiento (Solo para rol Admin)
+    eliminar: async (req, res) => {
+        // El rol_id de admin en base de datos/rolesData es 1
+        if (req.user?.rol_id !== 1) {
+            throw new error_middleware_1.AppError('Acceso denegado. Solo administradores pueden eliminar órdenes.', 403);
+        }
+        const { id } = req.params;
+        const client = await db_1.default.connect();
+        try {
+            await client.query('BEGIN');
+            // 1. Validar que la orden existe
+            const ocRes = await client.query('SELECT * FROM orden_compra WHERE orden_compra_id = $1', [id]);
+            if (ocRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('La orden de reabastecimiento no existe', 404);
+            }
+            // 2. Eliminar detalles de la orden
+            await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
+            // 3. Eliminar cabecera de la orden
+            await client.query('DELETE FROM orden_compra WHERE orden_compra_id = $1', [id]);
+            await client.query('COMMIT');
+            res.json({
+                success: true,
+                message: 'Orden de reabastecimiento eliminada correctamente.'
+            });
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al eliminar la orden de reabastecimiento', 500);
         }
         finally {
             client.release();

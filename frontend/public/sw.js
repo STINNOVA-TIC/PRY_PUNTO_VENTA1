@@ -35,8 +35,8 @@ self.addEventListener('activate', (event) => {
 
 // Interceptar peticiones y servir desde caché o red
 self.addEventListener('fetch', (event) => {
-  // Evitar interceptar peticiones al backend o externos
-  if (!event.request.url.startsWith(self.location.origin)) {
+  // Solo interceptar peticiones GET y evitar peticiones al backend (/api/) o externos
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/') || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 

@@ -50,4 +50,11 @@ export type Permiso =
   | 'nomina.configurar_descuentos'
   | 'configuracion.ver'
   | 'configuracion.editar'
-  | 'configuracion.ver_logs';
+  | 'configuracion.ver_logs'
+  
+  // ============ AUTOCONSUMO ============
+  | 'autoconsumo.ver'
+  | 'autoconsumo.crear'
+  | 'autoconsumo.aprobar'
+  | 'autoconsumo.entregar'
+  | 'autoconsumo.eliminar';

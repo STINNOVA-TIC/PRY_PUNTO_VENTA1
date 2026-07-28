@@ -12,7 +12,12 @@ exports.empleadosController = {
     getAll: async (req, res) => {
         try {
             let query = `
-        SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre
+        SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre,
+               EXISTS (
+                 SELECT 1 FROM usuario u 
+                 JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
+                 WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+               ) as permitir_autoconsumo
         FROM empleado e
         LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
         LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
@@ -43,7 +48,8 @@ exports.empleadosController = {
                 cargo: row.empleado_cargo || 'Empleado',
                 email: row.empleado_email || '',
                 foto_perfil: row.empleado_foto || `https://ui-avatars.com/api/?name=${row.empleado_nombre}+${row.empleado_apellido}&size=128`,
-                activo: row.empleado_estado === 'activo'
+                activo: row.empleado_estado === 'activo',
+                permitir_autoconsumo: row.permitir_autoconsumo || false
             }));
             res.json({
                 success: true,
@@ -59,7 +65,12 @@ exports.empleadosController = {
     getById: async (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const empRes = await db_1.default.query(`SELECT e.*, d.departamento_nombre 
+            const empRes = await db_1.default.query(`SELECT e.*, d.departamento_nombre,
+                EXISTS (
+                  SELECT 1 FROM usuario u 
+                  JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
+                  WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+                ) as permitir_autoconsumo
          FROM empleado e 
          LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
          WHERE e.empleado_id = $1`, [id]);
@@ -84,7 +95,8 @@ exports.empleadosController = {
                     cargo: empleado.empleado_cargo || 'Empleado',
                     email: empleado.empleado_email || '',
                     foto_perfil: empleado.empleado_foto || `https://ui-avatars.com/api/?name=${empleado.empleado_nombre}+${empleado.empleado_apellido}&size=128`,
-                    activo: empleado.empleado_estado === 'activo'
+                    activo: empleado.empleado_estado === 'activo',
+                    permitir_autoconsumo: empleado.permitir_autoconsumo || false
                 }
             });
             return;
@@ -137,7 +149,7 @@ exports.empleadosController = {
     },
     create: async (req, res) => {
         try {
-            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo } = req.body;
+            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo, permitir_autoconsumo } = req.body;
             if (!cedula || !nombre || !apellido) {
                 throw new error_middleware_1.AppError('Cédula, nombre y apellido son requeridos', 400);
             }
@@ -163,9 +175,21 @@ exports.empleadosController = {
                 foto_perfil || null,
                 activo !== false ? 'activo' : 'inactivo'
             ]);
+            const empleado = insertRes.rows[0];
+            if (permitir_autoconsumo) {
+                const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
+           VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
+                    `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
+                    empleado.empleado_email || `autoconsumo_${empleado.empleado_cedula}@empresa.local`,
+                    '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82', // bcrypt hash for 'autoconsumo123'
+                    empleado.empleado_id
+                ]);
+                const userId = userRes.rows[0].usuario_id;
+                await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`, [userId]);
+            }
             res.status(201).json({
                 success: true,
-                data: insertRes.rows[0],
+                data: empleado,
                 message: 'Empleado creado exitosamente'
             });
             return;
@@ -179,7 +203,7 @@ exports.empleadosController = {
     update: async (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo } = req.body;
+            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo, permitir_autoconsumo } = req.body;
             if (!cedula || !nombre || !apellido) {
                 throw new error_middleware_1.AppError('Cédula, nombre y apellido son requeridos', 400);
             }
@@ -210,9 +234,40 @@ exports.empleadosController = {
             if (updateRes.rows.length === 0) {
                 throw new error_middleware_1.AppError('Empleado no encontrado', 404);
             }
+            const empleado = updateRes.rows[0];
+            if (permitir_autoconsumo) {
+                // Buscar si existe el usuario para este empleado
+                const userCheck = await db_1.default.query('SELECT usuario_id FROM usuario WHERE empleado_id = $1', [id]);
+                if (userCheck.rows.length === 0) {
+                    // Crear usuario nuevo con rol 8
+                    const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
+             VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
+                        `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
+                        empleado.empleado_email || `autoconsumo_${empleado.empleado_cedula}@empresa.local`,
+                        '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82', // bcrypt hash for 'autoconsumo123'
+                        id
+                    ]);
+                    const userId = userRes.rows[0].usuario_id;
+                    await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`, [userId]);
+                }
+                else {
+                    const userId = userCheck.rows[0].usuario_id;
+                    // Reactivar usuario si estuviera inactivo
+                    await db_1.default.query("UPDATE usuario SET usuario_estado = 'activo' WHERE usuario_id = $1", [userId]);
+                    // Quitar para reinsertar o simplemente upsert
+                    await db_1.default.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 8', [userId]);
+                    await db_1.default.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)', [userId]);
+                }
+            }
+            else {
+                // Si se quita el check, borrar la asociación al rol de autoconsumo
+                await db_1.default.query(`DELETE FROM usuario_rol 
+           WHERE usuario_id IN (SELECT usuario_id FROM usuario WHERE empleado_id = $1) 
+           AND rol_id = 8`, [id]);
+            }
             res.json({
                 success: true,
-                data: updateRes.rows[0],
+                data: empleado,
                 message: 'Empleado actualizado exitosamente'
             });
             return;
