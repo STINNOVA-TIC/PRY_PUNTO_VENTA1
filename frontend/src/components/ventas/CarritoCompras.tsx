@@ -27,6 +27,7 @@ export const CarritoCompras: React.FC = () => {
   const [justificacion, setJustificacion] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState<string | number>('');
   const [departamentos, setDepartamentos] = useState<any[]>([]);
+  const [showAutoconsumoModal, setShowAutoconsumoModal] = useState(false);
 
   useEffect(() => {
     let timer: any;
@@ -189,6 +190,8 @@ export const CarritoCompras: React.FC = () => {
 
       setItems([]);
       setJustificacion('');
+      setSelectedDeptId('');
+      setShowAutoconsumoModal(false);
       const codRetiro = res.data?.codigo || 'AUTO-NUEVA-SOLICITUD';
       setCodigoRetiroResult(codRetiro);
       setMensaje('✅ Solicitud de autoconsumo registrada con éxito. Debe ser aprobada por Talento Humano.');
@@ -375,45 +378,6 @@ export const CarritoCompras: React.FC = () => {
                 </div>
 
                 <div className="pt-2.5 border-t border-gray-100 space-y-2 text-xs flex-shrink-0">
-                  {isAutoconsumoMode && (
-                    <div className="space-y-2.5 py-1">
-                      {/* Departamento Destino */}
-                      <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                          Departamento Destino
-                        </label>
-                        <select
-                          value={selectedDeptId}
-                          onChange={(e) => setSelectedDeptId(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-[11px] bg-white focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="">Selecciona Departamento</option>
-                          {departamentos.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {d.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-
-
-                      {/* Justificación */}
-                      <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                          Justificación
-                        </label>
-                        <textarea
-                          value={justificacion}
-                          onChange={(e) => setJustificacion(e.target.value)}
-                          placeholder="Reunión de departamento, refrigerio, etc..."
-                          rows={2}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-[11px] focus:outline-none focus:border-emerald-500 resize-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex justify-between font-bold text-gray-800 text-sm pt-1 border-t border-gray-100/60">
                     <span>{isAutoconsumoMode ? 'Costo Empresa:' : 'Total:'}</span>
                     <span>${totalNeto.toFixed(2)}</span>
@@ -427,7 +391,7 @@ export const CarritoCompras: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={isAutoconsumoMode ? realizarAutoconsumo : realizarVenta}
+                  onClick={isAutoconsumoMode ? () => setShowAutoconsumoModal(true) : realizarVenta}
                   disabled={loading || items.length === 0}
                   className={`w-full py-2.5 rounded-lg font-semibold transition disabled:opacity-50 text-xs mt-2 flex-shrink-0 ${
                     isAutoconsumoMode
@@ -513,6 +477,79 @@ export const CarritoCompras: React.FC = () => {
                 className="w-full bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 py-2.5 rounded-lg text-xs font-bold transition active:scale-95"
               >
                 Salir ({countdown}s)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN DE AUTOCONSUMO */}
+      {showAutoconsumoModal && (
+        <div className="fixed inset-0 bg-gray-900/65 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4 transform scale-105 transition duration-200">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-gray-800">Detalles de Autoconsumo</h3>
+              <p className="text-xs text-gray-500">Selecciona el departamento y justificación para registrar el consumo interno.</p>
+            </div>
+
+            {/* Departamento Destino */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Departamento Destino
+              </label>
+              <select
+                value={selectedDeptId}
+                onChange={(e) => setSelectedDeptId(e.target.value)}
+                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-emerald-500 font-medium text-gray-700"
+              >
+                <option value="">Selecciona Departamento</option>
+                {departamentos.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Justificación */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Justificación
+              </label>
+              <textarea
+                value={justificacion}
+                onChange={(e) => setJustificacion(e.target.value)}
+                placeholder="Reunión de departamento, refrigerio, etc..."
+                rows={3}
+                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-emerald-500 resize-none font-medium text-gray-700"
+              />
+            </div>
+
+            {/* Mensaje de error interno del modal */}
+            {mensaje && !mensaje.includes('éxito') && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-[11px]">
+                {mensaje}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAutoconsumoModal(false);
+                  setMensaje('');
+                }}
+                className="w-1/2 bg-gray-50 hover:bg-gray-100 text-gray-650 border border-gray-200 py-2 rounded-lg text-xs font-bold transition active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={realizarAutoconsumo}
+                disabled={loading}
+                className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50"
+              >
+                {loading ? 'Procesando...' : 'Confirmar'}
               </button>
             </div>
           </div>

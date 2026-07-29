@@ -269,10 +269,15 @@ exports.entregasController = {
             const devolucionId = devRes.rows[0].devolucion_id;
             // 3. Restaurar el stock físico únicamente de los productos devueltos
             const devDetailsRes = await client.query('SELECT * FROM devolucion_detalle WHERE devolucion_id = $1', [devolucionId]);
+            const stockUpdates = [];
             for (const d of devDetailsRes.rows) {
                 await client.query('UPDATE producto SET producto_stock = producto_stock + $1 WHERE producto_id = $2', [d.cantidad_devuelta, d.producto_id]);
                 // Registrar movimiento_inventario de devolución
                 const prodRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1', [d.producto_id]);
+                stockUpdates.push({
+                    producto_id: d.producto_id,
+                    cantidad: -Number(d.cantidad_devuelta)
+                });
                 const stockNuevo = prodRes.rows[0]?.producto_stock || 0;
                 await client.query(`INSERT INTO movimiento_inventario (
             producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
@@ -354,7 +359,8 @@ exports.entregasController = {
             if (req.io) {
                 req.io.emit('devolucion-actualizada', { id });
                 req.io.emit('entrega-realizada', { id });
-                console.log('📡 WebSocket: Emitido devolucion-actualizada y entrega-realizada para', id);
+                req.io.emit('stock-actualizado', { productos: stockUpdates });
+                console.log('📡 WebSocket: Emitido devolucion-actualizada, entrega-realizada y stock-actualizado para', id);
             }
             res.json({
                 success: true,
@@ -391,9 +397,14 @@ exports.entregasController = {
             }
             // 1. Restaurar stock físico de los productos y registrar movimientos
             const detailsRes = await client.query('SELECT * FROM solicitud_entrega_detalle WHERE solicitud_entrega_id = $1', [id]);
+            const stockUpdates = [];
             for (const d of detailsRes.rows) {
                 await client.query('UPDATE producto SET producto_stock = producto_stock + $1 WHERE producto_id = $2', [d.solicitud_entrega_detalle_cantidad, d.producto_id]);
                 const prodRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1', [d.producto_id]);
+                stockUpdates.push({
+                    producto_id: d.producto_id,
+                    cantidad: -Number(d.solicitud_entrega_detalle_cantidad)
+                });
                 const stockNuevo = prodRes.rows[0]?.producto_stock || 0;
                 await client.query(`INSERT INTO movimiento_inventario (
             producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
@@ -434,7 +445,8 @@ exports.entregasController = {
             if (req.io) {
                 req.io.emit('entrega-realizada', { id });
                 req.io.emit('devolucion-actualizada', { id });
-                console.log('📡 WebSocket: Emitido entrega-realizada y devolucion-actualizada para', id);
+                req.io.emit('stock-actualizado', { productos: stockUpdates });
+                console.log('📡 WebSocket: Emitido entrega-realizada, devolucion-actualizada y stock-actualizado para', id);
             }
             res.json({
                 success: true,

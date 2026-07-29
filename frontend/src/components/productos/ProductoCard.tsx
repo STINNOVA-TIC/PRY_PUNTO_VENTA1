@@ -21,15 +21,15 @@ export const ProductoCard: React.FC<ProductoCardProps> = ({ producto, onAgregar 
           />
           {isOutOfStock ? (
             <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-red-50 text-red-600 rounded-full border border-red-100">
-              Agotado
+              Agotado (0)
             </span>
           ) : isLowStock ? (
             <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100">
-              Bajo Stock
+              Bajo Stock ({producto.stock_actual})
             </span>
           ) : (
             <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
-              Disponible
+              Disponible ({producto.stock_actual})
             </span>
           )}
         </div>
@@ -53,6 +53,7 @@ export const ProductoCard: React.FC<ProductoCardProps> = ({ producto, onAgregar 
           <span className="text-lg font-black text-gray-800">
             ${producto.precio_venta.toFixed(2)}
           </span>
+          <span className="text-[9px] text-gray-400 mt-0.5">Stock: {producto.stock_actual} uds</span>
         </div>
         
         {onAgregar && !isOutOfStock ? (
