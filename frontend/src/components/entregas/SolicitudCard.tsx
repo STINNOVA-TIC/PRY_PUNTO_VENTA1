@@ -48,8 +48,13 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
   };
 
   const productosList = solicitud.detalles
-    ? solicitud.detalles.map((d: any) => `${d.producto_codigo} - ${d.producto_nombre} (x${d.cantidad})`).join(', ')
-    : `${solicitud.producto?.codigo || ''} - ${solicitud.producto?.nombre || 'Productos'}`;
+    ? solicitud.detalles
+        .map((d: any) => {
+          const desc = d.producto_descripcion ? `, ${d.producto_descripcion}` : '';
+          return `${d.producto_codigo} - ${d.producto_nombre}${desc} (x${d.cantidad})`;
+        })
+        .join(', ')
+    : `${solicitud.producto?.codigo_barras || solicitud.producto?.codigo || ''} - ${solicitud.producto?.nombre || 'Productos'}${solicitud.producto?.descripcion ? `, ${solicitud.producto.descripcion}` : ''}`;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
