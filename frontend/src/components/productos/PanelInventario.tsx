@@ -6,6 +6,7 @@ import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { BotonAccion } from '../common/BotonAccion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
@@ -858,45 +859,33 @@ export const PanelInventario: React.FC = () => {
                               </button>
                               <button
                                 onClick={() => setEditingStockId(null)}
-                                className="text-xs text-gray-400 hover:text-gray-600"
+                                className="text-xs text-gray-400 hover:text-gray-650"
                               >
                                 ✕
                               </button>
                             </div>
                           ) : (
                             <>
-                              <button
+                              <BotonAccion
+                                tipo="editar_detalle"
                                 onClick={() => handleEditProductClick(p)}
-                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-650 rounded-lg font-semibold text-[10px] transition"
-                              >
-                                Editar Detalle
-                              </button>
-                              <button
+                              />
+                              <BotonAccion
+                                tipo={p.activo ? 'desactivar' : 'activar'}
                                 onClick={() => handleToggleProductStatus(p.id, p.activo)}
-                                className={`px-3 py-1.5 border rounded-lg font-semibold text-[10px] transition ${
-                                  p.activo 
-                                    ? 'border-amber-250 hover:bg-amber-50 text-amber-600' 
-                                    : 'border-emerald-250 hover:bg-emerald-50 text-emerald-600'
-                                }`}
-                              >
-                                {p.activo ? 'Desactivar' : 'Activar'}
-                              </button>
-                              <button
+                              />
+                              <BotonAccion
+                                tipo="ajustar_stock"
                                 onClick={() => {
                                   setEditingStockId(p.id);
                                   setNewStockVal(p.stock_actual.toString());
                                 }}
-                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-655 rounded-lg font-semibold text-[10px] transition"
-                              >
-                                Ajustar Stock
-                              </button>
+                              />
                               {rol === 'admin' && (
-                                <button
+                                <BotonAccion
+                                  tipo="eliminar"
                                   onClick={() => handleDeleteProduct(p.id)}
-                                  className="px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg font-semibold text-[10px] transition"
-                                >
-                                  Eliminar
-                                </button>
+                                />
                               )}
                             </>
                           )}

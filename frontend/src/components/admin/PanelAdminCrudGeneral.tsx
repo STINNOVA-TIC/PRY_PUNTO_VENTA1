@@ -3,6 +3,7 @@ import { adminAPI } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { BotonAccion } from '../common/BotonAccion';
 import { useModal } from '../../context/ModalContext';
 
 interface FieldConfig {
@@ -627,22 +628,14 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button
+                          <BotonAccion
+                            tipo="editar"
                             onClick={() => handleEditClick(row)}
-                            className="px-2.5 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
-                          >
-                            Editar
-                          </button>
-                          <button
+                          />
+                          <BotonAccion
+                            tipo={isActivo ? 'desactivar' : 'activar'}
                             onClick={() => handleToggleActive(row)}
-                            className={`px-2.5 py-1.5 border rounded-lg font-semibold text-[10px] transition ${
-                              isActivo
-                                ? 'border-red-200 hover:bg-red-50 text-red-600'
-                                : 'border-emerald-200 hover:bg-emerald-50 text-emerald-600'
-                            }`}
-                          >
-                            {isActivo ? 'Desactivar' : 'Activar'}
-                          </button>
+                          />
                         </div>
                       </td>
                     </tr>

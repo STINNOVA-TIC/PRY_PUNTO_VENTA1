@@ -4,6 +4,7 @@ import { adminAPI } from '../../api/admin.api';
 import { Empleado } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { BotonAccion } from '../common/BotonAccion';
 import { useModal } from '../../context/ModalContext';
 
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
@@ -635,22 +636,14 @@ export const PanelAdminEmpleados: React.FC = () => {
                           </td>
                           <td className="px-5 py-4 text-right">
                             <div className="flex gap-2 justify-end">
-                              <button
+                              <BotonAccion
+                                tipo="editar"
                                 onClick={() => handleEditClick(emp)}
-                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition"
-                              >
-                                Editar
-                              </button>
-                              <button
+                              />
+                              <BotonAccion
+                                tipo={emp.activo ? 'desactivar' : 'activar'}
                                 onClick={() => handleToggleActivo(emp)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                                  emp.activo
-                                    ? 'bg-red-50 hover:bg-red-100 text-red-650'
-                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                                }`}
-                              >
-                                {emp.activo ? 'Desactivar' : 'Activar'}
-                              </button>
+                              />
                             </div>
                           </td>
                         </tr>

@@ -3,6 +3,7 @@ import { usuariosAPI, UsuarioOperador } from '../../api/usuarios.api';
 import { empleadosAPI } from '../../api/empleados.api';
 import { Empleado } from '../../types';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { BotonAccion } from '../common/BotonAccion';
 import { useModal } from '../../context/ModalContext';
 
 export const PanelAdminUsuarios: React.FC = () => {
@@ -308,18 +309,14 @@ export const PanelAdminUsuarios: React.FC = () => {
                   </td>
                   <td className="px-5 py-4 text-right">
                     <div className="flex gap-2 justify-end">
-                      <button
+                      <BotonAccion
+                        tipo="editar"
                         onClick={() => handleEditClick(u)}
-                        className="px-2.5 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-lg font-semibold text-[10px] transition"
-                      >
-                        Editar
-                      </button>
-                      <button
+                      />
+                      <BotonAccion
+                        tipo="eliminar"
                         onClick={() => handleDelete(u.id)}
-                        className="px-2.5 py-1.5 border border-red-200 hover:bg-red-50 text-red-650 rounded-lg font-semibold text-[10px] transition"
-                      >
-                        Eliminar
-                      </button>
+                      />
                     </div>
                   </td>
                 </tr>
