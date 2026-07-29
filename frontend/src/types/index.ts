@@ -92,6 +92,7 @@ export interface DetalleVenta {
 
 export interface SolicitudEntrega {
   id: number;
+  codigo_entrega?: string;
   venta_id: number;
   empleado_id: number;
   producto_id: number;

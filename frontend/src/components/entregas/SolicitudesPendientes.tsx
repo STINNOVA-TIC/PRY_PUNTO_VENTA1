@@ -174,8 +174,10 @@ export const SolicitudesPendientes: React.FC = () => {
 
       const nombre = `${sol.empleado?.nombre || ''} ${sol.empleado?.apellido || ''}`.toLowerCase();
       const cedula = ((sol.empleado as any)?.codigo || sol.empleado?.codigo_empleado || '').toLowerCase();
+      const codigoEntrega = (sol.codigo_entrega || '').toLowerCase();
+      const idStr = String(sol.id);
 
-      return nombre.includes(query) || cedula.includes(query);
+      return nombre.includes(query) || cedula.includes(query) || codigoEntrega.includes(query) || idStr.includes(query);
     });
   }, [solicitudes, activeTab, searchQuery]);
 

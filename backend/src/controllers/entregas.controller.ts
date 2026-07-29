@@ -33,7 +33,7 @@ export const entregasController = {
       const items = [];
       for (const row of solRes.rows) {
         const detailsRes = await pool.query(
-          `SELECT sd.*, p.producto_nombre, p.producto_codigo
+          `SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
            FROM solicitud_entrega_detalle sd
            JOIN producto p ON sd.producto_id = p.producto_id
            WHERE sd.solicitud_entrega_id = $1`,
@@ -67,6 +67,7 @@ export const entregasController = {
             producto_id: d.producto_id,
             producto_nombre: d.producto_nombre,
             producto_codigo: d.producto_codigo,
+            producto_descripcion: d.producto_descripcion,
             cantidad: d.solicitud_entrega_detalle_cantidad,
             precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
           })),
@@ -115,7 +116,7 @@ export const entregasController = {
       }
 
       const detailsRes = await pool.query(
-        `SELECT sd.*, p.producto_nombre, p.producto_codigo
+        `SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
          FROM solicitud_entrega_detalle sd
          JOIN producto p ON sd.producto_id = p.producto_id
          WHERE sd.solicitud_entrega_id = $1`,
@@ -152,6 +153,7 @@ export const entregasController = {
             producto_id: d.producto_id,
             producto_nombre: d.producto_nombre,
             producto_codigo: d.producto_codigo,
+            producto_descripcion: d.producto_descripcion,
             cantidad: d.solicitud_entrega_detalle_cantidad,
             precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
           })),
@@ -185,7 +187,7 @@ export const entregasController = {
       const items = [];
       for (const row of solRes.rows) {
         const detailsRes = await pool.query(
-          `SELECT sd.*, p.producto_nombre, p.producto_codigo
+          `SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
            FROM solicitud_entrega_detalle sd
            JOIN producto p ON sd.producto_id = p.producto_id
            WHERE sd.solicitud_entrega_id = $1`,
@@ -217,6 +219,7 @@ export const entregasController = {
             producto_id: d.producto_id,
             producto_nombre: d.producto_nombre,
             producto_codigo: d.producto_codigo,
+            producto_descripcion: d.producto_descripcion,
             cantidad: d.solicitud_entrega_detalle_cantidad
           })),
           devolucion_estado: devState

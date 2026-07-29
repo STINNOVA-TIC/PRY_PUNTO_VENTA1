@@ -31,7 +31,7 @@ exports.entregasController = {
             const solRes = await db_1.default.query(query, params);
             const items = [];
             for (const row of solRes.rows) {
-                const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo
+                const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
            FROM solicitud_entrega_detalle sd
            JOIN producto p ON sd.producto_id = p.producto_id
            WHERE sd.solicitud_entrega_id = $1`, [row.solicitud_entrega_id]);
@@ -58,6 +58,7 @@ exports.entregasController = {
                         producto_id: d.producto_id,
                         producto_nombre: d.producto_nombre,
                         producto_codigo: d.producto_codigo,
+                        producto_descripcion: d.producto_descripcion,
                         cantidad: d.solicitud_entrega_detalle_cantidad,
                         precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
                     })),
@@ -100,7 +101,7 @@ exports.entregasController = {
             if (!row) {
                 throw new error_middleware_1.AppError('Solicitud de entrega no encontrada', 404);
             }
-            const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo
+            const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
          FROM solicitud_entrega_detalle sd
          JOIN producto p ON sd.producto_id = p.producto_id
          WHERE sd.solicitud_entrega_id = $1`, [row.solicitud_entrega_id]);
@@ -130,6 +131,7 @@ exports.entregasController = {
                         producto_id: d.producto_id,
                         producto_nombre: d.producto_nombre,
                         producto_codigo: d.producto_codigo,
+                        producto_descripcion: d.producto_descripcion,
                         cantidad: d.solicitud_entrega_detalle_cantidad,
                         precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
                     })),
@@ -162,7 +164,7 @@ exports.entregasController = {
             const solRes = await db_1.default.query(query);
             const items = [];
             for (const row of solRes.rows) {
-                const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo
+                const detailsRes = await db_1.default.query(`SELECT sd.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
            FROM solicitud_entrega_detalle sd
            JOIN producto p ON sd.producto_id = p.producto_id
            WHERE sd.solicitud_entrega_id = $1`, [row.solicitud_entrega_id]);
@@ -187,6 +189,7 @@ exports.entregasController = {
                         producto_id: d.producto_id,
                         producto_nombre: d.producto_nombre,
                         producto_codigo: d.producto_codigo,
+                        producto_descripcion: d.producto_descripcion,
                         cantidad: d.solicitud_entrega_detalle_cantidad
                     })),
                     devolucion_estado: devState

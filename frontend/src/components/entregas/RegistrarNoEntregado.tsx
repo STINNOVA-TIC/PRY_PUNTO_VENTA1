@@ -142,10 +142,19 @@ export const RegistrarNoEntregado: React.FC = () => {
                 {solicitud.detalles?.map((d: any) => (
                   <tr key={d.id} className="text-gray-700">
                     <td className="px-4 py-3 font-semibold text-gray-800">
-                      <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px]">
-                        {d.producto_codigo}
-                      </span>
-                      {d.producto_nombre}
+                      <div className="flex items-center flex-wrap">
+                        <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px] flex-shrink-0">
+                          {d.producto_codigo}
+                        </span>
+                        <span className="text-gray-850">
+                          {d.producto_nombre}
+                          {d.producto_descripcion && (
+                            <span className="text-[11px] text-gray-400 font-normal ml-1">
+                              , {d.producto_descripcion}
+                            </span>
+                          )}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right font-bold">{d.cantidad}</td>
                   </tr>
