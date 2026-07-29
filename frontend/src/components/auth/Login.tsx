@@ -127,8 +127,10 @@ export const Login: React.FC = () => {
                 <div className="relative">
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={cedula}
-                    onChange={(e) => setCedula(e.target.value)}
+                    onChange={(e) => setCedula(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm shadow-inner"
                     placeholder="Ej. 1751992817"
                     required
