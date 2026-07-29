@@ -48,7 +48,7 @@ export const RecepcionRequerimientos: React.FC = () => {
         adminAPI.read('empresa')
       ]);
       setOrdenes(ordRes.data || []);
-      setEmpresas(empRes.data || []);
+      setEmpresas((empRes.data || []).filter((emp: any) => emp.empresa_estado === 'activo'));
     } catch (err: any) {
       console.error('Error al cargar órdenes de compra:', err);
       setError('No se pudieron cargar los requerimientos del sistema.');

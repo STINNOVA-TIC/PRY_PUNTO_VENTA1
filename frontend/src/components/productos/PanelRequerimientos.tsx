@@ -105,7 +105,7 @@ export const PanelRequerimientos: React.FC = () => {
       ]);
 
       // Filtrar y establecer empresas (ej: ST INNOVA y ST DRIVE)
-      const empData = empRes.data || [];
+      const empData = (empRes.data || []).filter((emp: any) => emp.empresa_estado === 'activo');
       setEmpresas(empData);
       if (empData.length > 0) setEmpresaId(empData[0].empresa_id);
 
