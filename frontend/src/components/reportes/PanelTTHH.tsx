@@ -36,7 +36,7 @@ export const PanelTTHH: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('todos');
 
   // Pestanias
-  const [activeTab, setActiveTab] = useState<'resumen' | 'detalle'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'detalle' | 'autoconsumos_reporte'>('resumen');
 
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState('');
@@ -235,6 +235,101 @@ export const PanelTTHH: React.FC = () => {
     });
   }, [transacciones, searchEmpleado, searchProducto, selectedDept, selectedCC, selectedCat]);
 
+  // Filtrado de autoconsumos para reportes
+  const autoconsumosFiltrados = useMemo(() => {
+    return autoconsumos.filter(a => {
+      if (!a) return false;
+      const matchEmpleado = searchEmpleado ? (
+        a.empleado.nombre.toLowerCase().includes(searchEmpleado.toLowerCase()) ||
+        a.empleado.cedula.includes(searchEmpleado)
+      ) : true;
+
+      const matchDept = selectedDept ? a.departamento.nombre === selectedDept : true;
+
+      const date = new Date(a.fecha_solicitud);
+      if (fechaInicio) {
+        const start = new Date(fechaInicio);
+        start.setHours(0,0,0,0);
+        if (date < start) return false;
+      }
+      if (fechaFin) {
+        const end = new Date(fechaFin);
+        end.setHours(23,59,59,999);
+        if (date > end) return false;
+      }
+
+      return matchEmpleado && matchDept;
+    });
+  }, [autoconsumos, searchEmpleado, selectedDept, fechaInicio, fechaFin]);
+
+  // Filtrado de consumo acumulado (resumen nomina)
+  const reporteConsumoFiltrado = useMemo(() => {
+    return reporteConsumo.filter(row => {
+      const matchEmpleado = searchEmpleado ? (
+        row.empleado.toLowerCase().includes(searchEmpleado.toLowerCase()) ||
+        row.codigo.includes(searchEmpleado)
+      ) : true;
+      const matchDept = selectedDept ? row.departamento === selectedDept : true;
+      return matchEmpleado && matchDept;
+    });
+  }, [reporteConsumo, searchEmpleado, selectedDept]);
+
+  // Consumo acumulado agrupado
+  const resumenAgrupado = useMemo(() => {
+    if (groupBy === 'none') return [];
+    
+    const groups: { [key: string]: { items: any[]; total: number; compras: number } } = {};
+    
+    reporteConsumoFiltrado.forEach(row => {
+      let key = 'General';
+      if (groupBy === 'departamento') key = row.departamento;
+      if (groupBy === 'empleado') key = row.empleado;
+      
+      if (!groups[key]) {
+        groups[key] = { items: [], total: 0, compras: 0 };
+      }
+      groups[key].items.push(row);
+      groups[key].total += row.total_gastado;
+      groups[key].compras += row.total_compras;
+    });
+    
+    return Object.keys(groups).map(key => ({
+      name: key,
+      items: groups[key].items,
+      total: groups[key].total,
+      compras: groups[key].compras
+    }));
+  }, [reporteConsumoFiltrado, groupBy]);
+
+  // Autoconsumos agrupados
+  const autoconsumosAgrupados = useMemo(() => {
+    if (groupBy === 'none') return [];
+    
+    const groups: { [key: string]: { items: any[]; total: number; count: number } } = {};
+    
+    autoconsumosFiltrados.forEach((a: any) => {
+      let key = 'General';
+      if (groupBy === 'departamento') key = a.departamento.nombre;
+      if (groupBy === 'empleado') key = a.empleado.nombre;
+      if (groupBy === 'centro_costos') key = a.centro_costos?.nombre || 'Sin Centro de Costos';
+      
+      if (!groups[key]) {
+        groups[key] = { items: [], total: 0, count: 0 };
+      }
+      const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      groups[key].items.push(a);
+      groups[key].total += total;
+      groups[key].count += 1;
+    });
+    
+    return Object.keys(groups).map(key => ({
+      name: key,
+      items: groups[key].items,
+      total: groups[key].total,
+      count: groups[key].count
+    }));
+  }, [autoconsumosFiltrados, groupBy]);
+
   // Filtros dinamicos extraidos de transacciones activas
   const departamentosUnicos = useMemo(() => Array.from(new Set(transacciones.map(t => t.departamento).filter(Boolean))), [transacciones]);
   const centrosCostosUnicos = useMemo(() => Array.from(new Set(transacciones.map(t => t.centro_costos).filter(Boolean))), [transacciones]);
@@ -277,17 +372,18 @@ export const PanelTTHH: React.FC = () => {
 
   // Exportar Consumo Acumulado (Resumen) a CSV
   const exportarResumenCSV = async () => {
-    if (reporteConsumo.length === 0) {
+    const listado = reporteConsumoFiltrado;
+    if (listado.length === 0) {
       await showAlert({
         title: 'Exportar Reporte',
-        message: 'No hay consumos para exportar.',
+        message: 'No hay consumos filtrados para exportar.',
         type: 'warning'
       });
       return;
     }
 
     const headers = ['Colaborador', 'Cedula', 'Departamento', 'No. Compras', 'Total a Descontar'];
-    const rows = reporteConsumo.map(row => [
+    const rows = listado.map(row => [
       row.empleado,
       row.codigo,
       row.departamento,
@@ -317,16 +413,17 @@ export const PanelTTHH: React.FC = () => {
 
   // Exportar Consumo Acumulado (Resumen) a XLSX
   const exportarResumenXLSX = async () => {
-    if (reporteConsumo.length === 0) {
+    const listado = reporteConsumoFiltrado;
+    if (listado.length === 0) {
       await showAlert({
         title: 'Exportar Reporte',
-        message: 'No hay consumos para exportar.',
+        message: 'No hay consumos filtrados para exportar.',
         type: 'warning'
       });
       return;
     }
 
-    const rows = reporteConsumo.map(row => ({
+    const rows = listado.map(row => ({
       'Colaborador': row.empleado,
       'Cédula': row.codigo,
       'Departamento': row.departamento,
@@ -345,10 +442,11 @@ export const PanelTTHH: React.FC = () => {
 
   // Exportar Consumo Acumulado (Resumen) a PDF
   const exportarResumenPDF = async () => {
-    if (reporteConsumo.length === 0) {
+    const listado = reporteConsumoFiltrado;
+    if (listado.length === 0) {
       await showAlert({
         title: 'Exportar Reporte',
-        message: 'No hay consumos para exportar.',
+        message: 'No hay consumos filtrados para exportar.',
         type: 'warning'
       });
       return;
@@ -370,7 +468,7 @@ export const PanelTTHH: React.FC = () => {
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
 
     const headers = [['Colaborador', 'Cédula', 'Departamento', 'No. Compras', 'Total a Descontar']];
-    const rows = reporteConsumo.map(row => [
+    const rows = listado.map(row => [
       row.empleado,
       row.codigo,
       row.departamento,
@@ -388,6 +486,151 @@ export const PanelTTHH: React.FC = () => {
     });
 
     doc.save(`Nomina_Consumo_Acumulado_${fInicio}_a_${fFin}.pdf`);
+  };
+
+  // Exportar Autoconsumos a CSV
+  const exportarAutoconsumosCSV = async () => {
+    const listado = autoconsumosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay autoconsumos filtrados para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const headers = ['Codigo', 'Fecha Solicitud', 'Empleado', 'Cedula', 'Departamento', 'Centro de Costos', 'Justificacion', 'Estado', 'Aprobador', 'Despachador', 'Total'];
+
+    const rows = listado.map(a => {
+      const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      return [
+        a.codigo,
+        new Date(a.fecha_solicitud).toLocaleString(),
+        a.empleado.nombre,
+        a.empleado.cedula,
+        a.departamento.nombre,
+        a.centro_costos?.nombre || '-',
+        a.justificacion,
+        a.estado,
+        a.aprobador || '-',
+        a.despachador || '-',
+        total.toFixed(2)
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Reporte_Autoconsumos_${fInicio}_a_${fFin}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Exportar Autoconsumos a Excel (XLSX)
+  const exportarAutoconsumosXLSX = async () => {
+    const listado = autoconsumosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay autoconsumos filtrados para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const rows = listado.map(a => {
+      const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      return {
+        'Código': a.codigo,
+        'Fecha Solicitud': new Date(a.fecha_solicitud).toLocaleString(),
+        'Empleado': a.empleado.nombre,
+        'Cédula': a.empleado.cedula,
+        'Departamento': a.departamento.nombre,
+        'Centro de Costos': a.centro_costos?.nombre || '-',
+        'Justificación': a.justificacion,
+        'Estado': a.estado,
+        'Aprobador': a.aprobador || '-',
+        'Despachador': a.despachador || '-',
+        'Total': total
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Autoconsumos');
+
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+    XLSX.writeFile(workbook, `Reporte_Autoconsumos_${fInicio}_a_${fFin}.xlsx`);
+  };
+
+  // Exportar Autoconsumos a PDF
+  const exportarAutoconsumosPDF = async () => {
+    const listado = autoconsumosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay autoconsumos filtrados para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    doc.setFontSize(16);
+    doc.text('Reporte de Autoconsumos - Talento Humano', 14, 15);
+    doc.setFontSize(10);
+    
+    const fInicio = fechaInicio || 'INICIO';
+    const fFin = fechaFin || 'FIN';
+    doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
+    doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
+
+    const headers = [['Código', 'Fecha Solicitud', 'Empleado', 'Cédula', 'Departamento', 'Centro de Costos', 'Justificación', 'Estado', 'Total']];
+
+    const rows = listado.map(a => {
+      const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      return [
+        a.codigo,
+        new Date(a.fecha_solicitud).toLocaleString(),
+        a.empleado.nombre,
+        a.empleado.cedula,
+        a.departamento.nombre,
+        a.centro_costos?.nombre || '-',
+        a.justificacion.length > 30 ? a.justificacion.substring(0, 28) + '..' : a.justificacion,
+        a.estado.toUpperCase(),
+        `$${total.toFixed(2)}`
+      ];
+    });
+
+    autoTable(doc, {
+      head: headers,
+      body: rows,
+      startY: 32,
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 8, cellPadding: 2.5 }
+    });
+
+    doc.save(`Reporte_Autoconsumos_${fInicio}_a_${fFin}.pdf`);
   };
 
   // Exportar a CSV (Registro Detallado)
@@ -698,6 +941,84 @@ export const PanelTTHH: React.FC = () => {
             </div>
           </div>
 
+          {/* FILTROS AVANZADOS GENERALES */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs">
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Buscar Colaborador</label>
+              <input
+                type="text"
+                placeholder="Nombre o Cedula..."
+                value={searchEmpleado}
+                onChange={(e) => setSearchEmpleado(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Buscar Producto</label>
+              <input
+                type="text"
+                placeholder="Nombre o Codigo..."
+                value={searchProducto}
+                onChange={(e) => setSearchProducto(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Departamento</label>
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
+              >
+                <option value="">Todos</option>
+                {departamentosUnicos.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Centro Costos</label>
+              <select
+                value={selectedCC}
+                onChange={(e) => setSelectedCC(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
+              >
+                <option value="">Todos</option>
+                {centrosCostosUnicos.map(cc => (
+                  <option key={cc} value={cc}>{cc}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Categoria</label>
+              <select
+                value={selectedCat}
+                onChange={(e) => setSelectedCat(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
+              >
+                <option value="">Todos</option>
+                {categoriasUnicas.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Agrupar por</label>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700 font-semibold"
+              >
+                <option value="none">Sin agrupar (Individual)</option>
+                <option value="empleado">Colaborador / Empleado</option>
+                <option value="producto">Producto (Solo Detalle)</option>
+                <option value="categoria">Categoría (Solo Detalle)</option>
+                <option value="centro_costos">Centro de Costos</option>
+                <option value="departamento">Departamento</option>
+              </select>
+            </div>
+          </div>
+
           {/* PESTANIAS DE REPORTES */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200">
@@ -722,6 +1043,16 @@ export const PanelTTHH: React.FC = () => {
                 >
                   Registro Detallado (Transacciones)
                 </button>
+                <button
+                  onClick={() => setActiveTab('autoconsumos_reporte')}
+                  className={`pb-3 text-sm font-semibold transition border-b-2 ${
+                    activeTab === 'autoconsumos_reporte'
+                      ? 'border-gray-800 text-gray-800'
+                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  Autoconsumos (Consumo Interno)
+                </button>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pb-2 sm:pb-0">
@@ -730,6 +1061,12 @@ export const PanelTTHH: React.FC = () => {
                     onExportCSV={exportarCSV}
                     onExportXLSX={exportarXLSX}
                     onExportPDF={exportarPDF}
+                  />
+                ) : activeTab === 'autoconsumos_reporte' ? (
+                  <BotonDescargar
+                    onExportCSV={exportarAutoconsumosCSV}
+                    onExportXLSX={exportarAutoconsumosXLSX}
+                    onExportPDF={exportarAutoconsumosPDF}
                   />
                 ) : (
                   <BotonDescargar
@@ -747,131 +1084,107 @@ export const PanelTTHH: React.FC = () => {
 
             {/* CONTENIDO DE PESTANIA: RESUMEN */}
             {activeTab === 'resumen' && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
-                  <span>Resumen general de descuentos</span>
-                  <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
-                </div>
+              groupBy === 'none' ? (
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
+                    <span>Resumen general de descuentos</span>
+                    <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
+                  </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
-                        <th className="px-5 py-3.5">Colaborador</th>
-                        <th className="px-5 py-3.5">Cedula</th>
-                        <th className="px-5 py-3.5">Departamento</th>
-                        <th className="px-5 py-3.5 text-center">No. Compras</th>
-                        <th className="px-5 py-3.5 text-right">Total a Descontar</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {reporteConsumo.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50/50">
-                          <td className="px-5 py-4 font-bold text-gray-800">{row.empleado}</td>
-                          <td className="px-5 py-4 font-mono text-gray-400">{row.codigo}</td>
-                          <td className="px-5 py-4 text-gray-500">{row.departamento}</td>
-                          <td className="px-5 py-4 text-center text-gray-600 font-medium">{row.total_compras}</td>
-                          <td className="px-5 py-4 text-right font-black text-gray-800 text-sm">
-                            ${row.total_gastado.toFixed(2)}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                          <th className="px-5 py-3.5">Colaborador</th>
+                          <th className="px-5 py-3.5">Cedula</th>
+                          <th className="px-5 py-3.5">Departamento</th>
+                          <th className="px-5 py-3.5 text-center">No. Compras</th>
+                          <th className="px-5 py-3.5 text-right">Total a Descontar</th>
                         </tr>
-                      ))}
-                      {reporteConsumo.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="text-center py-8 text-gray-400">
-                            No hay consumos en el periodo seleccionado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {reporteConsumoFiltrado.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="px-5 py-4 font-bold text-gray-800">{row.empleado}</td>
+                            <td className="px-5 py-4 font-mono text-gray-400">{row.codigo}</td>
+                            <td className="px-5 py-4 text-gray-500">{row.departamento}</td>
+                            <td className="px-5 py-4 text-center text-gray-600 font-medium">{row.total_compras}</td>
+                            <td className="px-5 py-4 text-right font-black text-gray-800 text-sm">
+                              ${row.total_gastado.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                        {reporteConsumoFiltrado.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="text-center py-8 text-gray-400">
+                              No hay consumos que coincidan con los filtros y periodo seleccionados.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {resumenAgrupado.map(group => (
+                    <div key={group.name} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div
+                        onClick={() => toggleGroup(group.name)}
+                        className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer select-none text-xs font-semibold border-b border-gray-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">{expandedGroups[group.name] ? 'v' : '>'}</span>
+                          <span className="text-gray-800 font-bold">{group.name}</span>
+                        </div>
+                        <div className="flex items-center gap-6 text-gray-600 font-mono">
+                          <span>No. Compras: {group.compras}</span>
+                          <span className="text-gray-800 font-black">Total: ${group.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {expandedGroups[group.name] && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-gray-105 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                                <th className="px-5 py-2.5">Colaborador</th>
+                                <th className="px-5 py-2.5">Cedula</th>
+                                <th className="px-5 py-2.5">Departamento</th>
+                                <th className="px-5 py-2.5 text-center">No. Compras</th>
+                                <th className="px-5 py-2.5 text-right">Total a Descontar</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {group.items.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50/30">
+                                  <td className="px-5 py-3 font-bold text-gray-800">{row.empleado}</td>
+                                  <td className="px-5 py-3 font-mono text-gray-400">{row.codigo}</td>
+                                  <td className="px-5 py-3 text-gray-500">{row.departamento}</td>
+                                  <td className="px-5 py-3 text-center text-gray-600 font-medium">{row.total_compras}</td>
+                                  <td className="px-5 py-3 text-right font-semibold text-gray-850">
+                                    ${row.total_gastado.toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {resumenAgrupado.length === 0 && (
+                    <div className="text-center py-8 bg-white border border-gray-200 rounded-xl text-gray-400 text-xs">
+                      No hay consumos agrupados con los filtros actuales.
+                    </div>
+                  )}
+                </div>
+              )
             )}
 
             {/* CONTENIDO DE PESTANIA: DETALLE (Transacciones) */}
             {activeTab === 'detalle' && (
               <div className="space-y-4">
-                {/* FILTROS AVANZADOS */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
-                  <div>
-                    <label className="block text-gray-500 mb-1 font-semibold">Buscar Colaborador</label>
-                    <input
-                      type="text"
-                      placeholder="Nombre o Cedula..."
-                      value={searchEmpleado}
-                      onChange={(e) => setSearchEmpleado(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 mb-1 font-semibold">Buscar Producto</label>
-                    <input
-                      type="text"
-                      placeholder="Nombre o Codigo..."
-                      value={searchProducto}
-                      onChange={(e) => setSearchProducto(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 mb-1 font-semibold">Departamento</label>
-                    <select
-                      value={selectedDept}
-                      onChange={(e) => setSelectedDept(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
-                    >
-                      <option value="">Todos</option>
-                      {departamentosUnicos.map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 mb-1 font-semibold">Centro Costos</label>
-                    <select
-                      value={selectedCC}
-                      onChange={(e) => setSelectedCC(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
-                    >
-                      <option value="">Todos</option>
-                      {centrosCostosUnicos.map(cc => (
-                        <option key={cc} value={cc}>{cc}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 mb-1 font-semibold">Categoria</label>
-                    <select
-                      value={selectedCat}
-                      onChange={(e) => setSelectedCat(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
-                    >
-                      <option value="">Todos</option>
-                      {categoriasUnicas.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* AGRUPAMIENTO */}
-                <div className="flex items-center gap-3 text-xs bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                  <span className="font-semibold text-gray-600">Agrupar por:</span>
-                  <select
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value as any)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg bg-white font-semibold text-gray-700 focus:outline-none"
-                  >
-                    <option value="none">Sin agrupar (Individual)</option>
-                    <option value="empleado">Colaborador / Empleado</option>
-                    <option value="producto">Producto</option>
-                    <option value="categoria">Categoria</option>
-                    <option value="centro_costos">Centro de Costos</option>
-                    <option value="departamento">Departamento</option>
-                  </select>
-                  <span className="text-[10px] text-gray-400 font-medium">({transaccionesFiltradas.length} transacciones individuales)</span>
-                </div>
 
                 {/* RENDER AGRUPADO O INDIVIDUAL */}
                 {groupBy === 'none' ? (
@@ -980,6 +1293,151 @@ export const PanelTTHH: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* CONTENIDO DE PESTANIA: AUTOCONSUMOS */}
+            {activeTab === 'autoconsumos_reporte' && (
+              groupBy === 'none' ? (
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
+                    <span>Listado de consumos internos (asumidos por la empresa)</span>
+                    <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-gray-100 text-gray-600 uppercase tracking-wider text-[9px] font-bold border-b border-gray-200">
+                          <th className="px-5 py-3">Código</th>
+                          <th className="px-5 py-3">Fecha</th>
+                          <th className="px-5 py-3">Empleado</th>
+                          <th className="px-5 py-3">Departamento</th>
+                          <th className="px-5 py-3">Centro de Costos</th>
+                          <th className="px-5 py-3">Justificación</th>
+                          <th className="px-5 py-3">Estado</th>
+                          <th className="px-5 py-3 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {autoconsumosFiltrados.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="px-5 py-8 text-center text-gray-400">
+                              No hay autoconsumos registrados en este rango de fechas o filtros.
+                            </td>
+                          </tr>
+                        ) : (
+                          autoconsumosFiltrados.map((a) => {
+                            const total = a.detalles?.reduce((sum, d) => sum + d.subtotal, 0) || 0;
+                            return (
+                              <tr key={a.id} className="hover:bg-gray-50/50">
+                                <td className="px-5 py-4 font-mono font-bold text-[10px] text-gray-700">{a.codigo}</td>
+                                <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{new Date(a.fecha_solicitud).toLocaleDateString()}</td>
+                                <td className="px-5 py-4">
+                                  <span className="font-bold text-gray-800">{a.empleado.nombre}</span>
+                                  <span className="block text-[9px] text-gray-400">{a.empleado.cedula}</span>
+                                </td>
+                                <td className="px-5 py-4 text-gray-650">{a.departamento.nombre}</td>
+                                <td className="px-5 py-4 text-gray-650">{a.centro_costos?.nombre || '-'}</td>
+                                <td className="px-5 py-4 text-gray-500 max-w-[200px] truncate" title={a.justificacion}>
+                                  {a.justificacion}
+                                </td>
+                                <td className="px-5 py-4">
+                                  <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                                    a.estado === 'entregado'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                      : a.estado === 'pendiente'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200'
+                                  }`}>
+                                    {a.estado}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 text-right font-bold text-gray-800">${total.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {autoconsumosAgrupados.map(group => (
+                    <div key={group.name} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div
+                        onClick={() => toggleGroup(group.name)}
+                        className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer select-none text-xs font-semibold border-b border-gray-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">{expandedGroups[group.name] ? 'v' : '>'}</span>
+                          <span className="text-gray-800 font-bold">{group.name}</span>
+                        </div>
+                        <div className="flex items-center gap-6 text-gray-600 font-mono">
+                          <span>Solicitudes: {group.count}</span>
+                          <span className="text-gray-800 font-black">Total: ${group.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {expandedGroups[group.name] && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-gray-100 border-b border-gray-200 text-gray-650 uppercase tracking-wider text-[9px] font-bold">
+                                <th className="px-5 py-2.5">Código</th>
+                                <th className="px-5 py-2.5">Fecha</th>
+                                <th className="px-5 py-2.5">Empleado</th>
+                                <th className="px-5 py-2.5">Departamento</th>
+                                <th className="px-5 py-2.5">Centro de Costos</th>
+                                <th className="px-5 py-2.5">Justificación</th>
+                                <th className="px-5 py-2.5">Estado</th>
+                                <th className="px-5 py-2.5 text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {group.items.map((a: any) => {
+                                const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+                                return (
+                                  <tr key={a.id} className="hover:bg-gray-50/30">
+                                    <td className="px-5 py-3 font-mono font-bold text-[10px] text-gray-700">{a.codigo}</td>
+                                    <td className="px-5 py-3 text-gray-500 whitespace-nowrap">{new Date(a.fecha_solicitud).toLocaleDateString()}</td>
+                                    <td className="px-5 py-3">
+                                      <span className="font-bold text-gray-800">{a.empleado.nombre}</span>
+                                      <span className="block text-[9px] text-gray-400">{a.empleado.cedula}</span>
+                                    </td>
+                                    <td className="px-5 py-3 text-gray-500">{a.departamento.nombre}</td>
+                                    <td className="px-5 py-3 text-gray-500">{a.centro_costos?.nombre || '-'}</td>
+                                    <td className="px-5 py-3 text-gray-500 max-w-[200px] truncate" title={a.justificacion}>
+                                      {a.justificacion}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                                        a.estado === 'entregado'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          : a.estado === 'pendiente'
+                                          ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                          : 'bg-gray-50 text-gray-600 border-gray-200'
+                                      }`}>
+                                        {a.estado}
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-3 text-right font-bold text-gray-800">${total.toFixed(2)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {autoconsumosAgrupados.length === 0 && (
+                    <div className="text-center py-8 bg-white border border-gray-200 rounded-xl text-gray-400 text-xs">
+                      No hay autoconsumos agrupados con los filtros actuales.
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
           </div>
         </div>
       )}
