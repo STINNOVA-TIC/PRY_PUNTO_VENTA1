@@ -49,7 +49,7 @@ const upload = (0, multer_1.default)({
         }
     },
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5 MB max
+        fileSize: 20 * 1024 * 1024 // 20 MB max
     }
 });
 router.post('/', auth_middleware_1.authenticate, upload.single('foto'), (req, res) => {

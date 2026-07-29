@@ -71,8 +71,9 @@ export const ConfirmarEntrega: React.FC = () => {
         setError('');
         const res = await adminAPI.uploadPhoto(file, 'entrega');
         setFotoUrl(res.url);
-      } catch (err) {
-        setError('Error al subir la fotografía de comprobación');
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.message || err.message || '';
+        setError(`Error al subir la fotografía de comprobación: ${errorMsg}`);
       } finally {
         setSubiendoFoto(false);
       }
