@@ -500,10 +500,11 @@ export const PanelTTHH: React.FC = () => {
       return;
     }
 
-    const headers = ['Codigo', 'Fecha Solicitud', 'Empleado', 'Cedula', 'Departamento', 'Centro de Costos', 'Justificacion', 'Estado', 'Aprobador', 'Despachador', 'Total'];
+    const headers = ['Codigo', 'Fecha Solicitud', 'Empleado', 'Cedula', 'Departamento', 'Centro de Costos', 'Justificacion', 'Productos', 'Estado', 'Aprobador', 'Despachador', 'Total'];
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join(' | ') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
@@ -512,6 +513,7 @@ export const PanelTTHH: React.FC = () => {
         a.departamento.nombre,
         a.centro_costos?.nombre || '-',
         a.justificacion,
+        productsText,
         a.estado,
         a.aprobador || '-',
         a.despachador || '-',
@@ -553,6 +555,7 @@ export const PanelTTHH: React.FC = () => {
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join(', ') || '-';
       return {
         'Código': a.codigo,
         'Fecha Solicitud': new Date(a.fecha_solicitud).toLocaleString(),
@@ -561,6 +564,7 @@ export const PanelTTHH: React.FC = () => {
         'Departamento': a.departamento.nombre,
         'Centro de Costos': a.centro_costos?.nombre || '-',
         'Justificación': a.justificacion,
+        'Productos': productsText,
         'Estado': a.estado,
         'Aprobador': a.aprobador || '-',
         'Despachador': a.despachador || '-',
@@ -604,10 +608,11 @@ export const PanelTTHH: React.FC = () => {
     doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
 
-    const headers = [['Código', 'Fecha Solicitud', 'Empleado', 'Cédula', 'Departamento', 'Centro de Costos', 'Justificación', 'Estado', 'Total']];
+    const headers = [['Código', 'Fecha Solicitud', 'Empleado', 'Cédula', 'Departamento', 'Centro de Costos', 'Justificación', 'Productos', 'Estado', 'Total']];
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join('\n') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
@@ -615,7 +620,8 @@ export const PanelTTHH: React.FC = () => {
         a.empleado.cedula,
         a.departamento.nombre,
         a.centro_costos?.nombre || '-',
-        a.justificacion.length > 30 ? a.justificacion.substring(0, 28) + '..' : a.justificacion,
+        a.justificacion.length > 25 ? a.justificacion.substring(0, 23) + '..' : a.justificacion,
+        productsText,
         a.estado.toUpperCase(),
         `$${total.toFixed(2)}`
       ];
@@ -1312,6 +1318,7 @@ export const PanelTTHH: React.FC = () => {
                           <th className="px-5 py-3">Departamento</th>
                           <th className="px-5 py-3">Centro de Costos</th>
                           <th className="px-5 py-3">Justificación</th>
+                          <th className="px-5 py-3">Productos</th>
                           <th className="px-5 py-3">Estado</th>
                           <th className="px-5 py-3 text-right">Total</th>
                         </tr>
@@ -1319,7 +1326,7 @@ export const PanelTTHH: React.FC = () => {
                       <tbody className="divide-y divide-gray-200">
                         {autoconsumosFiltrados.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-5 py-8 text-center text-gray-400">
+                            <td colSpan={9} className="px-5 py-8 text-center text-gray-400">
                               No hay autoconsumos registrados en este rango de fechas o filtros.
                             </td>
                           </tr>
@@ -1336,8 +1343,18 @@ export const PanelTTHH: React.FC = () => {
                                 </td>
                                 <td className="px-5 py-4 text-gray-650">{a.departamento.nombre}</td>
                                 <td className="px-5 py-4 text-gray-650">{a.centro_costos?.nombre || '-'}</td>
-                                <td className="px-5 py-4 text-gray-500 max-w-[200px] truncate" title={a.justificacion}>
+                                <td className="px-5 py-4 text-gray-500 max-w-[150px] truncate" title={a.justificacion}>
                                   {a.justificacion}
+                                </td>
+                                <td className="px-5 py-4">
+                                  <div className="space-y-0.5 text-[10px] text-gray-600 font-mono min-w-[150px]">
+                                    {a.detalles?.map((d: any) => (
+                                      <div key={d.id} className="flex justify-between gap-2">
+                                        <span>• {d.producto_nombre}</span>
+                                        <span className="font-bold text-gray-750">x{d.cantidad}</span>
+                                      </div>
+                                    )) || '-'}
+                                  </div>
                                 </td>
                                 <td className="px-5 py-4">
                                   <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
