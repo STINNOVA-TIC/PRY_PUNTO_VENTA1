@@ -8,8 +8,12 @@ import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
+import { BotonDescargar } from '../common/BotonDescargar';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const PanelInventario: React.FC = () => {
   const { user } = useAuth();
@@ -423,6 +427,198 @@ export const PanelInventario: React.FC = () => {
       });
   }, [productos, searchTerm, filterCategory, filterStatus, filterStock, sortBy, sortOrder]);
 
+  const exportarCSV = async () => {
+    const listado = productosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay productos en inventario para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const headers = ['Codigo', 'Producto', 'Descripcion', 'Precio Costo', 'Precio Venta', 'Stock', 'Val. Costo Total', 'Val. Venta Total'];
+    let totalStock = 0;
+    let totalValCosto = 0;
+    let totalValVenta = 0;
+
+    const rows = listado.map(p => {
+      const valCosto = p.precio_costo * p.stock_actual;
+      const valVenta = p.precio_venta * p.stock_actual;
+      totalStock += p.stock_actual;
+      totalValCosto += valCosto;
+      totalValVenta += valVenta;
+
+      return [
+        p.codigo_barras,
+        p.nombre,
+        p.descripcion || '-',
+        p.precio_costo.toFixed(2),
+        p.precio_venta.toFixed(2),
+        p.stock_actual,
+        valCosto.toFixed(2),
+        valVenta.toFixed(2)
+      ];
+    });
+
+    // Añadir fila de totales
+    rows.push([
+      'TOTALES',
+      `${listado.length} productos`,
+      '',
+      '',
+      '',
+      totalStock.toString(),
+      totalValCosto.toFixed(2),
+      totalValVenta.toFixed(2)
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Inventario_Stock_Totales_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportarXLSX = async () => {
+    const listado = productosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay productos en inventario para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    let totalStock = 0;
+    let totalValCosto = 0;
+    let totalValVenta = 0;
+
+    const rows = listado.map(p => {
+      const valCosto = p.precio_costo * p.stock_actual;
+      const valVenta = p.precio_venta * p.stock_actual;
+      totalStock += p.stock_actual;
+      totalValCosto += valCosto;
+      totalValVenta += valVenta;
+
+      return {
+        'Código': p.codigo_barras,
+        'Producto': p.nombre,
+        'Descripción': p.descripcion || '-',
+        'Precio Costo': p.precio_costo,
+        'Precio Venta': p.precio_venta,
+        'Stock': p.stock_actual,
+        'Val. Costo Total': valCosto,
+        'Val. Venta Total': valVenta
+      };
+    });
+
+    // Fila de totales
+    rows.push({
+      'Código': 'TOTALES',
+      'Producto': `${listado.length} productos`,
+      'Descripción': '',
+      'Precio Costo': 0,
+      'Precio Venta': 0,
+      'Stock': totalStock,
+      'Val. Costo Total': Number(totalValCosto.toFixed(2)),
+      'Val. Venta Total': Number(totalValVenta.toFixed(2))
+    } as any);
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario_Stock');
+    XLSX.writeFile(workbook, `Inventario_Stock_Totales_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportarPDF = async () => {
+    const listado = productosFiltrados;
+    if (listado.length === 0) {
+      await showAlert({
+        title: 'Exportar Reporte',
+        message: 'No hay productos en inventario para exportar.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    doc.setFontSize(16);
+    doc.text('Reporte de Stock e Inventario Valorado', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 21);
+    doc.text(`Filtros: Busqueda: "${searchTerm || 'Todas'}" | Categoria: ${filterCategory === 'ALL' ? 'Todas' : categorias.find(c => c.id === filterCategory)?.nombre || 'Todas'}`, 14, 26);
+
+    const headers = [['Código', 'Producto', 'Descripción', 'P. Costo', 'P. Venta', 'Stock', 'Val. Costo', 'Val. Venta']];
+    let totalStock = 0;
+    let totalValCosto = 0;
+    let totalValVenta = 0;
+
+    const rows = listado.map(p => {
+      const valCosto = p.precio_costo * p.stock_actual;
+      const valVenta = p.precio_venta * p.stock_actual;
+      totalStock += p.stock_actual;
+      totalValCosto += valCosto;
+      totalValVenta += valVenta;
+
+      return [
+        p.codigo_barras,
+        p.nombre,
+        p.descripcion || '-',
+        `$${p.precio_costo.toFixed(2)}`,
+        `$${p.precio_venta.toFixed(2)}`,
+        p.stock_actual.toString(),
+        `$${valCosto.toFixed(2)}`,
+        `$${valVenta.toFixed(2)}`
+      ];
+    });
+
+    // Fila de totales
+    rows.push([
+      'TOTALES',
+      `${listado.length} productos`,
+      '',
+      '',
+      '',
+      totalStock.toString(),
+      `$${totalValCosto.toFixed(2)}`,
+      `$${totalValVenta.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: headers,
+      body: rows,
+      startY: 31,
+      theme: 'striped',
+      headStyles: { fillColor: [31, 41, 55] }, // Gray-800
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      didParseCell: (data) => {
+        if (data.row.index === rows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [243, 244, 246]; // Gray-100
+        }
+      }
+    });
+
+    doc.save(`Inventario_Stock_Totales_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-3 font-sans">
@@ -444,33 +640,48 @@ export const PanelInventario: React.FC = () => {
         
         <div className="flex gap-2 items-center">
           <BotonRecargar onRefresh={cargarDatos} loading={loading} />
-          <button
-            type="button"
-            onClick={() => setIsImportExportOpen(true)}
-            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            Importar / Exportar
-          </button>
-          <button
-            onClick={() => {
-              if (showProductForm) {
-                handleCancelProductForm();
-              } else {
-                setShowProductForm(true);
-                setShowOCForm(false);
-              }
-            }}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            {showProductForm ? 'Cerrar Formulario' : 'Crear Nuevo Producto'}
-          </button>
-          
-          <Link
-            to="/requerimientos"
-            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center"
-          >
-            Generar Orden de Compra
-          </Link>
+          {rol !== 'guardia' ? (
+            <>
+              <BotonDescargar
+                onExportCSV={exportarCSV}
+                onExportXLSX={exportarXLSX}
+                onExportPDF={exportarPDF}
+              />
+              <button
+                type="button"
+                onClick={() => setIsImportExportOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                Importar / Exportar
+              </button>
+              <button
+                onClick={() => {
+                  if (showProductForm) {
+                    handleCancelProductForm();
+                  } else {
+                    setShowProductForm(true);
+                    setShowOCForm(false);
+                  }
+                }}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                {showProductForm ? 'Cerrar Formulario' : 'Crear Nuevo Producto'}
+              </button>
+              <Link
+                to="/requerimientos"
+                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center"
+              >
+                Generar Orden de Compra
+              </Link>
+            </>
+          ) : (
+            <button
+              onClick={exportarPDF}
+              className="px-3.5 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
+            >
+              <span>📕 Descargar PDF</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -866,26 +1077,32 @@ export const PanelInventario: React.FC = () => {
                             </div>
                           ) : (
                             <>
-                              <BotonAccion
-                                tipo="editar_detalle"
-                                onClick={() => handleEditProductClick(p)}
-                              />
-                              <BotonAccion
-                                tipo={p.activo ? 'desactivar' : 'activar'}
-                                onClick={() => handleToggleProductStatus(p.id, p.activo)}
-                              />
-                              <BotonAccion
-                                tipo="ajustar_stock"
-                                onClick={() => {
-                                  setEditingStockId(p.id);
-                                  setNewStockVal(p.stock_actual.toString());
-                                }}
-                              />
-                              {rol === 'admin' && (
-                                <BotonAccion
-                                  tipo="eliminar"
-                                  onClick={() => handleDeleteProduct(p.id)}
-                                />
+                              {rol !== 'guardia' ? (
+                                <>
+                                  <BotonAccion
+                                    tipo="editar_detalle"
+                                    onClick={() => handleEditProductClick(p)}
+                                  />
+                                  <BotonAccion
+                                    tipo={p.activo ? 'desactivar' : 'activar'}
+                                    onClick={() => handleToggleProductStatus(p.id, p.activo)}
+                                  />
+                                  <BotonAccion
+                                    tipo="ajustar_stock"
+                                    onClick={() => {
+                                      setEditingStockId(p.id);
+                                      setNewStockVal(p.stock_actual.toString());
+                                    }}
+                                  />
+                                  {rol === 'admin' && (
+                                    <BotonAccion
+                                      tipo="eliminar"
+                                      onClick={() => handleDeleteProduct(p.id)}
+                                    />
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 font-semibold italic">Solo Lectura</span>
                               )}
                             </>
                           )}

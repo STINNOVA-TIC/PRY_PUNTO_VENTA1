@@ -44,19 +44,23 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
               
-              {/* Inventario / Admin */}
-              {(rol === 'inventario' || rol === 'admin') && (
+              {/* Inventario / Admin / Guardia */}
+              {(rol === 'inventario' || rol === 'admin' || rol === 'guardia') && (
                 <>
                   <Link to="/inventario" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">
                     Inventario
                   </Link>
-                  <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">
-                    Requerimientos
-                  </Link>
-                  {rol === 'inventario' && (
-                    <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">
-                      Catálogos
-                    </Link>
+                  {(rol === 'inventario' || rol === 'admin') && (
+                    <>
+                      <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">
+                        Requerimientos
+                      </Link>
+                      {rol === 'inventario' && (
+                        <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">
+                          Catálogos
+                        </Link>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -141,8 +145,8 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
 
-          {/* Inventario / Admin */}
-          {(rol === 'inventario' || rol === 'admin') && (
+          {/* Inventario / Admin / Guardia */}
+          {(rol === 'inventario' || rol === 'admin' || rol === 'guardia') && (
             <>
               <Link
                 to="/inventario"
@@ -151,21 +155,25 @@ export const Navbar: React.FC = () => {
               >
                 Inventario
               </Link>
-              <Link
-                to="/requerimientos"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
-              >
-                Requerimientos
-              </Link>
-              {rol === 'inventario' && (
-                <Link
-                  to="/admin/tablas"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
-                >
-                  Catálogos
-                </Link>
+              {(rol === 'inventario' || rol === 'admin') && (
+                <>
+                  <Link
+                    to="/requerimientos"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                  >
+                    Requerimientos
+                  </Link>
+                  {rol === 'inventario' && (
+                    <Link
+                      to="/admin/tablas"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                    >
+                      Catálogos
+                    </Link>
+                  )}
+                </>
               )}
             </>
           )}
