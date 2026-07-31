@@ -130,7 +130,8 @@ export const GruposPermisos = {
     'entregas.ver',   // Para ver estado de sus entregas
     'inventario.ver', // Para ver disponibilidad
     'reportes.ver_consumo_empleados', // Solo su propio consumo
-    'nomina.ver_propia'
+    'nomina.ver_propia',
+    'autoconsumo.ver'
   ] as Permiso[],
 
   // INVENTARIO: Gestión de productos y stock

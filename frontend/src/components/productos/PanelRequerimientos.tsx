@@ -24,6 +24,7 @@ export const PanelRequerimientos: React.FC = () => {
 
   // Búsquedas y Tooltips
   const [productSearch, setProductSearch] = useState('');
+  const [ccSearch, setCcSearch] = useState('');
   const [showFotoTooltip, setShowFotoTooltip] = useState(false);
   const [itemCentrosCostoIds, setItemCentrosCostoIds] = useState<number[]>([]);
 
@@ -244,6 +245,7 @@ export const PanelRequerimientos: React.FC = () => {
     setItemDescripcion('');
     setItemFoto('');
     setItemCentrosCostoIds([]);
+    setCcSearch('');
     setError('');
   };
 
@@ -739,26 +741,40 @@ export const PanelRequerimientos: React.FC = () => {
             </div>
 
             {/* Selector de Múltiples Centros de Costo para el Ítem */}
-            <div className="md:col-span-4">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Centros de Costo Asignados al Producto (Puede elegir más de uno)</label>
+            <div className="md:col-span-4 space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-600">Centros de Costo Asignados al Producto (Puede elegir más de uno)</label>
+              <input
+                type="text"
+                placeholder="🔍 Buscar centro de costos por código o nombre..."
+                value={ccSearch}
+                onChange={(e) => setCcSearch(e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
+              />
               <div className="flex flex-wrap gap-2.5 bg-white p-3 border border-gray-300 rounded-xl max-h-24 overflow-y-auto">
-                {centrosCosto.map(cc => (
-                  <label key={cc.centro_costos_id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:text-gray-900 select-none">
-                    <input
-                      type="checkbox"
-                      checked={itemCentrosCostoIds.includes(cc.centro_costos_id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setItemCentrosCostoIds([...itemCentrosCostoIds, cc.centro_costos_id]);
-                        } else {
-                          setItemCentrosCostoIds(itemCentrosCostoIds.filter(id => id !== cc.centro_costos_id));
-                        }
-                      }}
-                      className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850 rounded border-gray-300"
-                    />
-                    <span>{cc.centro_costos_codigo} - {cc.centro_costos_nombre}</span>
-                  </label>
-                ))}
+                {centrosCosto
+                  .filter(cc => {
+                    const q = ccSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    return cc.centro_costos_codigo.toLowerCase().includes(q) ||
+                           cc.centro_costos_nombre.toLowerCase().includes(q);
+                  })
+                  .map(cc => (
+                    <label key={cc.centro_costos_id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:text-gray-900 select-none">
+                      <input
+                        type="checkbox"
+                        checked={itemCentrosCostoIds.includes(cc.centro_costos_id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setItemCentrosCostoIds([...itemCentrosCostoIds, cc.centro_costos_id]);
+                          } else {
+                            setItemCentrosCostoIds(itemCentrosCostoIds.filter(id => id !== cc.centro_costos_id));
+                          }
+                        }}
+                        className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850 rounded border-gray-300"
+                      />
+                      <span>{cc.centro_costos_codigo} - {cc.centro_costos_nombre}</span>
+                    </label>
+                  ))}
               </div>
             </div>
 

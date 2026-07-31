@@ -3,8 +3,10 @@ import { useAuth } from '../../context/AuthContext';
 import { ventasAPI } from '../../api/ventas.api';
 import { empleadosAPI } from '../../api/empleados.api';
 import { autoconsumoAPI } from '../../api/autoconsumo.api';
+import { entregasAPI } from '../../api/entregas.api';
 import { Producto, CreateVentaRequest } from '../../types';
 import { CatalogoProductos } from '../productos/CatalogoProductos';
+import { BotonRecargar } from '../common/BotonRecargar';
 import logoEmpresa from '../../assets/logo.png';
 
 interface ItemCarrito {
@@ -19,15 +21,72 @@ export const CarritoCompras: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [codigoRetiroResult, setCodigoRetiroResult] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'productos' | 'carrito'>('productos');
+  const [activeTab, setActiveTab] = useState<'productos' | 'carrito' | 'pedidos'>('productos');
   const [countdown, setCountdown] = useState(5);
 
-  // Estados de Autoconsumo
+  // Estados de Autoconsumo e Historial
   const [isAutoconsumoMode, setIsAutoconsumoMode] = useState(false);
   const [justificacion, setJustificacion] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState<string | number>('');
   const [departamentos, setDepartamentos] = useState<any[]>([]);
   const [showAutoconsumoModal, setShowAutoconsumoModal] = useState(false);
+  
+  const [historialAutoconsumo, setHistorialAutoconsumo] = useState<any[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  const cargarHistorial = async () => {
+    try {
+      setLoadingHistorial(true);
+      const [entregasRes, autoconsumosRes] = await Promise.allSettled([
+        entregasAPI.getAll(),
+        autoconsumoAPI.getAll()
+      ]);
+
+      const listCombined: any[] = [];
+
+      if (entregasRes.status === 'fulfilled' && entregasRes.value.data) {
+        entregasRes.value.data.forEach((ent: any) => {
+          listCombined.push({
+            id: `ent-${ent.id}`,
+            codigo: ent.codigo_entrega || `RET-${ent.id}`,
+            fecha_solicitud: ent.fecha_solicitud,
+            estado: ent.estado,
+            justificacion: 'Pedido de consumo personal (Descuento de nómina)',
+            tipo: 'pedido',
+            detalles: ent.detalles || []
+          });
+        });
+      }
+
+      if (autoconsumosRes.status === 'fulfilled' && autoconsumosRes.value.data) {
+        autoconsumosRes.value.data.forEach((auto: any) => {
+          listCombined.push({
+            id: `auto-${auto.id}`,
+            codigo: auto.codigo || `AUTO-${auto.id}`,
+            fecha_solicitud: auto.fecha_solicitud,
+            estado: auto.estado,
+            justificacion: auto.justificacion || 'Autoconsumo interno',
+            tipo: 'autoconsumo',
+            detalles: auto.detalles || []
+          });
+        });
+      }
+
+      listCombined.sort((a, b) => new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime());
+
+      setHistorialAutoconsumo(listCombined);
+    } catch (err) {
+      console.error('Error cargando historial:', err);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      cargarHistorial();
+    }
+  }, [user]);
 
   useEffect(() => {
     let timer: any;
@@ -128,6 +187,7 @@ export const CarritoCompras: React.FC = () => {
       const codRetiro = res.data?.codigo_retiro || 'RET-NUEVA-COMPRA';
       setCodigoRetiroResult(codRetiro);
       setMensaje('✅ Compra realizada con éxito.');
+      cargarHistorial();
       setShowSuccessModal(true);
     } catch (error: any) {
       setMensaje(error.response?.data?.message || 'Error al procesar la compra');
@@ -195,6 +255,7 @@ export const CarritoCompras: React.FC = () => {
       const codRetiro = res.data?.codigo || 'AUTO-NUEVA-SOLICITUD';
       setCodigoRetiroResult(codRetiro);
       setMensaje('✅ Solicitud de autoconsumo registrada con éxito. Debe ser aprobada por Talento Humano.');
+      cargarHistorial();
       setShowSuccessModal(true);
     } catch (error: any) {
       setMensaje(error.response?.data?.message || 'Error al procesar el autoconsumo');
@@ -237,6 +298,17 @@ export const CarritoCompras: React.FC = () => {
               {isAutoconsumoMode ? 'Volver a Compras' : 'Modo Autoconsumo'}
             </button>
           )}
+          {/* Botón de Mis Pedidos al lado de Salir (solo visible en computadora) */}
+          <button
+            onClick={() => setActiveTab(activeTab === 'pedidos' ? 'productos' : 'pedidos')}
+            className={`hidden md:flex px-4 py-2 rounded-lg text-xs font-bold transition items-center gap-1 active:scale-95 border ${
+              activeTab === 'pedidos'
+                ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-850 shadow-sm'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
+            }`}
+          >
+            {activeTab === 'pedidos' ? '🛍️ Ver Catálogo' : '📋 Mis Pedidos / Códigos'}
+          </button>
           <button
             onClick={handleSalir}
             className="bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95"
@@ -273,6 +345,17 @@ export const CarritoCompras: React.FC = () => {
               {items.reduce((acc, curr) => acc + curr.cantidad, 0)}
             </span>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('pedidos')}
+          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all ${
+            activeTab === 'pedidos'
+              ? 'bg-white text-gray-800 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📋 Mis Pedidos
         </button>
       </div>
 
@@ -413,10 +496,11 @@ export const CarritoCompras: React.FC = () => {
         </div>
 
         {/* PANEL DERECHO: Catalogo de Productos */}
-        <div className={`${activeTab === 'productos' ? 'flex' : 'hidden'} md:flex md:col-span-2 lg:col-span-3 flex-col min-h-0 bg-white border border-gray-200 rounded-xl p-5 shadow-sm`}>
+        <div className={`${activeTab === 'productos' ? 'flex' : 'hidden'} ${activeTab === 'pedidos' ? 'md:hidden' : 'md:flex'} md:col-span-2 lg:col-span-3 flex-col min-h-0 bg-white border border-gray-200 rounded-xl p-5 shadow-sm`}>
           <div className="overflow-y-auto flex-grow pr-1">
             <CatalogoProductos 
               onAgregarProducto={agregarProducto} 
+              hideZeroStock={true}
               onProductosLoaded={(prods) => {
                 // Sincronizar los items del carrito con el stock_actual fresco del catálogo al cargar/actualizar
                 setItems(prevItems => prevItems.map(item => {
@@ -433,6 +517,88 @@ export const CarritoCompras: React.FC = () => {
                 }).filter(item => item.producto.stock_actual > 0)); // Eliminar del carrito si ya no existe stock disponible
               }}
             />
+          </div>
+        </div>
+
+        {/* PANEL HISTORIAL: Mis Pedidos / Códigos */}
+        <div className={`${activeTab === 'pedidos' ? 'flex flex-col md:col-span-2 lg:col-span-3' : 'hidden'} min-h-0 bg-white border border-gray-200 rounded-xl p-5 shadow-sm overflow-hidden`}>
+          <div className="flex justify-between items-center pb-3 border-b border-gray-150 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-gray-800">📋 Mis Pedidos y Códigos de Retiro</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Verifica los códigos de retiro de tus solicitudes autorizadas y pendientes.</p>
+            </div>
+            <BotonRecargar onRefresh={cargarHistorial} loading={loadingHistorial} />
+          </div>
+
+          <div className="overflow-y-auto flex-1 space-y-3.5 pr-1">
+            {historialAutoconsumo.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-xs">
+                No tienes solicitudes registradas en tu historial.
+              </div>
+            ) : (
+              historialAutoconsumo.map((auto) => (
+                <div key={auto.id} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3 shadow-none">
+                  {/* Fila 1: Código, Fecha y Estado */}
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-gray-850 bg-white px-2 py-0.5 border border-gray-250 rounded">
+                        {auto.codigo}
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(auto.codigo);
+                        }}
+                        className="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded font-medium active:scale-95"
+                      >
+                        Copiar Código
+                      </button>
+                    </div>
+                    
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {new Date(auto.fecha_solicitud).toLocaleDateString()}
+                    </span>
+
+                    {/* Estado Badge */}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      auto.estado === 'entregado'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-250'
+                        : auto.estado === 'aprobado'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-250'
+                        : auto.estado === 'rechazado' || auto.estado === 'cancelado'
+                        ? 'bg-red-100 text-red-800 border border-red-250'
+                        : 'bg-amber-100 text-amber-800 border border-amber-250'
+                    }`}>
+                      {auto.estado === 'entregado' 
+                        ? '✅ Entregado' 
+                        : auto.estado === 'aprobado' 
+                        ? '🔵 Aprobado (Por Retirar)' 
+                        : auto.estado === 'pendiente' 
+                        ? '⏳ Pendiente Aprobación' 
+                        : `❌ ${auto.estado}`}
+                    </span>
+                  </div>
+
+                  {/* Justificación */}
+                  <div className="text-xs text-gray-650 bg-white p-2.5 border border-gray-150 rounded-lg">
+                    <span className="font-bold text-gray-400 block text-[9px] uppercase tracking-wider mb-0.5">Justificación / Motivo:</span>
+                    {auto.justificacion}
+                  </div>
+
+                  {/* Detalles / Productos */}
+                  <div className="space-y-1">
+                    <span className="font-bold text-gray-400 block text-[9px] uppercase tracking-wider">Productos de la Solicitud:</span>
+                    <div className="grid grid-cols-1 gap-1 pl-1">
+                      {auto.detalles?.map((det: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-xs text-gray-700 py-1 border-b border-gray-100 last:border-0">
+                          <span>• {det.producto_nombre || 'Artículo de Consumo'}</span>
+                          <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded text-[10px]">x{det.cantidad}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Empleado } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
+import { Paginacion } from '../common/Paginacion';
 import { useModal } from '../../context/ModalContext';
 
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
@@ -17,6 +18,10 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
+
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Formulario Empleado
   const [showForm, setShowForm] = useState(false);
@@ -63,6 +68,10 @@ export const PanelAdminEmpleados: React.FC = () => {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterDept, filterCC, filterEstado]);
 
   const cargarDatos = async () => {
     try {
@@ -531,6 +540,10 @@ export const PanelAdminEmpleados: React.FC = () => {
             return 0;
           });
 
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedList = filtered.slice(startIndex, endIndex);
+
         return (
           <>
             <SearchAndFilterBar
@@ -599,7 +612,7 @@ export const PanelAdminEmpleados: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      filtered.map((emp) => (
+                      paginatedList.map((emp) => (
                         <tr key={emp.id} className="hover:bg-gray-50/50">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
@@ -652,6 +665,16 @@ export const PanelAdminEmpleados: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Componente Reutilizable de Paginación */}
+              <Paginacion
+                currentPage={currentPage}
+                totalItems={filtered.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
+
             </div>
           </>
         );

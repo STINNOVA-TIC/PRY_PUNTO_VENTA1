@@ -8,9 +8,10 @@ import { useSocket } from '../../context/SocketContext';
 interface CatalogoProductosProps {
   onAgregarProducto?: (producto: Producto) => void;
   onProductosLoaded?: (productos: Producto[]) => void;
+  hideZeroStock?: boolean;
 }
 
-export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarProducto, onProductosLoaded }) => {
+export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarProducto, onProductosLoaded, hideZeroStock }) => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<{ id: number; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ onAgregarP
 
   const filtered = productos.filter(p => {
     if (!p.activo) return false;
+    if (hideZeroStock && p.stock_actual <= 0) return false;
     const matchesSearch = 
       p.nombre.toLowerCase().includes(search.toLowerCase()) || 
       (p.descripcion && p.descripcion.toLowerCase().includes(search.toLowerCase())) ||
