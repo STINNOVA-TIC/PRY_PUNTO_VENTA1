@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { productosAPI } from '../../api/productos.api';
 import { ordenesAPI } from '../../api/ordenes.api';
 import { adminAPI } from '../../api/admin.api';
+import { empleadosAPI } from '../../api/empleados.api';
 import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
-
 import { useModal } from '../../context/ModalContext';
 
 export const PanelRequerimientos: React.FC = () => {
@@ -20,6 +20,12 @@ export const PanelRequerimientos: React.FC = () => {
   const [productos, setProductos] = useState<any[]>([]);
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [ordenes, setOrdenes] = useState<any[]>([]);
+  const [colaboradores, setColaboradores] = useState<any[]>([]);
+
+  // Búsquedas y Tooltips
+  const [productSearch, setProductSearch] = useState('');
+  const [showFotoTooltip, setShowFotoTooltip] = useState(false);
+  const [itemCentrosCostoIds, setItemCentrosCostoIds] = useState<number[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -83,25 +89,47 @@ export const PanelRequerimientos: React.FC = () => {
     }
   }, [departamentoId, empresaId]);
 
-  // Actualizar elaboradoPor cuando carguen los datos del usuario
+  // Actualizar elaboradoPor y preseleccionar departamento/centro de costos cuando carguen los datos del usuario
   useEffect(() => {
-    if (user) {
-      const deptoLabel = user.empleado?.departamento || 'TIC';
-      setElaboradoPor(`${deptoLabel}: ${user.nombre}`);
+    if (user && user.empleado) {
+      const deptoLabel = user.empleado.departamento || 'TIC';
+      const primerNombre = user.empleado.nombre.split(' ')[0] || '';
+      const primerApellido = user.empleado.apellido.split(' ')[0] || '';
+      setElaboradoPor(`${deptoLabel}: ${primerNombre} ${primerApellido}`);
     }
-  }, [user]);
+    if (user && user.empleado && departamentos.length > 0) {
+      const userDepto = departamentos.find(
+        (d) => d.departamento_nombre.toLowerCase().trim() === user.empleado?.departamento.toLowerCase().trim()
+      );
+      if (userDepto) {
+        setDepartamentoId(userDepto.departamento_id);
+      }
+    }
+    if (user && user.empleado && centrosCosto.length > 0) {
+      const userCCStr = user.empleado.centro_costos || '';
+      const userCC = centrosCosto.find((cc) => {
+        return userCCStr.toLowerCase().includes(cc.centro_costos_nombre.toLowerCase().trim()) ||
+               userCCStr.toLowerCase().includes(cc.centro_costos_codigo.toLowerCase().trim()) ||
+               cc.centro_costos_nombre.toLowerCase().trim() === userCCStr.toLowerCase().trim();
+      });
+      if (userCC) {
+        setCentroCostosId(userCC.centro_costos_id);
+      }
+    }
+  }, [user, departamentos, centrosCosto]);
 
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const [empRes, sucRes, depRes, ccRes, prodRes, provRes, ordRes] = await Promise.all([
+      const [empRes, sucRes, depRes, ccRes, prodRes, provRes, ordRes, colabRes] = await Promise.all([
         adminAPI.read('empresa'),
         adminAPI.read('sucursal'),
         adminAPI.read('departamento'),
         adminAPI.read('centro_costos'),
         productosAPI.getAll(),
         productosAPI.getProveedores(),
-        ordenesAPI.getAll()
+        ordenesAPI.getAll(),
+        empleadosAPI.getAll()
       ]);
 
       // Filtrar y establecer empresas (ej: ST INNOVA y ST DRIVE)
@@ -124,6 +152,7 @@ export const PanelRequerimientos: React.FC = () => {
       setProductos(prodRes.data || []);
       setProveedores(provRes.data || []);
       setOrdenes(ordRes.data || []);
+      setColaboradores(colabRes.data || []);
     } catch (err) {
       console.error('Error cargando datos para requerimientos:', err);
       setError('Error al conectar con la base de datos para cargar catálogos.');
@@ -181,6 +210,12 @@ export const PanelRequerimientos: React.FC = () => {
     const prodName = matchedProduct ? matchedProduct.nombre : itemDescripcion;
     const finalFoto = matchedProduct ? matchedProduct.foto : itemFoto;
 
+    // Obtener códigos de centros de costo seleccionados para este ítem
+    const selectedCCs = centrosCosto.filter(cc => itemCentrosCostoIds.includes(cc.centro_costos_id));
+    const ccCodes = selectedCCs.map(cc => cc.centro_costos_codigo).join(', ');
+    const ccPrefix = ccCodes ? `[CC: ${ccCodes}] ` : '';
+    const finalComment = `${ccPrefix}${itemComentario}`.trim();
+
     const nuevoItem = {
       producto_id: selectedProductId || null,
       descripcion: prodName,
@@ -190,7 +225,7 @@ export const PanelRequerimientos: React.FC = () => {
       forma_pago: itemFormaPago,
       plazo_pago: itemPlazoPago,
       tiempo_entrega: itemTiempoEntrega,
-      comentario: itemComentario,
+      comentario: finalComment,
       precio_unitario: price,
       subtotal,
       foto: finalFoto || null,
@@ -208,6 +243,7 @@ export const PanelRequerimientos: React.FC = () => {
     setItemProveedorId('');
     setItemDescripcion('');
     setItemFoto('');
+    setItemCentrosCostoIds([]);
     setError('');
   };
 
@@ -425,10 +461,10 @@ export const PanelRequerimientos: React.FC = () => {
 
             {/* Persona que Solicita (Pre-llenado) */}
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Persona que solicita</label>
+              <label className="block text-xs font-semibold text-gray-550 mb-1">Persona que solicita</label>
               <input
                 type="text"
-                value={user?.nombre || ''}
+                value={user?.empleado ? `${user.empleado.nombre} ${user.empleado.apellido}` : user?.nombre || ''}
                 readOnly
                 className="w-full px-3.5 py-2 border border-gray-250 bg-gray-50 text-gray-550 rounded-xl text-sm focus:outline-none"
               />
@@ -517,17 +553,31 @@ export const PanelRequerimientos: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50/50 p-4 border border-gray-200 rounded-2xl">
             
             {/* Seleccionar Producto */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Producto (Almacén)</label>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-600">Producto (Almacén)</label>
+              <input
+                type="text"
+                placeholder="🔍 Buscar por nombre o código..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
+              />
               <select
                 value={selectedProductId}
                 onChange={(e) => handleProductSelect(Number(e.target.value))}
                 className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
               >
                 <option value="">-- Servicio o Artículo Personalizado --</option>
-                {productos.filter(p => p.activo).map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock_actual})</option>
-                ))}
+                {productos
+                  .filter(p => {
+                    if (!p.activo) return false;
+                    const q = productSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q);
+                  })
+                  .map(p => (
+                    <option key={p.id} value={p.id}>{p.codigo_barras} - {p.nombre} (Stock: {p.stock_actual})</option>
+                  ))}
               </select>
             </div>
 
@@ -661,8 +711,24 @@ export const PanelRequerimientos: React.FC = () => {
             </div>
 
             {/* Foto URL (opcional) */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Foto o Imagen URL (Opcional)</label>
+            <div className="relative">
+              <div className="flex items-center gap-1 mb-1">
+                <label className="block text-xs font-semibold text-gray-600">Foto o Imagen URL</label>
+                <div
+                  className="relative flex items-center"
+                  onMouseEnter={() => setShowFotoTooltip(true)}
+                  onMouseLeave={() => setShowFotoTooltip(false)}
+                >
+                  <div className="w-3.5 h-3.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm cursor-help select-none">
+                    !
+                  </div>
+                  {showFotoTooltip && (
+                    <div className="absolute left-0 bottom-full mb-1.5 z-10 w-48 p-2 bg-slate-800 text-white text-[10px] rounded-lg shadow-lg leading-relaxed pointer-events-none">
+                      Este campo es opcional. La imagen o foto se trae directamente del producto cuando fue registrado.
+                    </div>
+                  )}
+                </div>
+              </div>
               <input
                 type="text"
                 value={itemFoto}
@@ -670,6 +736,30 @@ export const PanelRequerimientos: React.FC = () => {
                 placeholder="https://..."
                 className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
               />
+            </div>
+
+            {/* Selector de Múltiples Centros de Costo para el Ítem */}
+            <div className="md:col-span-4">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Centros de Costo Asignados al Producto (Puede elegir más de uno)</label>
+              <div className="flex flex-wrap gap-2.5 bg-white p-3 border border-gray-300 rounded-xl max-h-24 overflow-y-auto">
+                {centrosCosto.map(cc => (
+                  <label key={cc.centro_costos_id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:text-gray-900 select-none">
+                    <input
+                      type="checkbox"
+                      checked={itemCentrosCostoIds.includes(cc.centro_costos_id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setItemCentrosCostoIds([...itemCentrosCostoIds, cc.centro_costos_id]);
+                        } else {
+                          setItemCentrosCostoIds(itemCentrosCostoIds.filter(id => id !== cc.centro_costos_id));
+                        }
+                      }}
+                      className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850 rounded border-gray-300"
+                    />
+                    <span>{cc.centro_costos_codigo} - {cc.centro_costos_nombre}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* Comentario */}
@@ -863,31 +953,50 @@ export const PanelRequerimientos: React.FC = () => {
                 value={elaboradoPor}
                 onChange={(e) => setElaboradoPor(e.target.value)}
                 placeholder="Ej. TIC: David Quishpe"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm"
-                required
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-gray-50 text-gray-500 font-semibold"
+                readOnly
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Aprobado por (Gerente Finanzas)</label>
-              <input
-                type="text"
+              <select
                 value={aprobadoPor}
                 onChange={(e) => setAprobadoPor(e.target.value)}
-                placeholder="Ej. Gerente Financiera: Dominique Veloz"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm"
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
                 required
-              />
+              >
+                <option value="Gerente Financiera: Dominique Veloz">Gerente Financiera: Dominique Veloz (Por defecto)</option>
+                {colaboradores.map(c => {
+                  const label = `${c.departamento || 'General'}: ${c.nombre} ${c.apellido}`;
+                  if (label.toLowerCase().includes('dominique veloz')) return null;
+                  return (
+                    <option key={c.id} value={label}>{label}</option>
+                  );
+                })}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Recibido por (Ventas/Compras)</label>
-              <input
-                type="text"
+              <select
                 value={recibidoPor}
                 onChange={(e) => setRecibidoPor(e.target.value)}
-                placeholder="Ej. Compras: Mishell Paucar"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm"
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
                 required
-              />
+              >
+                <option value="Compras: Mishell Paucar">Compras: Mishell Paucar (Por defecto)</option>
+                {colaboradores
+                  .filter(c => {
+                    const cargo = (c.cargo || '').toLowerCase();
+                    return cargo.includes('compras locales') || cargo.includes('comex') || cargo.includes('compra');
+                  })
+                  .map(c => {
+                    const label = `${c.cargo || 'Compras'}: ${c.nombre} ${c.apellido}`;
+                    if (label.toLowerCase().includes('mishell paucar')) return null;
+                    return (
+                      <option key={c.id} value={label}>{label}</option>
+                    );
+                  })}
+              </select>
             </div>
           </div>
         </div>
