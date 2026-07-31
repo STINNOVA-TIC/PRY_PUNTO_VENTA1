@@ -143,7 +143,7 @@ export const GruposPermisos = {
     'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
     'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
     'categorias.ver', 'categorias.crear', 'categorias.editar',
-    'autoconsumo.ver'
+    'autoconsumo.ver', 'empleados.ver'
   ] as Permiso[],
 
   // TTHH: Gestión de nómina, devoluciones y gastos de empleados

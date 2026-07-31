@@ -50,7 +50,8 @@ exports.GruposPermisos = {
         'entregas.ver', // Para ver estado de sus entregas
         'inventario.ver', // Para ver disponibilidad
         'reportes.ver_consumo_empleados', // Solo su propio consumo
-        'nomina.ver_propia'
+        'nomina.ver_propia',
+        'autoconsumo.ver'
     ],
     // INVENTARIO: Gestión de productos y stock
     INVENTARIO: [
@@ -61,7 +62,7 @@ exports.GruposPermisos = {
         'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
         'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
         'categorias.ver', 'categorias.crear', 'categorias.editar',
-        'autoconsumo.ver'
+        'autoconsumo.ver', 'empleados.ver'
     ],
     // TTHH: Gestión de nómina, devoluciones y gastos de empleados
     TTHH: [
