@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { entregasAPI } from '../../api/entregas.api';
 import { devolucionesAPI } from '../../api/devoluciones.api';
-import { adminAPI } from '../../api/admin.api';
 import { autoconsumoAPI } from '../../api/autoconsumo.api';
 import { SolicitudEntrega, Autoconsumo } from '../../types';
 import { SolicitudCard } from './SolicitudCard';
+import { AutoconsumoCard } from './AutoconsumoCard';
 import { useSocket } from '../../context/SocketContext';
+import { Paginacion } from '../common/Paginacion';
 
 export const SolicitudesPendientes: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudEntrega[]>([]);
@@ -15,15 +17,13 @@ export const SolicitudesPendientes: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Estados para despacho de Autoconsumo
-  const [showDespachoAutoModal, setShowDespachoAutoModal] = useState(false);
-  const [selectedAuto, setSelectedAuto] = useState<Autoconsumo | null>(null);
-  const [fotoUrl, setFotoUrl] = useState('');
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
-  const [observacionAuto, setObservacionAuto] = useState('');
+
+  // Paginación de la pestaña de Entregadas
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { socket } = useSocket();
+  const navigate = useNavigate();
 
   useEffect(() => {
     cargarSolicitudes();
@@ -110,54 +110,8 @@ export const SolicitudesPendientes: React.FC = () => {
     }
   };
 
-  const openDespachoAutoModal = (auto: Autoconsumo) => {
-    setSelectedAuto(auto);
-    setFotoUrl('');
-    setObservacionAuto('');
-    setError('');
-    setShowDespachoAutoModal(true);
-  };
-
-  const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      try {
-        setSubiendoFoto(true);
-        setError('');
-        const res = await adminAPI.uploadPhoto(file, 'entrega');
-        setFotoUrl(res.url);
-      } catch (err) {
-        setError('Error al subir la fotografía de comprobación.');
-      } finally {
-        setSubiendoFoto(false);
-      }
-    }
-  };
-
-  const handleConfirmarDespachoAuto = async () => {
-    if (!selectedAuto) return;
-    if (!fotoUrl) {
-      setError('Debes cargar una fotografía de comprobación del despacho.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await autoconsumoAPI.entregar(selectedAuto.id, {
-        observacion: observacionAuto || 'Autoconsumo entregado a bodega.',
-        foto_entrega: fotoUrl
-      });
-      setMensaje(`✅ Autoconsumo ${selectedAuto.codigo} despachado exitosamente.`);
-      setShowDespachoAutoModal(false);
-      setSelectedAuto(null);
-      setFotoUrl('');
-      setObservacionAuto('');
-      cargarSolicitudes();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al despachar el autoconsumo');
-    } finally {
-      setLoading(false);
-    }
+  const handleDespacharAutoconsumo = (auto: Autoconsumo) => {
+    navigate(`/entregas/autoconsumos/${auto.id}/despacho`);
   };
 
   // Filtrado de solicitudes en base a pestaña y buscador
@@ -209,6 +163,18 @@ export const SolicitudesPendientes: React.FC = () => {
         : (estadoStr === 'entregado' || estadoStr === 'no_entregado' || estadoStr === 'cancelado' || estadoStr === 'cancelada' || estadoStr === 'completada');
     }).length;
   }, [solicitudes, autoconsumos, activeTab]);
+
+  // Reiniciar a la primera página al cambiar de pestaña o buscar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, itemsPerPage]);
+
+  const entregadasPaginadas = useMemo(() => {
+    if (activeTab !== 'entregadas') return solicitudesFiltradas;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return solicitudesFiltradas.slice(startIndex, endIndex);
+  }, [solicitudesFiltradas, activeTab, currentPage, itemsPerPage]);
 
   if (loading) {
     return (
@@ -321,79 +287,11 @@ export const SolicitudesPendientes: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {autoconsumosFiltrados.map((auto) => (
-              <div key={auto.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition duration-150 space-y-4 text-xs">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-mono text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">
-                      {auto.codigo}
-                    </span>
-                    <h3 className="text-sm font-bold text-gray-800 mt-1.5">
-                      {auto.empleado.nombre}
-                    </h3>
-                    <p className="text-[10px] text-gray-400 font-mono">
-                      C.I. {auto.empleado.cedula}
-                    </p>
-                  </div>
-                  <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                    auto.estado === 'entregado'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                      : 'bg-amber-50 text-amber-700 border-amber-100'
-                  }`}>
-                    {auto.estado}
-                  </span>
-                </div>
-
-                <div className="text-gray-600 space-y-1">
-                  <div>
-                    <span className="font-semibold text-gray-450">Justificación:</span> {auto.justificacion}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-450">Dpto:</span> {auto.departamento.nombre}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-450">Centro Costos:</span> {auto.centro_costos.nombre}
-                  </div>
-                </div>
-
-                <div className="pt-2.5 border-t border-gray-100">
-                  <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Productos Solicitados
-                  </span>
-                  <div className="space-y-1 font-mono text-[10px] text-gray-600">
-                    {auto.detalles.map((d) => (
-                      <div key={d.id} className="flex justify-between">
-                        <span>• {d.producto_nombre}</span>
-                        <span className="font-bold text-gray-700">x{d.cantidad}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-100/60 flex justify-between items-center">
-                  <span className="text-[10px] text-gray-400">
-                    Solicitado: {new Date(auto.fecha_solicitud).toLocaleDateString()}
-                  </span>
-                  {auto.estado === 'aprobado' && (
-                    <button
-                      onClick={() => openDespachoAutoModal(auto)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-xs transition active:scale-95"
-                    >
-                      Confirmar Despacho
-                    </button>
-                  )}
-                </div>
-
-                {auto.foto_entrega && (
-                  <div className="pt-2">
-                    <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Evidencia despacho</span>
-                    <img 
-                      src={auto.foto_entrega} 
-                      alt="Despacho" 
-                      className="w-full h-24 object-cover rounded-lg border border-gray-200"
-                    />
-                  </div>
-                )}
-              </div>
+              <AutoconsumoCard
+                key={auto.id}
+                auto={auto}
+                onDespachar={handleDespacharAutoconsumo}
+              />
             ))}
           </div>
         )
@@ -408,135 +306,29 @@ export const SolicitudesPendientes: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {solicitudesFiltradas.map((solicitud) => (
-              <SolicitudCard
-                key={solicitud.id}
-                solicitud={solicitud}
-                onCancelar={handleCancelar}
-                onSolicitarDevolucion={handleSolicitarDevolucion}
-              />
-            ))}
-          </div>
-        )
-      )}
-
-      {/* MODAL DESPACHO AUTOCONSUMO */}
-      {showDespachoAutoModal && selectedAuto && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 text-left">
-            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-              <h3 className="text-sm sm:text-base font-bold text-gray-800">
-                Confirmar Despacho Autoconsumo: {selectedAuto.codigo}
-              </h3>
-              <button 
-                onClick={() => { setShowDespachoAutoModal(false); setSelectedAuto(null); }}
-                className="text-gray-450 hover:text-gray-700 text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-gray-600">
-              <div>
-                <span className="font-semibold text-gray-400 uppercase text-[9px] block">Colaborador Destinatario</span>
-                <span className="font-bold text-gray-800 text-sm">{selectedAuto.empleado.nombre}</span>
-              </div>
-
-              <div>
-                <span className="font-semibold text-gray-400 uppercase text-[9px] block">Artículos a Entregar</span>
-                <div className="bg-gray-50 border border-gray-100 rounded-lg p-2.5 space-y-1 mt-1 font-mono">
-                  {selectedAuto.detalles.map((d) => (
-                    <div key={d.id} className="flex justify-between">
-                      <span>{d.producto_nombre}</span>
-                      <span className="font-bold text-gray-800">x{d.cantidad} ud(s)</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Registro de Fotografía */}
-              <div className="space-y-1.5">
-                <span className="block text-[9px] font-bold text-gray-450 uppercase tracking-wider">
-                  Fotografía de Evidencia (Obligatorio)
-                </span>
-                
-                {fotoUrl ? (
-                  <div className="relative">
-                    <img 
-                      src={fotoUrl} 
-                      alt="Evidencia cargada" 
-                      className="w-full h-36 object-cover rounded-xl border border-gray-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFotoUrl('')}
-                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 shadow-sm text-xs font-bold transition"
-                    >
-                      ✕ Quitar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-gray-450 transition bg-gray-50">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment"
-                      onChange={handleFotoChange}
-                      className="hidden" 
-                      id="upload-foto-auto" 
-                    />
-                    <label htmlFor="upload-foto-auto" className="cursor-pointer space-y-2 block">
-                      <div className="text-2xl text-gray-400">📷</div>
-                      <span className="text-xs font-bold text-gray-700 block">
-                        {subiendoFoto ? 'Subiendo fotografía...' : 'Tomar / Cargar Fotografía'}
-                      </span>
-                      <span className="text-[10px] text-gray-400 block font-normal">
-                        Obligatorio para auditar el despacho físico
-                      </span>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Observación / Observación del Guardia */}
-              <div className="space-y-1">
-                <label className="block text-[9px] font-bold text-gray-450 uppercase tracking-wider">
-                  Observaciones de Entrega (Opcional)
-                </label>
-                <textarea
-                  value={observacionAuto}
-                  onChange={(e) => setObservacionAuto(e.target.value)}
-                  placeholder="Detalla cualquier novedad física..."
-                  rows={2}
-                  className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-450 resize-none font-sans"
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {entregadasPaginadas.map((solicitud) => (
+                <SolicitudCard
+                  key={solicitud.id}
+                  solicitud={solicitud}
+                  onCancelar={handleCancelar}
+                  onSolicitarDevolucion={handleSolicitarDevolucion}
                 />
-              </div>
+              ))}
             </div>
 
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-750 rounded-lg text-xs leading-normal">
-                {error}
-              </div>
+            {activeTab === 'entregadas' && (
+              <Paginacion
+                currentPage={currentPage}
+                totalItems={solicitudesFiltradas.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
             )}
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => { setShowDespachoAutoModal(false); setSelectedAuto(null); }}
-                className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-xs font-semibold transition"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={handleConfirmarDespachoAuto}
-                disabled={loading || subiendoFoto || !fotoUrl}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
-              >
-                {loading ? 'Procesando...' : 'Confirmar Despacho'}
-              </button>
-            </div>
-          </div>
-        </div>
+          </>
+        )
       )}
     </div>
   );

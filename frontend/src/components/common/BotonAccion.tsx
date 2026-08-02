@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type TipoBotonAccion = 'editar' | 'eliminar' | 'activar' | 'desactivar' | 'ajustar_stock' | 'editar_detalle';
+export type TipoBotonAccion = 'editar' | 'eliminar' | 'activar' | 'desactivar' | 'ajustar_stock' | 'editar_detalle' | 'ver_detalle';
 
 interface BotonAccionProps {
   tipo: TipoBotonAccion;
@@ -25,6 +25,10 @@ export const BotonAccion: React.FC<BotonAccionProps> = ({
     editar_detalle: {
       styles: 'border border-gray-300 hover:bg-gray-50 text-gray-650 font-semibold',
       defaultLabel: 'Editar Detalle',
+    },
+    ver_detalle: {
+      styles: 'border border-gray-300 hover:bg-gray-50 text-gray-650 font-semibold',
+      defaultLabel: 'Ver Detalle',
     },
     eliminar: {
       styles: 'border border-red-200 hover:bg-red-50 text-red-650 font-semibold',

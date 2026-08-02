@@ -431,34 +431,27 @@ export const PanelRequerimientos: React.FC = () => {
 
             {/* Departamento */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento</label>
-              <select
-                value={departamentoId}
-                onChange={(e) => setDepartamentoId(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
-                required
-              >
-                <option value="">Seleccionar departamento...</option>
-                {departamentos.map(dept => (
-                  <option key={dept.departamento_id} value={dept.departamento_id}>{dept.departamento_nombre} ({dept.departamento_codigo})</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-gray-550 mb-1">Departamento</label>
+              <input
+                type="text"
+                value={departamentos.find(d => d.departamento_id === departamentoId)?.departamento_nombre || 'Seleccionar departamento...'}
+                readOnly
+                className="w-full px-3.5 py-2 border border-gray-250 bg-gray-50 text-gray-550 rounded-xl text-sm focus:outline-none"
+              />
             </div>
 
             {/* Centro de Costos */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Centro de Costos</label>
-              <select
-                value={centroCostosId}
-                onChange={(e) => setCentroCostosId(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
-                required
-              >
-                <option value="">Seleccionar centro de costos...</option>
-                {centrosCosto.map(cc => (
-                  <option key={cc.centro_costos_id} value={cc.centro_costos_id}>{cc.centro_costos_codigo} - {cc.centro_costos_nombre}</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-gray-550 mb-1">Centro de Costos</label>
+              <input
+                type="text"
+                value={(() => {
+                  const cc = centrosCosto.find(cc => cc.centro_costos_id === centroCostosId);
+                  return cc ? `${cc.centro_costos_codigo} - ${cc.centro_costos_nombre}` : 'Seleccionar centro de costos...';
+                })()}
+                readOnly
+                className="w-full px-3.5 py-2 border border-gray-250 bg-gray-50 text-gray-550 rounded-xl text-sm focus:outline-none"
+              />
             </div>
 
             {/* Persona que Solicita (Pre-llenado) */}
@@ -750,7 +743,7 @@ export const PanelRequerimientos: React.FC = () => {
                 onChange={(e) => setCcSearch(e.target.value)}
                 className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
               />
-              <div className="flex flex-wrap gap-2.5 bg-white p-3 border border-gray-300 rounded-xl max-h-24 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 bg-white p-3 border border-gray-300 rounded-xl max-h-40 overflow-y-auto">
                 {centrosCosto
                   .filter(cc => {
                     const q = ccSearch.toLowerCase().trim();
@@ -759,7 +752,7 @@ export const PanelRequerimientos: React.FC = () => {
                            cc.centro_costos_nombre.toLowerCase().includes(q);
                   })
                   .map(cc => (
-                    <label key={cc.centro_costos_id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:text-gray-900 select-none">
+                    <label key={cc.centro_costos_id} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-gray-900 select-none px-2 py-1.5 rounded-lg hover:bg-gray-50">
                       <input
                         type="checkbox"
                         checked={itemCentrosCostoIds.includes(cc.centro_costos_id)}
@@ -770,9 +763,12 @@ export const PanelRequerimientos: React.FC = () => {
                             setItemCentrosCostoIds(itemCentrosCostoIds.filter(id => id !== cc.centro_costos_id));
                           }
                         }}
-                        className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850 rounded border-gray-300"
+                        className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850 rounded border-gray-300 flex-shrink-0"
                       />
-                      <span>{cc.centro_costos_codigo} - {cc.centro_costos_nombre}</span>
+                      <span className="truncate">
+                        <span className="font-bold text-gray-800">{cc.centro_costos_codigo}</span>
+                        <span className="text-gray-500"> - {cc.centro_costos_nombre}</span>
+                      </span>
                     </label>
                   ))}
               </div>
@@ -1006,7 +1002,8 @@ export const PanelRequerimientos: React.FC = () => {
                     return cargo.includes('compras locales') || cargo.includes('comex') || cargo.includes('compra');
                   })
                   .map(c => {
-                    const label = `${c.cargo || 'Compras'}: ${c.nombre} ${c.apellido}`;
+                    const cc = (c.centro_costos || '').trim() || 'Compras';
+                    const label = `${cc}: ${c.nombre} ${c.apellido}`;
                     if (label.toLowerCase().includes('mishell paucar')) return null;
                     return (
                       <option key={c.id} value={label}>{label}</option>

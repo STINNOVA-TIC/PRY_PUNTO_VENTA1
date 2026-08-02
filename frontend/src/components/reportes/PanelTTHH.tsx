@@ -9,6 +9,9 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonDescargar } from '../common/BotonDescargar';
+import { Paginacion } from '../common/Paginacion';
+import { BotonAccion } from '../common/BotonAccion';
+import { ModalDetalle } from '../common/ModalDetalle';
 import { useModal } from '../../context/ModalContext';
 
 export const PanelTTHH: React.FC = () => {
@@ -50,6 +53,22 @@ export const PanelTTHH: React.FC = () => {
   const [selectedCat, setSelectedCat] = useState('');
   const [groupBy, setGroupBy] = useState<'none' | 'empleado' | 'producto' | 'categoria' | 'centro_costos' | 'departamento'>('none');
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
+
+  // Paginación de pestañas de reportes
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Paginación de historiales (devoluciones procesadas y autoconsumos procesados)
+  const [currentPageHistorial, setCurrentPageHistorial] = useState(1);
+  const [itemsPerPageHistorial, setItemsPerPageHistorial] = useState(10);
+
+  // Paginación de solicitudes pendientes (devoluciones y autoconsumos)
+  const [currentPagePendientes, setCurrentPagePendientes] = useState(1);
+  const [itemsPerPagePendientes, setItemsPerPagePendientes] = useState(10);
+
+  // Detalle de registros en historiales
+  const [detalleDevolucion, setDetalleDevolucion] = useState<any>(null);
+  const [detalleAutoconsumo, setDetalleAutoconsumo] = useState<any>(null);
 
   useEffect(() => {
     cargarDatos();
@@ -369,6 +388,33 @@ export const PanelTTHH: React.FC = () => {
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // Reiniciar a la primera página cuando cambian filtros, pestañas o tamaño de página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, groupBy, searchEmpleado, searchProducto, selectedDept, selectedCC, selectedCat, fechaInicio, fechaFin, itemsPerPage]);
+
+  // Reiniciar página del historial al cambiar de módulo
+  useEffect(() => {
+    setCurrentPageHistorial(1);
+    setCurrentPagePendientes(1);
+  }, [moduloActivo]);
+
+  // Slices paginados por pestaña
+  const reporteConsumoPaginado = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return reporteConsumoFiltrado.slice(start, start + itemsPerPage);
+  }, [reporteConsumoFiltrado, currentPage, itemsPerPage]);
+
+  const transaccionesPaginadas = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return transaccionesFiltradas.slice(start, start + itemsPerPage);
+  }, [transaccionesFiltradas, currentPage, itemsPerPage]);
+
+  const autoconsumosPaginados = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return autoconsumosFiltrados.slice(start, start + itemsPerPage);
+  }, [autoconsumosFiltrados, currentPage, itemsPerPage]);
 
   // Exportar Consumo Acumulado (Resumen) a CSV
   const exportarResumenCSV = async () => {
@@ -860,7 +906,7 @@ export const PanelTTHH: React.FC = () => {
               : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          Autoconsumos
+          Solicitudes de Autoconsumos
           {autoconsumos.filter(a => a.estado === 'pendiente').length > 0 && (
             <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
               {autoconsumos.filter(a => a.estado === 'pendiente').length}
@@ -1109,7 +1155,7 @@ export const PanelTTHH: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {reporteConsumoFiltrado.map((row, idx) => (
+                        {reporteConsumoPaginado.map((row, idx) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
                             <td className="px-5 py-4 font-bold text-gray-800">{row.empleado}</td>
                             <td className="px-5 py-4 font-mono text-gray-400">{row.codigo}</td>
@@ -1130,6 +1176,14 @@ export const PanelTTHH: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  <Paginacion
+                    currentPage={currentPage}
+                    totalItems={reporteConsumoFiltrado.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1213,7 +1267,7 @@ export const PanelTTHH: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 font-mono text-gray-700">
-                          {transaccionesFiltradas.map((t, idx) => (
+                          {transaccionesPaginadas.map((t, idx) => (
                             <tr key={idx} className="hover:bg-gray-50/50">
                               <td className="px-5 py-3 whitespace-nowrap text-gray-500">
                                 {new Date(t.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
@@ -1240,6 +1294,14 @@ export const PanelTTHH: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
+
+                    <Paginacion
+                      currentPage={currentPage}
+                      totalItems={transaccionesFiltradas.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={setItemsPerPage}
+                    />
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1331,7 +1393,7 @@ export const PanelTTHH: React.FC = () => {
                             </td>
                           </tr>
                         ) : (
-                          autoconsumosFiltrados.map((a) => {
+                          autoconsumosPaginados.map((a) => {
                             const total = a.detalles?.reduce((sum, d) => sum + d.subtotal, 0) || 0;
                             return (
                               <tr key={a.id} className="hover:bg-gray-50/50">
@@ -1375,6 +1437,14 @@ export const PanelTTHH: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  <Paginacion
+                    currentPage={currentPage}
+                    totalItems={autoconsumosFiltrados.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1478,80 +1548,102 @@ export const PanelTTHH: React.FC = () => {
                 <p className="text-gray-400 text-xs mt-1">Todos los pedidos cancelados han sido procesados.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendientes.map((d) => (
-                  <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3 text-xs">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-mono text-[10px] text-gray-400 block">Codigo: {d.codigo_entrega}</span>
-                        <h4 className="font-bold text-gray-800 text-sm">{d.empleado_nombre}</h4>
-                      </div>
+              <>
+                <div className="flex flex-col gap-3">
+                  {pendientes
+                    .slice((currentPagePendientes - 1) * itemsPerPagePendientes, currentPagePendientes * itemsPerPagePendientes)
+                    .map((d) => (
+                      <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono text-[10px] text-gray-400 block">Codigo: {d.codigo_entrega}</span>
+                          <h4 className="font-bold text-gray-800 text-sm">{d.empleado_nombre}</h4>
+                          <div className="text-gray-600 mt-1 truncate">
+                            <span className="font-semibold text-gray-500">Motivo de Cancelación:</span> {d.motivo}
+                          </div>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleAprobar(d.id)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm"
-                        >
-                          Aprobar
-                        </button>
-                        <button
-                          onClick={() => openRechazoModal(d.id)}
-                          className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 rounded-lg text-xs font-semibold transition"
-                        >
-                          Rechazar
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <BotonAccion
+                            tipo="ver_detalle"
+                            onClick={() => setDetalleDevolucion(d)}
+                          />
+                          <button
+                            onClick={() => handleAprobar(d.id)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm"
+                          >
+                            Aprobar
+                          </button>
+                          <button
+                            onClick={() => openRechazoModal(d.id)}
+                            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 rounded-lg text-xs font-semibold transition"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ))}
+                </div>
 
-                    <div className="text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 font-mono">
-                      <span className="font-semibold text-gray-500 block text-[9px] uppercase tracking-wider mb-1">Motivo de Cancelacion</span>
-                      {d.motivo}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                <Paginacion
+                  currentPage={currentPagePendientes}
+                  totalItems={pendientes.length}
+                  itemsPerPage={itemsPerPagePendientes}
+                  onPageChange={setCurrentPagePendientes}
+                  onItemsPerPageChange={setItemsPerPagePendientes}
+                />
+              </>
             )}
           </div>
 
-          {/* HISTORICO DE DEVOLUCIONES */}
+          {/* HISTORIAL DE DEVOLUCIONES */}
           <div className="space-y-4 pt-6 border-t border-gray-200">
-            <h2 className="text-base font-bold text-gray-800">Historico de Devoluciones Procesadas</h2>
+            <h2 className="text-base font-bold text-gray-800">Historial de Devoluciones Procesadas</h2>
 
             {historico.length === 0 ? (
               <div className="text-center py-12 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-400 text-xs font-semibold">
                 No hay registro de devoluciones procesadas historicas.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {historico.map((d) => (
-                  <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3 text-xs">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-mono text-[10px] text-gray-400 block">{d.codigo_entrega}</span>
-                        <h4 className="font-bold text-gray-800">{d.empleado_nombre}</h4>
+              <>
+                <div className="flex flex-col gap-3">
+                  {historico
+                    .slice((currentPageHistorial - 1) * itemsPerPageHistorial, currentPageHistorial * itemsPerPageHistorial)
+                    .map((d) => (
+                      <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-[10px] text-gray-400">{d.codigo_entrega}</span>
+                            <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                              d.estado === 'aprobado' || d.estado === 'ejecutado'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-red-50 text-red-700 border-red-100'
+                            }`}>
+                              {d.estado}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-gray-800 mt-1">{d.empleado_nombre}</h4>
+                          <div className="text-gray-500 mt-0.5 truncate">
+                            <span className="font-semibold">Motivo:</span> {d.motivo}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <BotonAccion
+                            tipo="ver_detalle"
+                            onClick={() => setDetalleDevolucion(d)}
+                          />
+                        </div>
                       </div>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                        d.estado === 'aprobado' || d.estado === 'ejecutado'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                          : 'bg-red-50 text-red-700 border-red-100'
-                      }`}>
-                        {d.estado}
-                      </span>
-                    </div>
+                    ))}
+                </div>
 
-                    <div className="text-gray-500">
-                      <span className="font-semibold">Motivo:</span> {d.motivo}
-                    </div>
-
-                    {d.observacion_tthh && (
-                      <div className="p-2.5 bg-gray-50 border border-gray-100 rounded text-gray-600">
-                        <span className="font-semibold text-[10px] text-gray-400 block uppercase">Obs TTHH</span>
-                        {d.observacion_tthh}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                <Paginacion
+                  currentPage={currentPageHistorial}
+                  totalItems={historico.length}
+                  itemsPerPage={itemsPerPageHistorial}
+                  onPageChange={setCurrentPageHistorial}
+                  onItemsPerPageChange={setItemsPerPageHistorial}
+                />
+              </>
             )}
           </div>
         </div>
@@ -1568,111 +1660,63 @@ export const PanelTTHH: React.FC = () => {
                 No hay solicitudes de autoconsumo pendientes de aprobación.
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {autoconsumos
-                  .filter((a) => a.estado === 'pendiente')
-                  .map((a) => (
-                    <div key={a.id} className="bg-white border border-gray-250/70 rounded-xl p-5 shadow-xs space-y-4 text-xs">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-mono text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">
-                            {a.codigo}
-                          </span>
+              <>
+                <div className="flex flex-col gap-3">
+                  {autoconsumos
+                    .filter((a) => a.estado === 'pendiente')
+                    .slice((currentPagePendientes - 1) * itemsPerPagePendientes, currentPagePendientes * itemsPerPagePendientes)
+                    .map((a) => (
+                      <div key={a.id} className="bg-white border border-gray-250/70 rounded-xl px-5 py-4 shadow-xs flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">
+                              {a.codigo}
+                            </span>
+                            <span className="text-gray-400 text-[10px] font-medium">
+                              {new Date(a.fecha_solicitud).toLocaleString()}
+                            </span>
+                          </div>
                           <h4 className="font-bold text-gray-800 mt-1.5 text-sm">{a.empleado.nombre}</h4>
                           <span className="text-[10px] text-gray-400 block font-mono">C.I. {a.empleado.cedula}</span>
-                        </div>
-                        <span className="text-gray-400 text-[10px] font-medium">
-                          {new Date(a.fecha_solicitud).toLocaleString()}
-                        </span>
-                      </div>
-
-                      <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-2 text-gray-600">
-                        <div>
-                          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                            Justificación de Consumo
-                          </span>
-                          <p className="text-gray-700 font-medium text-xs mt-0.5">{a.justificacion}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 pt-1 border-t border-gray-150/40 text-[10px]">
-                          <div>
-                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                              Departamento
-                            </span>
-                            <span className="font-semibold text-gray-700">{a.departamento.nombre}</span>
-                          </div>
-                          <div>
-                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                              Centro de Costos
-                            </span>
-                            <span className="font-semibold text-gray-700">
-                              {a.centro_costos.codigo} - {a.centro_costos.nombre}
-                            </span>
+                          <div className="text-gray-600 mt-1 truncate">
+                            <span className="font-semibold text-gray-500">Justificación:</span> {a.justificacion}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Productos */}
-                      <div>
-                        <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                          Productos Solicitados
-                        </span>
-                        <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-white">
-                          {a.detalles.map((d) => (
-                            <div key={d.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
-                              <div>
-                                <span className="font-semibold text-gray-800">{d.producto_nombre}</span>
-                                <span className="text-[10px] text-gray-400 font-mono block">Cód: {d.producto_codigo}</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-bold text-gray-700 block">Cant: {d.cantidad}</span>
-                                <span className="text-[10px] text-gray-400">${d.precio_unitario.toFixed(2)} c/u</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex justify-between items-center mt-3 font-bold text-gray-800 text-[13px] border-t border-gray-100 pt-2">
-                          <span>Costo total a ser asumido por la empresa:</span>
-                          <span className="text-emerald-700">
-                            ${a.detalles.reduce((sum, d) => sum + d.subtotal, 0).toFixed(2)}
-                          </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <BotonAccion
+                            tipo="ver_detalle"
+                            onClick={() => setDetalleAutoconsumo(a)}
+                          />
+                          <button
+                            onClick={() => openRechazoAutoModal(a.id)}
+                            className="px-3.5 py-1.5 border border-red-200 hover:bg-red-50 text-red-650 rounded-lg text-xs font-semibold transition"
+                          >
+                            Rechazar
+                          </button>
+                          <button
+                            onClick={() => handleAprobarAutoconsumo(a.id)}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                          >
+                            Aprobar Solicitud
+                          </button>
                         </div>
                       </div>
+                    ))}
+                </div>
 
-                      {/* Observación para aprobar */}
-                      <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                          Observación / Comentario TTHH (Opcional)
-                        </label>
-                        <input
-                          type="text"
-                          value={autoconsumoObservacion}
-                          onChange={(e) => setAutoconsumoObservacion(e.target.value)}
-                          placeholder="Ej: Aprobado para reunión anual..."
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
-
-                      <div className="flex gap-2 justify-end pt-2">
-                        <button
-                          onClick={() => openRechazoAutoModal(a.id)}
-                          className="px-3.5 py-1.5 border border-red-200 hover:bg-red-50 text-red-650 rounded-lg text-xs font-semibold transition"
-                        >
-                          Rechazar
-                        </button>
-                        <button
-                          onClick={() => handleAprobarAutoconsumo(a.id)}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
-                        >
-                          Aprobar Solicitud
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+                <Paginacion
+                  currentPage={currentPagePendientes}
+                  totalItems={autoconsumos.filter((a) => a.estado === 'pendiente').length}
+                  itemsPerPage={itemsPerPagePendientes}
+                  onPageChange={setCurrentPagePendientes}
+                  onItemsPerPageChange={setItemsPerPagePendientes}
+                />
+              </>
             )}
           </div>
 
-          {/* HISTÓRICO DE AUTOCONSUMOS */}
+          {/* HISTORIAL DE AUTOCONSUMOS */}
           <div className="space-y-4 pt-6 border-t border-gray-200">
             <h2 className="text-base font-bold text-gray-800">Historial de Autoconsumos Procesados</h2>
 
@@ -1681,81 +1725,52 @@ export const PanelTTHH: React.FC = () => {
                 No hay registros históricos de autoconsumo.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {autoconsumos
-                  .filter((a) => a.estado !== 'pendiente')
-                  .map((a) => (
-                    <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3.5 text-xs">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-mono text-[9px] text-gray-400 block">{a.codigo}</span>
-                          <h4 className="font-bold text-gray-800 text-xs mt-0.5">{a.empleado.nombre}</h4>
-                        </div>
-                        <span
-                          className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                            a.estado === 'entregado'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                              : a.estado === 'aprobado'
-                              ? 'bg-amber-50 text-amber-700 border-amber-100'
-                              : 'bg-red-50 text-red-700 border-red-100'
-                          }`}
-                        >
-                          {a.estado}
-                        </span>
-                      </div>
-
-                      <div className="text-gray-500 space-y-1">
-                        <div>
-                          <span className="font-semibold text-gray-400">Justificación:</span> {a.justificacion}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-gray-400">Dpto / CC:</span> {a.departamento.nombre} •{' '}
-                          {a.centro_costos.nombre}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-gray-400">Total:</span> $
-                          {a.detalles.reduce((sum, d) => sum + d.subtotal, 0).toFixed(2)}
-                        </div>
-                      </div>
-
-                      {/* Auditoría de Flujo */}
-                      <div className="p-2.5 bg-gray-50 border border-gray-100 rounded space-y-1.5 text-[10px] text-gray-550">
-                        {a.aprobador && (
-                          <div>
-                            <span className="font-bold">Aprobado por:</span> {a.aprobador}{' '}
-                            {a.fecha_aprobacion && `(${new Date(a.fecha_aprobacion).toLocaleDateString()})`}
+              <>
+                <div className="flex flex-col gap-3">
+                  {autoconsumos
+                    .filter((a) => a.estado !== 'pendiente')
+                    .slice((currentPageHistorial - 1) * itemsPerPageHistorial, currentPageHistorial * itemsPerPageHistorial)
+                    .map((a) => (
+                      <div key={a.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-[9px] text-gray-400">{a.codigo}</span>
+                            <span
+                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                                a.estado === 'entregado'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : a.estado === 'aprobado'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                  : 'bg-red-50 text-red-700 border-red-100'
+                              }`}
+                            >
+                              {a.estado}
+                            </span>
                           </div>
-                        )}
-                        {a.despachador && (
-                          <div>
-                            <span className="font-bold">Despachado por:</span> {a.despachador}{' '}
-                            {a.fecha_entrega && `(${new Date(a.fecha_entrega).toLocaleDateString()})`}
+                          <h4 className="font-bold text-gray-800 mt-1">{a.empleado.nombre}</h4>
+                          <div className="text-gray-500 mt-0.5 truncate">
+                            <span className="font-semibold text-gray-400">Dpto / CC:</span> {a.departamento.nombre} •{' '}
+                            {a.centro_costos.nombre}
                           </div>
-                        )}
-                        {a.observacion && (
-                          <div className="text-gray-700 italic border-t border-gray-200/50 pt-1 mt-1">
-                            <span className="font-bold text-[9px] text-gray-400 uppercase not-italic block">Comentario TTHH / Guardia</span>
-                            "{a.observacion}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Foto de Entrega */}
-                      {a.foto_entrega && a.estado === 'entregado' && (
-                        <div className="pt-1">
-                          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                            Evidencia de Despacho
-                          </span>
-                          <img
-                            src={a.foto_entrega}
-                            alt="Evidencia entrega"
-                            className="w-full h-32 object-cover rounded-lg border border-gray-250 shadow-inner"
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <BotonAccion
+                            tipo="ver_detalle"
+                            onClick={() => setDetalleAutoconsumo(a)}
                           />
                         </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
+                      </div>
+                    ))}
+                </div>
+
+                <Paginacion
+                  currentPage={currentPageHistorial}
+                  totalItems={autoconsumos.filter((a) => a.estado !== 'pendiente').length}
+                  itemsPerPage={itemsPerPageHistorial}
+                  onPageChange={setCurrentPageHistorial}
+                  onItemsPerPageChange={setItemsPerPageHistorial}
+                />
+              </>
             )}
           </div>
         </div>
@@ -1848,6 +1863,126 @@ export const PanelTTHH: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL DE DETALLE DE DEVOLUCION */}
+      <ModalDetalle
+        isOpen={!!detalleDevolucion}
+        onClose={() => setDetalleDevolucion(null)}
+        title="Detalle de Devolución"
+        subtitle={detalleDevolucion?.codigo_entrega}
+        badge={
+          detalleDevolucion && (
+            <span className={`inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+              detalleDevolucion.estado === 'aprobado' || detalleDevolucion.estado === 'ejecutado'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                : 'bg-red-50 text-red-700 border-red-100'
+            }`}>
+              {detalleDevolucion.estado}
+            </span>
+          )
+        }
+        campos={[
+          { label: 'Colaborador', value: detalleDevolucion?.empleado_nombre },
+          { label: 'Cédula', value: detalleDevolucion?.empleado_cedula },
+          { label: 'Motivo de Cancelación', value: detalleDevolucion?.motivo },
+          { label: 'Fecha de Solicitud', value: detalleDevolucion?.fecha_solicitud ? new Date(detalleDevolucion.fecha_solicitud).toLocaleString() : '-' },
+          { label: 'Fecha de Aprobación', value: detalleDevolucion?.fecha_aprobacion ? new Date(detalleDevolucion.fecha_aprobacion).toLocaleString() : '-' },
+          { label: 'Solicitada por (Entrega)', value: detalleDevolucion?.entregador_nombre || '-' },
+          { label: 'Revisada por (TTHH)', value: detalleDevolucion?.tthh_nombre || '-' },
+          { label: 'Observación TTHH', value: detalleDevolucion?.observacion_tthh || '-' },
+        ]}
+      >
+        {detalleDevolucion && detalleDevolucion.detalles && detalleDevolucion.detalles.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+              Artículos Devueltos
+            </span>
+            <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-gray-50">
+              {detalleDevolucion.detalles.map((det: any) => (
+                <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
+                  <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                  <span className="font-mono text-gray-500">Cód: {det.producto_codigo} • x{det.cantidad}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ModalDetalle>
+
+      {/* MODAL DE DETALLE DE AUTOCONSUMO */}
+      <ModalDetalle
+        isOpen={!!detalleAutoconsumo}
+        onClose={() => setDetalleAutoconsumo(null)}
+        title="Detalle de Autoconsumo"
+        subtitle={detalleAutoconsumo?.codigo}
+        badge={
+          detalleAutoconsumo && (
+            <span className={`inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+              detalleAutoconsumo.estado === 'entregado'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                : detalleAutoconsumo.estado === 'aprobado'
+                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                : 'bg-red-50 text-red-700 border-red-100'
+            }`}>
+              {detalleAutoconsumo.estado}
+            </span>
+          )
+        }
+        campos={[
+          { label: 'Colaborador', value: detalleAutoconsumo?.empleado?.nombre },
+          { label: 'Cédula', value: detalleAutoconsumo?.empleado?.cedula },
+          { label: 'Departamento', value: detalleAutoconsumo?.departamento?.nombre },
+          { label: 'Centro de Costos', value: detalleAutoconsumo?.centro_costos ? `${detalleAutoconsumo.centro_costos.codigo} - ${detalleAutoconsumo.centro_costos.nombre}` : '-' },
+          { label: 'Justificación', value: detalleAutoconsumo?.justificacion },
+          { label: 'Fecha de Solicitud', value: detalleAutoconsumo?.fecha_solicitud ? new Date(detalleAutoconsumo.fecha_solicitud).toLocaleString() : '-' },
+          { label: 'Aprobado por', value: detalleAutoconsumo?.aprobador || '-' },
+          { label: 'Despachado por', value: detalleAutoconsumo?.despachador || '-' },
+          { label: 'Observación', value: detalleAutoconsumo?.observacion || '-' },
+        ]}
+      >
+        {detalleAutoconsumo && (
+          <>
+            <div className="space-y-1.5">
+              <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                Productos Consumidos
+              </span>
+              <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-gray-50">
+                {detalleAutoconsumo.detalles?.map((det: any) => (
+                  <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
+                    <div>
+                      <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                      <span className="block font-mono text-[10px] text-gray-400">Cód: {det.producto_codigo}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-gray-700 block">x{det.cantidad}</span>
+                      <span className="text-[10px] text-gray-400">${det.subtotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center font-bold text-gray-800 text-xs border-t border-gray-100 pt-2">
+                <span>Total asumido por la empresa:</span>
+                <span className="text-emerald-700">
+                  ${detalleAutoconsumo.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {detalleAutoconsumo.foto_entrega && (
+              <div className="space-y-1">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                  Evidencia de Despacho
+                </span>
+                <img
+                  src={detalleAutoconsumo.foto_entrega}
+                  alt="Evidencia entrega"
+                  className="w-full h-36 object-cover rounded-lg border border-gray-200"
+                />
+              </div>
+            )}
+          </>
+        )}
+      </ModalDetalle>
     </div>
   );
 };

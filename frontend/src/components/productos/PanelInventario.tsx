@@ -8,6 +8,7 @@ import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
+import { Paginacion } from '../common/Paginacion';
 import { BotonDescargar } from '../common/BotonDescargar';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
@@ -71,6 +72,10 @@ export const PanelInventario: React.FC = () => {
   const [filterStock, setFilterStock] = useState<'ALL' | 'low' | 'normal'>('ALL');
   const [sortBy, setSortBy] = useState<'codigo' | 'nombre' | 'precio_venta' | 'precio_costo' | 'stock_actual'>('nombre');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Paginación del Inventario
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Formulario de Orden de Compra
   const [showOCForm, setShowOCForm] = useState(false);
@@ -426,6 +431,15 @@ export const PanelInventario: React.FC = () => {
         return 0;
       });
   }, [productos, searchTerm, filterCategory, filterStatus, filterStock, sortBy, sortOrder]);
+
+  // Reiniciar a la primera página cuando cambian los filtros o el ordenamiento
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCategory, filterStatus, filterStock, sortBy, sortOrder, itemsPerPage]);
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const productosPaginados = productosFiltrados.slice(startIndex, endIndex);
 
   const exportarCSV = async () => {
     const listado = productosFiltrados;
@@ -1010,7 +1024,7 @@ export const PanelInventario: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {productosFiltrados.map((p) => {
+                {productosPaginados.map((p) => {
                   const isLow = p.stock_actual <= 5;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50/50">
@@ -1114,6 +1128,14 @@ export const PanelInventario: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          <Paginacion
+            currentPage={currentPage}
+            totalItems={productosFiltrados.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </div>
       </div>
 

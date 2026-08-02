@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
+import { Paginacion } from '../common/Paginacion';
 import { useModal } from '../../context/ModalContext';
 
 interface FieldConfig {
@@ -157,6 +158,10 @@ export const PanelAdminCrudGeneral: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
 
+  // Paginación de tablas maestras
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   // Caché de tablas referenciales para selects (ej: empresas, categorías)
   const [refCache, setRefCache] = useState<{ [table: string]: any[] }>({});
 
@@ -176,6 +181,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
   useEffect(() => {
     cargarDatos();
+    setCurrentPage(1);
   }, [activeSchema]);
 
   const cargarDatos = async () => {
@@ -384,6 +390,8 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     }
   };
 
+  const rowsPaginados = rows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="font-sans space-y-6">
       
@@ -583,7 +591,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {rows.map((row) => {
+                {rowsPaginados.map((row) => {
                   const pkVal = row[`${activeSchema.table}_id`];
                   const stateVal = row[`${activeSchema.table}_estado`];
                   const isActivo = stateVal === 'activo';
@@ -645,6 +653,16 @@ export const PanelAdminCrudGeneral: React.FC = () => {
             </table>
           )}
         </div>
+
+        {!loading && rows.length > 0 && (
+          <Paginacion
+            currentPage={currentPage}
+            totalItems={rows.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
+        )}
       </div>
 
       <ModalImportExport

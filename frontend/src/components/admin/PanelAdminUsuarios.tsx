@@ -4,6 +4,7 @@ import { empleadosAPI } from '../../api/empleados.api';
 import { Empleado } from '../../types';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
+import { Paginacion } from '../common/Paginacion';
 import { useModal } from '../../context/ModalContext';
 
 export const PanelAdminUsuarios: React.FC = () => {
@@ -24,6 +25,10 @@ export const PanelAdminUsuarios: React.FC = () => {
   const [selectedRol, setSelectedRol] = useState<number | ''>('');
   const [selectedEmpleado, setSelectedEmpleado] = useState<number | ''>('');
   const [activo, setActivo] = useState(true);
+
+  // Paginación de operadores
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     cargarDatos();
@@ -132,6 +137,10 @@ export const PanelAdminUsuarios: React.FC = () => {
       </div>
     );
   }
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const usuariosPaginados = usuarios.slice(startIndex, endIndex);
 
   return (
     <div className="font-sans space-y-6">
@@ -286,7 +295,7 @@ export const PanelAdminUsuarios: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {usuarios.map((u) => (
+              {usuariosPaginados.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50/50">
                   <td className="px-5 py-4 font-bold text-gray-800">{u.nombre}</td>
                   <td className="px-5 py-4 font-mono text-gray-400">{u.email}</td>
@@ -324,6 +333,14 @@ export const PanelAdminUsuarios: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        <Paginacion
+          currentPage={currentPage}
+          totalItems={usuarios.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       </div>
 
     </div>

@@ -15,7 +15,7 @@ export const Paginacion: React.FC<PaginacionProps> = ({
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
-  itemsPerPageOptions = [10, 20, 30, 50, 100]
+  itemsPerPageOptions = [5, 10, 20, 30, 50, 100]
 }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
