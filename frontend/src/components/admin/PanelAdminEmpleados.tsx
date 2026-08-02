@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { empleadosAPI } from '../../api/empleados.api';
-import { adminAPI } from '../../api/admin.api';
 import { Empleado } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
+import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
@@ -23,24 +23,11 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Formulario Empleado
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [cedula, setCedula] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
-  const [email, setEmail] = useState('');
-  const [cargo, setCargo] = useState('');
-  const [fotoPerfil, setFotoPerfil] = useState('');
-  const [selectedDept, setSelectedDept] = useState<number | ''>('');
-  const [selectedCC, setSelectedCC] = useState<number | ''>('');
-  const [activo, setActivo] = useState(true);
-  const [permitirAutoconsumo, setPermitirAutoconsumo] = useState(false);
-  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  // Modal de registro / edición de colaborador
+  const [isModalAbierto, setIsModalAbierto] = useState(false);
+  const [editingEmpleado, setEditingEmpleado] = useState<any>(null);
 
-  // Estados de subida de fotos
-  const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Estados de búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,21 +36,6 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [filterEstado, setFilterEstado] = useState<'ALL' | 'activo' | 'inactivo'>('ALL');
   const [sortBy, setSortBy] = useState<'nombre' | 'codigo' | 'departamento' | 'cargo'>('nombre');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      try {
-        setSubiendoFoto(true);
-        const res = await adminAPI.uploadPhoto(file, 'empleado');
-        setFotoPerfil(res.url);
-      } catch (err) {
-        console.error('Error al subir foto:', err);
-      } finally {
-        setSubiendoFoto(false);
-      }
-    }
-  };
 
   useEffect(() => {
     cargarDatos();
@@ -95,71 +67,81 @@ export const PanelAdminEmpleados: React.FC = () => {
   };
 
   const handleEditClick = (emp: any) => {
-    setEditingId(emp.id);
-    setCedula(emp.codigo_empleado);
-    setNombre(emp.nombre);
-    setApellido(emp.apellido);
-    setEmail(emp.email || '');
-    setCargo(emp.cargo || '');
-    setFotoPerfil(emp.foto_perfil.startsWith('https://ui-avatars') ? '' : emp.foto_perfil);
-    setSelectedDept(emp.departamento_id || '');
-    setSelectedCC(emp.centro_costos_id || '');
-    setActivo(emp.activo);
-    setPermitirAutoconsumo(emp.permitir_autoconsumo || false);
-    setShowForm(true);
+    setEditingEmpleado(emp);
+    setIsModalAbierto(true);
   };
 
   const handleCreateNewClick = () => {
-    setEditingId(null);
-    setCedula('');
-    setNombre('');
-    setApellido('');
-    setEmail('');
-    setCargo('');
-    setFotoPerfil('');
-    setSelectedDept(departamentos.length > 0 ? departamentos[0].id : '');
-    setSelectedCC(centrosCostos.length > 0 ? centrosCostos[0].id : '');
-    setActivo(true);
-    setPermitirAutoconsumo(false);
-    setShowForm(true);
+    setEditingEmpleado(null);
+    setIsModalAbierto(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMensaje('');
+  const camposColaborador: CampoFormulario[] = [
+    { name: 'cedula', label: 'Cédula / Documento', tipo: 'texto', placeholder: 'Ej. 1723456789', required: true },
+    { name: 'email', label: 'Correo Electrónico (Email)', tipo: 'email', placeholder: 'ejemplo@empresa.com' },
+    { name: 'nombre', label: 'Nombre', tipo: 'texto', placeholder: 'Nombres', required: true },
+    { name: 'apellido', label: 'Apellido', tipo: 'texto', placeholder: 'Apellidos', required: true },
+    { name: 'cargo', label: 'Cargo / Puesto', tipo: 'texto', placeholder: 'Ej. Vendedor' },
+    {
+      name: 'departamento_id',
+      label: 'Departamento',
+      tipo: 'select',
+      opciones: departamentos.map((d) => ({ value: d.id, label: d.nombre }))
+    },
+    {
+      name: 'centro_costos_id',
+      label: 'Centro de Costos',
+      tipo: 'select',
+      opciones: centrosCostos.map((cc) => ({ value: cc.id, label: cc.nombre }))
+    },
+    {
+      name: 'foto_perfil',
+      label: 'Foto de Perfil del Colaborador',
+      tipo: 'foto',
+      fotoCarpeta: 'empleado',
+      colSpan: 2,
+      fotoAviso: 'Puedes ingresar una URL o subir/tomar una foto desde tu dispositivo.'
+    },
+    { name: 'activo', label: 'Colaborador Activo', tipo: 'checkbox' },
+    { name: 'permitir_autoconsumo', label: 'Autorizar Autoconsumo (Consumo Interno)', tipo: 'checkbox' }
+  ];
 
-    if (!cedula || !nombre || !apellido) {
-      setError('Cédula, Nombre y Apellido son requeridos.');
-      return;
-    }
+  const valoresInicialesColaborador = (emp: any) => ({
+    cedula: emp?.codigo_empleado || '',
+    nombre: emp?.nombre || '',
+    apellido: emp?.apellido || '',
+    email: emp?.email || '',
+    cargo: emp?.cargo || '',
+    foto_perfil: (emp?.foto_perfil || '').startsWith('https://ui-avatars') ? '' : (emp?.foto_perfil || ''),
+    departamento_id: emp?.departamento_id || '',
+    centro_costos_id: emp?.centro_costos_id || '',
+    activo: emp?.activo !== undefined ? emp.activo : true,
+    permitir_autoconsumo: emp?.permitir_autoconsumo || false
+  });
 
+  const handleGuardarColaborador = async (valores: Record<string, any>) => {
     const payload = {
-      cedula,
-      nombre,
-      apellido,
-      email: email || null,
-      cargo: cargo || null,
-      foto_perfil: fotoPerfil || null,
-      departamento_id: selectedDept ? Number(selectedDept) : null,
-      centro_costos_id: selectedCC ? Number(selectedCC) : null,
-      activo,
-      permitir_autoconsumo: permitirAutoconsumo
+      cedula: valores.cedula,
+      nombre: valores.nombre,
+      apellido: valores.apellido,
+      email: valores.email || null,
+      cargo: valores.cargo || null,
+      foto_perfil: valores.foto_perfil || null,
+      departamento_id: valores.departamento_id ? Number(valores.departamento_id) : null,
+      centro_costos_id: valores.centro_costos_id ? Number(valores.centro_costos_id) : null,
+      activo: !!valores.activo,
+      permitir_autoconsumo: !!valores.permitir_autoconsumo
     };
 
-    try {
-      if (editingId) {
-        await empleadosAPI.update(editingId, payload);
-        setMensaje('Colaborador actualizado exitosamente.');
-      } else {
-        await empleadosAPI.create(payload);
-        setMensaje('Colaborador creado exitosamente.');
-      }
-      setShowForm(false);
-      cargarDatos();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al guardar los datos del colaborador');
+    if (editingEmpleado) {
+      await empleadosAPI.update(editingEmpleado.id, payload);
+      setMensaje('Colaborador actualizado exitosamente.');
+    } else {
+      await empleadosAPI.create(payload);
+      setMensaje('Colaborador creado exitosamente.');
     }
+    setIsModalAbierto(false);
+    cargarDatos();
   };
 
   const handleToggleActivo = async (emp: Empleado) => {
@@ -274,24 +256,22 @@ export const PanelAdminEmpleados: React.FC = () => {
           <h1 className="text-xl font-bold text-gray-800">Administración de Colaboradores</h1>
           <p className="text-xs text-gray-500 mt-1">Registro de empleados de la empresa y configuración de nómina</p>
         </div>
-        {!showForm && (
-          <div className="flex items-center gap-2">
-            <BotonRecargar onRefresh={cargarDatos} loading={loading} />
-            <button
-              type="button"
-              onClick={() => setIsImportExportOpen(true)}
-              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
-            >
-              Importar / Exportar
-            </button>
-            <button
-              onClick={handleCreateNewClick}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-            >
-              Registrar Colaborador
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+          <button
+            type="button"
+            onClick={() => setIsImportExportOpen(true)}
+            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
+          >
+            Importar / Exportar
+          </button>
+          <button
+            onClick={handleCreateNewClick}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+          >
+            Registrar Colaborador
+          </button>
+        </div>
       </div>
 
       {mensaje && (
@@ -304,195 +284,6 @@ export const PanelAdminEmpleados: React.FC = () => {
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
         </div>
-      )}
-
-      {/* FORMULARIO */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-            {editingId ? 'Editar Colaborador' : 'Registrar Nuevo Colaborador'}
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Cédula / Documento</label>
-              <input
-                type="text"
-                value={cedula}
-                onChange={(e) => setCedula(e.target.value)}
-                placeholder="Ej. 1723456789"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Correo Electrónico (Email)</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ejemplo@empresa.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre</label>
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Nombres"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Apellido</label>
-              <input
-                type="text"
-                value={apellido}
-                onChange={(e) => setApellido(e.target.value)}
-                placeholder="Apellidos"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Cargo / Puesto</label>
-              <input
-                type="text"
-                value={cargo}
-                onChange={(e) => setCargo(e.target.value)}
-                placeholder="Ej. Vendedor"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Departamento</label>
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-              >
-                <option value="">Selecciona Departamento...</option>
-                {departamentos.map(d => (
-                  <option key={d.id} value={d.id}>{d.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Centro de Costos</label>
-              <select
-                value={selectedCC}
-                onChange={(e) => setSelectedCC(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-              >
-                <option value="">Selecciona Centro...</option>
-                {centrosCostos.map(cc => (
-                  <option key={cc.id} value={cc.id}>{cc.nombre}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-gray-500">Foto de Perfil del Colaborador</label>
-            <div className="flex items-center gap-4 text-xs">
-              <label className="flex items-center gap-1.5 font-medium text-gray-650">
-                <input
-                  type="radio"
-                  name="photoOptionEmp"
-                  checked={urlOption === 'url'}
-                  onChange={() => setUrlOption('url')}
-                />
-                Dirección URL (Imagen Web)
-              </label>
-              <label className="flex items-center gap-1.5 font-medium text-gray-650">
-                <input
-                  type="radio"
-                  name="photoOptionEmp"
-                  checked={urlOption === 'file'}
-                  onChange={() => setUrlOption('file')}
-                />
-                Subir o Tomar Foto (Cámara)
-              </label>
-            </div>
-
-            {urlOption === 'url' ? (
-              <input
-                type="text"
-                value={fotoPerfil}
-                onChange={(e) => setFotoPerfil(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-              />
-            ) : (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFotoUpload}
-                className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-              />
-            )}
-            {subiendoFoto && <p className="text-[10px] text-gray-400 animate-pulse font-medium">Subiendo foto de perfil...</p>}
-            {fotoPerfil && (
-              <div className="pt-1">
-                <p className="text-[10px] text-emerald-700 font-semibold mb-1">Vista previa:</p>
-                <img src={fotoPerfil} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-6 pt-1 flex-wrap">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="colaborador_activo"
-                checked={activo}
-                onChange={(e) => setActivo(e.target.checked)}
-                className="rounded text-gray-800"
-              />
-              <label htmlFor="colaborador_activo" className="text-xs text-gray-600 font-semibold select-none">
-                Colaborador Activo
-              </label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="permitir_autoconsumo"
-                checked={permitirAutoconsumo}
-                onChange={(e) => setPermitirAutoconsumo(e.target.checked)}
-                className="rounded text-emerald-600"
-              />
-              <label htmlFor="permitir_autoconsumo" className="text-xs text-emerald-700 font-semibold select-none">
-                Autorizar Autoconsumo (Consumo Interno)
-              </label>
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              Guardar Datos
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-250 text-gray-650 rounded-lg text-xs font-semibold transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
       )}
 
       {/* Filtros y Buscador usando SearchAndFilterBar */}
@@ -687,6 +478,16 @@ export const PanelAdminEmpleados: React.FC = () => {
         columns={columnsConfig}
         data={empleados}
         onImport={handleImportColaboradores}
+      />
+
+      <ModalFormulario
+        isOpen={isModalAbierto}
+        onClose={() => setIsModalAbierto(false)}
+        titulo={editingEmpleado ? 'Editar Colaborador' : 'Registrar Nuevo Colaborador'}
+        campos={camposColaborador}
+        valoresIniciales={valoresInicialesColaborador(editingEmpleado)}
+        onGuardar={handleGuardarColaborador}
+        botonGuardarLabel="Guardar Colaborador"
       />
     </div>
   );

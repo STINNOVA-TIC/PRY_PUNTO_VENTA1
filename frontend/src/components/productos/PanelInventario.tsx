@@ -5,6 +5,7 @@ import { ordenesAPI } from '../../api/ordenes.api';
 import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
 import { ModalImportExport } from '../common/ModalImportExport';
+import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
@@ -25,41 +26,13 @@ export const PanelInventario: React.FC = () => {
   const [categorias, setCategorias] = useState<{ id: number; nombre: string }[]>([]);
   const [proveedores, setProveedores] = useState<{ id: number; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mensaje, setMensaje] = useState('');
   
-  // Formulario de Producto
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [codigo, setCodigo] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [precioCosto, setPrecioCosto] = useState('');
-  const [precioVenta, setPrecioVenta] = useState('');
-  const [stock, setStock] = useState('');
-  const [foto, setFoto] = useState('');
+  // Modal de Producto (crear / editar)
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
+
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<number | null>(null);
-
-  // Estados de subida de fotos
-  const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
-
-  const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      try {
-        setSubiendoFoto(true);
-        const res = await adminAPI.uploadPhoto(file, 'producto');
-        setFoto(res.url);
-      } catch (err) {
-        console.error('Error al subir foto:', err);
-      } finally {
-        setSubiendoFoto(false);
-      }
-    }
-  };
-  const [selectedCategoria, setSelectedCategoria] = useState<number | ''>('');
-  const [selectedProveedor, setSelectedProveedor] = useState<number | ''>('');
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
 
   // Formulario de Ajuste de Stock
   const [editingStockId, setEditingStockId] = useState<number | null>(null);
@@ -101,15 +74,9 @@ export const PanelInventario: React.FC = () => {
       // Cargar categorías y proveedores para la creación de productos
       const catRes = await productosAPI.getCategorias();
       setCategorias(catRes.data);
-      if (catRes.data.length > 0) {
-        setSelectedCategoria(catRes.data[0].id);
-      }
 
       const provRes = await productosAPI.getProveedores();
       setProveedores(provRes.data);
-      if (provRes.data.length > 0) {
-        setSelectedProveedor(provRes.data[0].id);
-      }
     } catch (error) {
       console.error('Error cargando datos de inventario:', error);
     } finally {
@@ -117,98 +84,99 @@ export const PanelInventario: React.FC = () => {
     }
   };
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
+  const camposProducto: CampoFormulario[] = [
+    { name: 'codigo', label: 'Código de producto', tipo: 'texto', placeholder: 'Ej. PROD-SOD-05', required: true },
+    { name: 'nombre', label: 'Nombre Comercial', tipo: 'texto', placeholder: 'Ej. Jugo de Manzana Natural', required: true },
+    { name: 'descripcion', label: 'Descripción corta', tipo: 'texto', placeholder: 'Ej. Envase de vidrio 400ml', colSpan: 2 },
+    {
+      name: 'categoria_id',
+      label: 'Categoría',
+      tipo: 'select',
+      placeholder: 'Selecciona Categoría...',
+      opciones: categorias.map(cat => ({ value: cat.id, label: cat.nombre })),
+      required: true
+    },
+    {
+      name: 'proveedor_id',
+      label: 'Proveedor',
+      tipo: 'select',
+      placeholder: 'Selecciona Proveedor...',
+      opciones: proveedores.map(prov => ({ value: prov.id, label: prov.nombre })),
+      required: true
+    },
+    { name: 'precio_costo', label: 'Precio Compra (Costo)', tipo: 'numero', placeholder: '0.90' },
+    { name: 'precio_venta', label: 'Precio Venta (POS)', tipo: 'numero', placeholder: '1.50', required: true },
+    ...(editingProduct ? [] : [{ name: 'stock', label: 'Stock Inicial', tipo: 'numero' as const, placeholder: '50', required: true }]),
+    {
+      name: 'foto',
+      label: 'Foto del Producto',
+      tipo: 'foto',
+      fotoCarpeta: 'producto',
+      colSpan: 2,
+      fotoAviso: 'Puedes ingresar una URL o subir/tomar una foto desde tu dispositivo.'
+    }
+  ];
 
-    if (!codigo || !nombre || !precioVenta || (!editingProductId && !stock) || !selectedCategoria || !selectedProveedor) {
-      setFormError('Los campos Código, Nombre, Precio Venta, Categoría y Proveedor son requeridos.');
-      return;
+  const valoresInicialesProducto = (p: Producto | null): Record<string, any> => ({
+    codigo: p?.codigo_barras || '',
+    nombre: p?.nombre || '',
+    descripcion: p?.descripcion || '',
+    categoria_id: p?.categoria_id || (categorias.length > 0 ? categorias[0].id : ''),
+    proveedor_id: p?.proveedor_id || (proveedores.length > 0 ? proveedores[0].id : ''),
+    precio_costo: p ? p.precio_costo : '',
+    precio_venta: p ? p.precio_venta : '',
+    stock: p ? p.stock_actual : '',
+    foto: p?.foto || ''
+  });
+
+  const handleGuardarProducto = async (valores: Record<string, any>) => {
+    if (!valores.codigo || !valores.nombre || !valores.precio_venta || (!editingProduct && !valores.stock) || !valores.categoria_id || !valores.proveedor_id) {
+      throw new Error('Los campos Código, Nombre, Precio Venta, Categoría y Proveedor son requeridos.');
     }
 
     try {
-      if (editingProductId) {
-        await adminAPI.update('producto', editingProductId, {
-          categoria_id: Number(selectedCategoria),
-          proveedor_id: Number(selectedProveedor),
-          producto_codigo: codigo,
-          producto_nombre: nombre,
-          producto_descripcion: descripcion,
-          producto_precio: parseFloat(precioVenta),
-          producto_precio_compra: parseFloat(precioCosto || '0'),
-          producto_foto: foto || null
+      if (editingProduct) {
+        await adminAPI.update('producto', editingProduct.id, {
+          categoria_id: Number(valores.categoria_id),
+          proveedor_id: Number(valores.proveedor_id),
+          producto_codigo: valores.codigo,
+          producto_nombre: valores.nombre,
+          producto_descripcion: valores.descripcion,
+          producto_precio: parseFloat(valores.precio_venta),
+          producto_precio_compra: parseFloat(valores.precio_costo || '0'),
+          producto_foto: valores.foto || null
         });
-        setFormSuccess('Producto actualizado exitosamente.');
+        setMensaje('Producto actualizado exitosamente.');
       } else {
         await productosAPI.create({
-          codigo_barras: codigo,
-          nombre,
-          descripcion,
-          precio_costo: parseFloat(precioCosto || '0'),
-          precio_venta: parseFloat(precioVenta),
-          stock_actual: parseInt(stock),
-          categoria_id: Number(selectedCategoria),
-          proveedor_id: Number(selectedProveedor),
-          foto: foto || undefined
+          codigo_barras: valores.codigo,
+          nombre: valores.nombre,
+          descripcion: valores.descripcion,
+          precio_costo: parseFloat(valores.precio_costo || '0'),
+          precio_venta: parseFloat(valores.precio_venta),
+          stock_actual: parseInt(valores.stock),
+          categoria_id: Number(valores.categoria_id),
+          proveedor_id: Number(valores.proveedor_id),
+          foto: valores.foto || undefined
         });
-        setFormSuccess('Producto creado exitosamente.');
+        setMensaje('Producto creado exitosamente.');
       }
 
-      setCodigo('');
-      setNombre('');
-      setDescripcion('');
-      setPrecioCosto('');
-      setPrecioVenta('');
-      setStock('');
-      setFoto('');
-      setSelectedCategoria('');
-      setSelectedProveedor('');
-      setEditingProductId(null);
-
-      // Cerrar formulario tras 1.5s
-      setTimeout(() => {
-        setShowProductForm(false);
-        setFormSuccess('');
-      }, 1500);
-
+      setIsProductModalOpen(false);
       cargarDatos();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Error al guardar los datos del producto');
+      throw err;
     }
   };
 
   const handleEditProductClick = (p: Producto) => {
-    setEditingProductId(p.id);
-    setCodigo(p.codigo_barras);
-    setNombre(p.nombre);
-    setDescripcion(p.descripcion || '');
-    setPrecioCosto(p.precio_costo.toString());
-    setPrecioVenta(p.precio_venta.toString());
-    setSelectedCategoria(p.categoria_id || '');
-    setSelectedProveedor(p.proveedor_id || '');
-    setFoto(p.foto || '');
-    setUrlOption(p.foto ? 'url' : 'file');
-    setShowProductForm(true);
-    setShowOCForm(false);
-    setFormError('');
-    setFormSuccess('');
+    setEditingProduct(p);
+    setIsProductModalOpen(true);
   };
 
-  const handleCancelProductForm = () => {
-    setCodigo('');
-    setNombre('');
-    setDescripcion('');
-    setPrecioCosto('');
-    setPrecioVenta('');
-    setStock('');
-    setFoto('');
-    setSelectedCategoria('');
-    setSelectedProveedor('');
-    setEditingProductId(null);
-    setShowProductForm(false);
-    setFormError('');
-    setFormSuccess('');
+  const handleCreateProductClick = () => {
+    setEditingProduct(null);
+    setIsProductModalOpen(true);
   };
 
   const handleDeleteProduct = async (id: number) => {
@@ -669,17 +637,10 @@ export const PanelInventario: React.FC = () => {
                 Importar / Exportar
               </button>
               <button
-                onClick={() => {
-                  if (showProductForm) {
-                    handleCancelProductForm();
-                  } else {
-                    setShowProductForm(true);
-                    setShowOCForm(false);
-                  }
-                }}
+                onClick={handleCreateProductClick}
                 className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
               >
-                {showProductForm ? 'Cerrar Formulario' : 'Crear Nuevo Producto'}
+                Crear Nuevo Producto
               </button>
               <Link
                 to="/requerimientos"
@@ -699,190 +660,10 @@ export const PanelInventario: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL / FORMULARIO: CREAR PRODUCTO */}
-      {showProductForm && (
-        <form onSubmit={handleCreateProduct} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-            {editingProductId ? 'Editar Producto' : 'Nuevo Producto en Bodega'}
-          </h3>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Código de producto</label>
-              <input
-                type="text"
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                placeholder="Ej. PROD-SOD-05"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre Comercial</label>
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej. Jugo de Manzana Natural"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Descripción corta</label>
-            <input
-              type="text"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Ej. Envase de vidrio 400ml"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Categoría</label>
-              <select
-                value={selectedCategoria}
-                onChange={(e) => setSelectedCategoria(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-                required
-              >
-                <option value="">Selecciona Categoría...</option>
-                {categorias.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Proveedor</label>
-              <select
-                value={selectedProveedor}
-                onChange={(e) => setSelectedProveedor(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-                required
-              >
-                <option value="">Selecciona Proveedor...</option>
-                {proveedores.map(prov => (
-                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Precio Compra (Costo)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={precioCosto}
-                onChange={(e) => setPrecioCosto(e.target.value)}
-                placeholder="0.90"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Precio Venta (POS)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={precioVenta}
-                onChange={(e) => setPrecioVenta(e.target.value)}
-                placeholder="1.50"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                required
-              />
-            </div>
-
-            {!editingProductId && (
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Stock Inicial</label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="50"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  required
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-gray-500">Foto del Producto</label>
-            <div className="flex items-center gap-4 text-xs">
-              <label className="flex items-center gap-1.5 font-medium text-gray-650">
-                <input
-                  type="radio"
-                  name="photoOptionPOS"
-                  checked={urlOption === 'url'}
-                  onChange={() => setUrlOption('url')}
-                />
-                Dirección URL (Imagen Web)
-              </label>
-              <label className="flex items-center gap-1.5 font-medium text-gray-650">
-                <input
-                  type="radio"
-                  name="photoOptionPOS"
-                  checked={urlOption === 'file'}
-                  onChange={() => setUrlOption('file')}
-                />
-                Subir archivo local
-              </label>
-            </div>
-
-            {urlOption === 'url' ? (
-              <input
-                type="text"
-                value={foto}
-                onChange={(e) => setFoto(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            ) : (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFotoUpload}
-                className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-              />
-            )}
-            {subiendoFoto && <p className="text-[10px] text-gray-400 animate-pulse font-medium">Subiendo foto de producto...</p>}
-            {foto && (
-              <div className="pt-1">
-                <p className="text-[10px] text-emerald-700 font-semibold mb-1">Vista previa:</p>
-                <img src={foto} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-              </div>
-            )}
-          </div>
-
-          {formError && <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded">{formError}</p>}
-          {formSuccess && <p className="text-xs text-emerald-600 bg-emerald-50 p-2.5 rounded">{formSuccess}</p>}
-
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              {editingProductId ? 'Guardar Cambios' : 'Registrar Producto'}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelProductForm}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-250 text-gray-650 rounded-lg text-xs font-semibold transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {mensaje && (
+        <div className="p-4 bg-gray-50 border border-gray-200 text-gray-800 rounded-lg text-sm font-medium">
+          {mensaje}
+        </div>
       )}
 
       {/* MODAL / FORMULARIO: GENERAR ORDEN DE COMPRA */}
@@ -1198,6 +979,16 @@ export const PanelInventario: React.FC = () => {
         columns={columnsConfig}
         data={productosMapeadosParaExportar}
         onImport={handleImportProductos}
+      />
+
+      <ModalFormulario
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        titulo={editingProduct ? 'Editar Producto' : 'Nuevo Producto en Bodega'}
+        campos={camposProducto}
+        valoresIniciales={valoresInicialesProducto(editingProduct)}
+        onGuardar={handleGuardarProducto}
+        botonGuardarLabel={editingProduct ? 'Guardar Cambios' : 'Registrar Producto'}
       />
     </div>
   );

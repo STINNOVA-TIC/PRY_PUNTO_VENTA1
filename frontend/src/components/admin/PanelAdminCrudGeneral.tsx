@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
 import { ModalImportExport } from '../common/ModalImportExport';
+import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
@@ -166,15 +167,9 @@ export const PanelAdminCrudGeneral: React.FC = () => {
   const [refCache, setRefCache] = useState<{ [table: string]: any[] }>({});
 
   // Formulario
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<{ [key: string]: any }>({});
-  
-  // Para subida de fotos
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isModalAbierto, setIsModalAbierto] = useState(false);
+  const [editingRow, setEditingRow] = useState<any>(null);
 
-  const [urlOption, setUrlOption] = useState<'url' | 'file'>('url');
-  const [photoUrlInput, setPhotoUrlInput] = useState('');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   const lastRequestTokenRef = useRef<number>(0);
@@ -271,45 +266,118 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     const selected = allowedSchemas.find(s => s.table === e.target.value);
     if (selected) {
       setActiveSchema(selected);
-      setShowForm(false);
+      setIsModalAbierto(false);
     }
+  };
+
+  const buildCamposMaestros = (schema: TableSchema): CampoFormulario[] => {
+    return schema.fields.map(f => {
+      if (f.type === 'image') {
+        return {
+          name: f.key,
+          label: f.label,
+          tipo: 'foto' as const,
+          fotoCarpeta: schema.table === 'empleado' ? 'empleado' : 'producto',
+          colSpan: 2,
+          fotoAviso: 'Puedes ingresar una URL o subir/tomar una foto desde tu dispositivo.'
+        };
+      }
+      if (f.type === 'select' && f.refTable) {
+        const options = (refCache[f.refTable] || []).map((opt: any) => ({
+          value: opt[f.refIdKey || ''],
+          label: `${opt[f.refLabelKey || '']} (ID: ${opt[f.refIdKey || '']})`
+        }));
+        return {
+          name: f.key,
+          label: f.label,
+          tipo: 'select' as const,
+          required: f.required,
+          placeholder: 'Seleccionar...',
+          opciones: options
+        };
+      }
+      if (f.type === 'number') {
+        return {
+          name: f.key,
+          label: f.label,
+          tipo: 'numero' as const,
+          required: f.required
+        };
+      }
+      if (f.type === 'checkbox') {
+        return {
+          name: f.key,
+          label: f.label,
+          tipo: 'checkbox' as const
+        };
+      }
+      return {
+        name: f.key,
+        label: f.label,
+        tipo: 'texto' as const,
+        required: f.required
+      };
+    });
+  };
+
+  const buildValoresInicialesMaestros = (schema: TableSchema, row: any | null): Record<string, any> => {
+    if (row) {
+      const data: Record<string, any> = {};
+      schema.fields.forEach(f => {
+        data[f.key] = row[f.key] !== null && row[f.key] !== undefined ? row[f.key] : '';
+      });
+      return data;
+    }
+
+    const data: Record<string, any> = {};
+    schema.fields.forEach(f => {
+      if (f.type === 'number') data[f.key] = 0;
+      else if (f.type === 'checkbox') data[f.key] = true;
+      else if (f.type === 'select' && f.refTable && refCache[f.refTable]?.length > 0) {
+        data[f.key] = refCache[f.refTable][0][f.refIdKey || ''];
+      } else data[f.key] = '';
+    });
+    return data;
   };
 
   const handleCreateNewClick = () => {
-    setEditingId(null);
-    const initialData: { [key: string]: any } = {};
-    activeSchema.fields.forEach(f => {
-      if (f.type === 'number') initialData[f.key] = 0;
-      else if (f.type === 'checkbox') initialData[f.key] = true;
-      else if (f.type === 'select' && f.refTable && refCache[f.refTable]?.length > 0) {
-        initialData[f.key] = refCache[f.refTable][0][f.refIdKey || ''];
-      } else initialData[f.key] = '';
-    });
-    setFormData(initialData);
-
-    setPhotoUrlInput('');
-    setUrlOption('url');
-    setShowForm(true);
+    setEditingRow(null);
+    setIsModalAbierto(true);
   };
 
   const handleEditClick = (row: any) => {
-    const pkKey = `${activeSchema.table}_id`;
-    setEditingId(row[pkKey]);
-    
-    const editData: { [key: string]: any } = {};
-    activeSchema.fields.forEach(f => {
-      editData[f.key] = row[f.key] !== null ? row[f.key] : '';
-    });
-    
-    setFormData(editData);
+    setEditingRow(row);
+    setIsModalAbierto(true);
+  };
 
-    if (editData[`${activeSchema.table}_foto`]) {
-      setPhotoUrlInput(editData[`${activeSchema.table}_foto`]);
-    } else {
-      setPhotoUrlInput('');
+  const handleGuardarMaestro = async (valores: Record<string, any>) => {
+    const pkKey = `${activeSchema.table}_id`;
+    const editingId = editingRow ? editingRow[pkKey] : null;
+
+    const payload: Record<string, any> = { ...valores };
+
+    // Subida de imagen si corresponde
+    const imageField = activeSchema.fields.find(f => f.type === 'image');
+    if (imageField) {
+      payload[imageField.key] = payload[imageField.key] || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
     }
-    setUrlOption('url');
-    setShowForm(true);
+
+    // Validar tipos numéricos
+    activeSchema.fields.forEach(f => {
+      if (f.type === 'number') {
+        payload[f.key] = Number(payload[f.key]);
+      }
+    });
+
+    if (editingId) {
+      await adminAPI.update(activeSchema.table, editingId, payload);
+      setMensaje('Registro actualizado con éxito.');
+    } else {
+      await adminAPI.create(activeSchema.table, payload);
+      setMensaje('Registro creado con éxito.');
+    }
+    setIsModalAbierto(false);
+    cargarDatos();
   };
 
   const handleToggleActive = async (row: any) => {
@@ -336,60 +404,6 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-
-      try {
-        setUploadingImage(true);
-        const type = activeSchema.table === 'empleado' ? 'empleado' : 'producto';
-        const uploadRes = await adminAPI.uploadPhoto(file, type);
-        setPhotoUrlInput(uploadRes.url);
-      } catch (err) {
-        console.error('Error al subir imagen:', err);
-      } finally {
-        setUploadingImage(false);
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMensaje('');
-
-    const payload = { ...formData };
-
-    try {
-      // Subida de imagen si corresponde
-      const imageField = activeSchema.fields.find(f => f.type === 'image');
-      if (imageField) {
-        payload[imageField.key] = photoUrlInput || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
-      }
-
-      // Validar tipos
-      activeSchema.fields.forEach(f => {
-        if (f.type === 'number') {
-          payload[f.key] = Number(payload[f.key]);
-        }
-      });
-
-      if (editingId) {
-        await adminAPI.update(activeSchema.table, editingId, payload);
-        setMensaje('Registro actualizado con éxito.');
-      } else {
-        await adminAPI.create(activeSchema.table, payload);
-        setMensaje('Registro creado con éxito.');
-      }
-      setShowForm(false);
-      cargarDatos();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al guardar el registro en la base de datos.');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   const rowsPaginados = rows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
@@ -413,26 +427,24 @@ export const PanelAdminCrudGeneral: React.FC = () => {
             ))}
           </select>
 
-          {!showForm && (
-            <div className="flex items-center gap-2">
-              <BotonRecargar onRefresh={cargarDatos} loading={loading} />
-              {activeSchema.table === 'centro_costos' && (
-                <button
-                  type="button"
-                  onClick={() => setIsImportExportOpen(true)}
-                  className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-755 rounded-lg text-xs font-semibold shadow-sm transition"
-                >
-                  Importar / Exportar
-                </button>
-              )}
+          <div className="flex items-center gap-2">
+            <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+            {activeSchema.table === 'centro_costos' && (
               <button
-                onClick={handleCreateNewClick}
-                className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                type="button"
+                onClick={() => setIsImportExportOpen(true)}
+                className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-755 rounded-lg text-xs font-semibold shadow-sm transition"
               >
-                Registrar nuevo
+                Importar / Exportar
               </button>
-            </div>
-          )}
+            )}
+            <button
+              onClick={handleCreateNewClick}
+              className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+            >
+              Registrar nuevo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -446,126 +458,6 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
         </div>
-      )}
-
-      {/* FORMULARIO */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-            {editingId ? `Editar en ${activeSchema.label}` : `Insertar en ${activeSchema.label}`}
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {activeSchema.fields.map(field => {
-              if (field.type === 'image') {
-                return (
-                  <div key={field.key} className="col-span-2 space-y-2 border-t border-gray-100 pt-3">
-                    <label className="block text-xs font-semibold text-gray-600">{field.label}</label>
-                    <div className="flex items-center gap-4 text-xs">
-                      <label className="flex items-center gap-1.5 font-medium text-gray-655">
-                        <input
-                          type="radio"
-                          name="photoOption"
-                          checked={urlOption === 'url'}
-                          onChange={() => setUrlOption('url')}
-                        />
-                        Dirección URL (Imagen Web)
-                      </label>
-                      <label className="flex items-center gap-1.5 font-medium text-gray-655">
-                        <input
-                          type="radio"
-                          name="photoOption"
-                          checked={urlOption === 'file'}
-                          onChange={() => setUrlOption('file')}
-                        />
-                        Subir o Tomar Foto (Cámara)
-                      </label>
-                    </div>
-
-                    {urlOption === 'url' ? (
-                      <input
-                        type="text"
-                        value={photoUrlInput}
-                        onChange={(e) => setPhotoUrlInput(e.target.value)}
-                        placeholder="https://images.unsplash.com/..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                      />
-                    ) : (
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-                      />
-                    )}
-                    {uploadingImage && <p className="text-[10px] text-gray-400 animate-pulse font-medium">Subiendo imagen...</p>}
-                    {photoUrlInput && (
-                      <div className="pt-1">
-                        <p className="text-[10px] text-emerald-700 font-semibold mb-1">Vista previa:</p>
-                        <img src={photoUrlInput} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (field.type === 'select') {
-                const options = refCache[field.refTable || ''] || [];
-                return (
-                  <div key={field.key}>
-                    <label className="block text-xs text-gray-500 mb-1">{field.label}</label>
-                    <select
-                      value={formData[field.key] || ''}
-                      onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none"
-                      required={field.required}
-                    >
-                      <option value="">Seleccionar...</option>
-                      {options.map((opt: any) => {
-                        const optId = opt[field.refIdKey || ''];
-                        const optLabel = opt[field.refLabelKey || ''];
-                        return (
-                          <option key={optId} value={optId}>{optLabel} (ID: {optId})</option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={field.key}>
-                  <label className="block text-xs text-gray-500 mb-1">{field.label}</label>
-                  <input
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    step={field.type === 'number' ? 'any' : undefined}
-                    value={formData[field.key] || ''}
-                    onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                    required={field.required}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="submit"
-              disabled={uploadingImage}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
-            >
-              {uploadingImage ? 'Guardando...' : 'Guardar Datos'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-semibold transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
       )}
 
       {/* LISTADO */}
@@ -672,6 +564,16 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         columns={columnsConfigCentroCostos}
         data={rows}
         onImport={handleImportCentroCostos}
+      />
+
+      <ModalFormulario
+        isOpen={isModalAbierto}
+        onClose={() => setIsModalAbierto(false)}
+        titulo={editingRow ? `Editar en ${activeSchema.label}` : `Insertar en ${activeSchema.label}`}
+        campos={buildCamposMaestros(activeSchema)}
+        valoresIniciales={buildValoresInicialesMaestros(activeSchema, editingRow)}
+        onGuardar={handleGuardarMaestro}
+        botonGuardarLabel="Guardar Datos"
       />
     </div>
   );

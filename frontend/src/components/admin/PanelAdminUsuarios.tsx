@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usuariosAPI, UsuarioOperador } from '../../api/usuarios.api';
 import { empleadosAPI } from '../../api/empleados.api';
 import { Empleado } from '../../types';
+import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
@@ -16,15 +17,9 @@ export const PanelAdminUsuarios: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
 
-  // Formulario Operador
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [selectedRol, setSelectedRol] = useState<number | ''>('');
-  const [selectedEmpleado, setSelectedEmpleado] = useState<number | ''>('');
-  const [activo, setActivo] = useState(true);
+  // Modal Operador
+  const [isModalAbierto, setIsModalAbierto] = useState(false);
+  const [editingUsuario, setEditingUsuario] = useState<UsuarioOperador | null>(null);
 
   // Paginación de operadores
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,59 +51,75 @@ export const PanelAdminUsuarios: React.FC = () => {
   };
 
   const handleEditClick = (u: UsuarioOperador) => {
-    setEditingId(u.id);
-    setNombre(u.nombre);
-    setEmail(u.email);
-    setPassword('');
-    setSelectedRol(u.rol ? u.rol.id : '');
-    setSelectedEmpleado(u.empleado ? u.empleado.id : '');
-    setActivo(u.activo);
-    setShowForm(true);
+    setEditingUsuario(u);
+    setIsModalAbierto(true);
   };
 
   const handleCreateNewClick = () => {
-    setEditingId(null);
-    setNombre('');
-    setEmail('');
-    setPassword('');
-    setSelectedRol(roles.length > 0 ? roles[0].id : '');
-    setSelectedEmpleado('');
-    setActivo(true);
-    setShowForm(true);
+    setEditingUsuario(null);
+    setIsModalAbierto(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMensaje('');
+  const camposOperador: CampoFormulario[] = [
+    { name: 'nombre', label: 'Nombre de Usuario', tipo: 'texto', placeholder: 'Ej. Carlos Martínez', required: true },
+    { name: 'email', label: 'Email / Login', tipo: 'email', placeholder: 'carlos.martinez@empresa.com', required: true },
+    {
+      name: 'password',
+      label: 'Contraseña',
+      tipo: 'password',
+      placeholder: 'Ingresa contraseña'
+    },
+    {
+      name: 'rol_id',
+      label: 'Rol de Acceso',
+      tipo: 'select',
+      placeholder: 'Selecciona Rol...',
+      opciones: roles.map((r) => ({ value: r.id, label: `${r.nombre.toUpperCase()} - ${r.descripcion}` })),
+      required: true
+    },
+    {
+      name: 'empleado_id',
+      label: 'Vincular a un Colaborador de Nómina (Opcional)',
+      tipo: 'select',
+      placeholder: 'Ninguno / Usuario Operador General',
+      colSpan: 2,
+      opciones: empleados.map((emp) => ({ value: emp.id, label: `${emp.nombre} ${emp.apellido} (Ced: ${emp.codigo_empleado})` }))
+    },
+    { name: 'activo', label: 'Usuario Habilitado / Activo', tipo: 'checkbox' }
+  ];
 
-    if (!nombre || !email || (!editingId && !password) || !selectedRol) {
-      setError('Nombre, email, contraseña (para nuevos) y rol son requeridos.');
-      return;
+  const valoresInicialesOperador = (u: UsuarioOperador | null) => ({
+    nombre: u?.nombre || '',
+    email: u?.email || '',
+    password: '',
+    rol_id: u?.rol?.id || (roles.length > 0 ? roles[0].id : ''),
+    empleado_id: u?.empleado?.id || '',
+    activo: u?.activo !== undefined ? u.activo : true
+  });
+
+  const handleGuardarOperador = async (valores: Record<string, any>) => {
+    if (!valores.nombre || !valores.email || (!editingUsuario && !valores.password) || !valores.rol_id) {
+      throw new Error('Nombre, email, contraseña (para nuevos) y rol son requeridos.');
     }
 
     const payload = {
-      nombre,
-      email,
-      password: password || undefined,
-      rol_id: Number(selectedRol),
-      empleado_id: selectedEmpleado ? Number(selectedEmpleado) : null,
-      activo
+      nombre: valores.nombre,
+      email: valores.email,
+      password: valores.password || undefined,
+      rol_id: Number(valores.rol_id),
+      empleado_id: valores.empleado_id ? Number(valores.empleado_id) : null,
+      activo: !!valores.activo
     };
 
-    try {
-      if (editingId) {
-        await usuariosAPI.update(editingId, payload);
-        setMensaje('Operador actualizado exitosamente.');
-      } else {
-        await usuariosAPI.create(payload);
-        setMensaje('Operador creado exitosamente.');
-      }
-      setShowForm(false);
-      cargarDatos();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al guardar el operador');
+    if (editingUsuario) {
+      await usuariosAPI.update(editingUsuario.id, payload);
+      setMensaje('Operador actualizado exitosamente.');
+    } else {
+      await usuariosAPI.create(payload);
+      setMensaje('Operador creado exitosamente.');
     }
+    setIsModalAbierto(false);
+    cargarDatos();
   };
 
   const handleDelete = async (id: number) => {
@@ -150,17 +161,15 @@ export const PanelAdminUsuarios: React.FC = () => {
           <h1 className="text-xl font-bold text-gray-800">Operadores del Sistema</h1>
           <p className="text-xs text-gray-500 mt-1">Gestión de accesos, perfiles de sistema y asignación de roles</p>
         </div>
-        {!showForm && (
-          <div className="flex items-center gap-2">
-            <BotonRecargar onRefresh={cargarDatos} loading={loading} />
-            <button
-              onClick={handleCreateNewClick}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-            >
-              Nuevo Operador
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+          <button
+            onClick={handleCreateNewClick}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+          >
+            Nuevo Operador
+          </button>
+        </div>
       </div>
 
       {mensaje && (
@@ -173,111 +182,6 @@ export const PanelAdminUsuarios: React.FC = () => {
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
         </div>
-      )}
-
-      {/* FORMULARIO */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-            {editingId ? 'Editar Operador' : 'Registrar Nuevo Operador'}
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre de Usuario</label>
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej. Carlos Martínez"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Email / Login</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="carlos.martinez@empresa.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={editingId ? 'Dejar en blanco para no cambiar' : 'Ingresa contraseña'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-                required={!editingId}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Rol de Acceso</label>
-              <select
-                value={selectedRol}
-                onChange={(e) => setSelectedRol(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-                required
-              >
-                <option value="">Selecciona Rol...</option>
-                {roles.map(r => (
-                  <option key={r.id} value={r.id}>{r.nombre.toUpperCase()} - {r.descripcion}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Vincular a un Colaborador de Nómina (Opcional)</label>
-            <select
-              value={selectedEmpleado}
-              onChange={(e) => setSelectedEmpleado(e.target.value ? Number(e.target.value) : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
-            >
-              <option value="">Ninguno / Usuario Operador General</option>
-              {empleados.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.nombre} {emp.apellido} (Ced: {emp.codigo_empleado})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="usuario_activo"
-              checked={activo}
-              onChange={(e) => setActivo(e.target.checked)}
-              className="rounded text-gray-800"
-            />
-            <label htmlFor="usuario_activo" className="text-xs text-gray-600 font-semibold select-none">
-              Usuario Habilitado / Activo
-            </label>
-          </div>
-
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              Guardar Operador
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-250 text-gray-650 rounded-lg text-xs font-semibold transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
       )}
 
       {/* LISTADO */}
@@ -342,6 +246,16 @@ export const PanelAdminUsuarios: React.FC = () => {
           onItemsPerPageChange={setItemsPerPage}
         />
       </div>
+
+      <ModalFormulario
+        isOpen={isModalAbierto}
+        onClose={() => setIsModalAbierto(false)}
+        titulo={editingUsuario ? 'Editar Operador' : 'Registrar Nuevo Operador'}
+        campos={camposOperador}
+        valoresIniciales={valoresInicialesOperador(editingUsuario)}
+        onGuardar={handleGuardarOperador}
+        botonGuardarLabel="Guardar Operador"
+      />
 
     </div>
   );
