@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsClipboardCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -33,14 +33,16 @@ export const Navbar: React.FC = () => {
             <div className="hidden md:flex items-center space-x-1">
               {/* Guardia / Admin */}
               {(rol === 'guardia' || rol === 'admin') && (
-                <Link to="/entregas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                <Link to="/entregas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsBoxSeam className="h-4 w-4" />
                   Entregas
                 </Link>
               )}
               
               {/* Recepción de Requerimientos */}
               {(rol === 'admin' || rol === 'guardia' || rol === 'inventario') && (
-                <Link to="/recepcion-requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                <Link to="/recepcion-requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsClipboardCheck className="h-4 w-4" />
                   Recepción Reqs
                 </Link>
               )}
@@ -48,16 +50,19 @@ export const Navbar: React.FC = () => {
               {/* Inventario / Admin / Guardia */}
               {(rol === 'inventario' || rol === 'admin' || rol === 'guardia') && (
                 <>
-                  <Link to="/inventario" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                  <Link to="/inventario" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                    <BsBoxes className="h-4 w-4" />
                     Inventario
                   </Link>
                   {(rol === 'inventario' || rol === 'admin') && (
                     <>
-                      <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                      <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                        <BsFileEarmarkText className="h-4 w-4" />
                         Requerimientos
                       </Link>
                       {rol === 'inventario' && (
-                        <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                        <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                          <BsGrid1X2Fill className="h-4 w-4" />
                           Catálogos
                         </Link>
                       )}
@@ -68,7 +73,8 @@ export const Navbar: React.FC = () => {
 
               {/* TTHH / Admin */}
               {(rol === 'tthh' || rol === 'admin') && (
-                <Link to="/tthh" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                <Link to="/tthh" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsBarChart className="h-4 w-4" />
                   Reportes
                 </Link>
               )}
@@ -76,13 +82,16 @@ export const Navbar: React.FC = () => {
               {/* Solo Admin */}
               {rol === 'admin' && (
                 <>
-                  <Link to="/admin/empleados" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                  <Link to="/admin/empleados" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                    <BsPeople className="h-4 w-4" />
                     Colaboradores
                   </Link>
-                  <Link to="/admin/usuarios" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                  <Link to="/admin/usuarios" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                    <BsPersonGear className="h-4 w-4" />
                     Operadores
                   </Link>
-                  <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition">
+                  <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                    <BsGrid1X2Fill className="h-4 w-4" />
                     Tablas Maestras
                   </Link>
                 </>
@@ -97,8 +106,9 @@ export const Navbar: React.FC = () => {
             </div>
             <button
               onClick={handleLogout}
-              className="px-3.5 py-1.5 rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-55 text-gray-600 hover:text-gray-800 text-xs font-semibold transition"
+              className="px-3.5 py-1.5 rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-55 text-gray-600 hover:text-gray-800 text-xs font-semibold transition flex items-center gap-1.5"
             >
+              <BsBoxArrowRight className="h-4 w-4" />
               Cerrar Sesión
             </button>
 
@@ -127,8 +137,9 @@ export const Navbar: React.FC = () => {
             <Link
               to="/entregas"
               onClick={() => setMobileMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
             >
+              <BsBoxSeam className="h-4 w-4 text-gray-400" />
               Entregas
             </Link>
           )}
@@ -138,8 +149,9 @@ export const Navbar: React.FC = () => {
             <Link
               to="/recepcion-requerimientos"
               onClick={() => setMobileMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
             >
+              <BsClipboardCheck className="h-4 w-4 text-gray-400" />
               Recepción Reqs
             </Link>
           )}
@@ -150,8 +162,9 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/inventario"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
               >
+                <BsBoxes className="h-4 w-4 text-gray-400" />
                 Inventario
               </Link>
               {(rol === 'inventario' || rol === 'admin') && (
@@ -159,16 +172,18 @@ export const Navbar: React.FC = () => {
                   <Link
                     to="/requerimientos"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                    className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
                   >
+                    <BsFileEarmarkText className="h-4 w-4 text-gray-400" />
                     Requerimientos
                   </Link>
                   {rol === 'inventario' && (
                     <Link
                       to="/admin/tablas"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                      className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
                     >
+                      <BsGrid1X2Fill className="h-4 w-4 text-gray-400" />
                       Catálogos
                     </Link>
                   )}
@@ -182,8 +197,9 @@ export const Navbar: React.FC = () => {
             <Link
               to="/tthh"
               onClick={() => setMobileMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
             >
+              <BsBarChart className="h-4 w-4 text-gray-400" />
               Reportes
             </Link>
           )}
@@ -194,22 +210,25 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/admin/empleados"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
               >
+                <BsPeople className="h-4 w-4 text-gray-400" />
                 Colaboradores
               </Link>
               <Link
                 to="/admin/usuarios"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
               >
+                <BsPersonGear className="h-4 w-4 text-gray-400" />
                 Operadores
               </Link>
               <Link
                 to="/admin/tablas"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition"
+                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
               >
+                <BsGrid1X2Fill className="h-4 w-4 text-gray-400" />
                 Tablas Maestras
               </Link>
             </>

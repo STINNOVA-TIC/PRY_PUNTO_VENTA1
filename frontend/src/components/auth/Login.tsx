@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
 import bannerEmpresa from '../../assets/banner.jpg';
-import { BsEnvelope, BsKey, BsExclamationTriangle } from 'react-icons/bs';
+import { BsEnvelope, BsKey, BsExclamationTriangle, BsPerson, BsPersonGear } from 'react-icons/bs';
 
 export const Login: React.FC = () => {
   const [isEmployee, setIsEmployee] = useState(true);
@@ -97,23 +97,25 @@ export const Login: React.FC = () => {
             <button
               type="button"
               onClick={() => { setIsEmployee(true); setError(''); }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5 ${
                 isEmployee 
                   ? 'bg-white text-slate-800 shadow-sm border border-gray-200/60' 
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
+              <BsPerson className="h-3.5 w-3.5" />
               Colaborador
             </button>
             <button
               type="button"
               onClick={() => { setIsEmployee(false); setError(''); }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5 ${
                 !isEmployee 
                   ? 'bg-white text-slate-800 shadow-sm border border-gray-200/60' 
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
+              <BsPersonGear className="h-3.5 w-3.5" />
               Operador / Admin
             </button>
           </div>
@@ -126,13 +128,16 @@ export const Login: React.FC = () => {
                   Número de Cédula
                 </label>
                 <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">
+                    <BsPerson />
+                  </span>
                   <input
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={cedula}
                     onChange={(e) => setCedula(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm shadow-inner"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm shadow-inner"
                     placeholder="Ej. 1751992817"
                     required
                   />

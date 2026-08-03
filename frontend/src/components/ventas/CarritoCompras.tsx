@@ -9,7 +9,7 @@ import { CatalogoProductos } from '../productos/CatalogoProductos';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { Paginacion } from '../common/Paginacion';
 import logoEmpresa from '../../assets/logo.png';
-import { BsTrash, BsFileEarmarkText, BsCheckCircle, BsInfoCircle, BsHourglassSplit, BsXCircle } from 'react-icons/bs';
+import { BsTrash, BsFileEarmarkText, BsCheckCircle, BsInfoCircle, BsHourglassSplit, BsXCircle, BsCartPlus, BsCart, BsBoxArrowRight } from 'react-icons/bs';
 
 interface ItemCarrito {
   producto: Producto;
@@ -23,6 +23,7 @@ export const CarritoCompras: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [codigoRetiroResult, setCodigoRetiroResult] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showConfirmarModal, setShowConfirmarModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'productos' | 'carrito' | 'pedidos'>('productos');
   const [countdown, setCountdown] = useState(5);
 
@@ -309,6 +310,11 @@ export const CarritoCompras: React.FC = () => {
                   : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
               }`}
             >
+              {isAutoconsumoMode ? (
+                <BsCart className="h-4 w-4" />
+              ) : (
+                <BsCartPlus className="h-4 w-4" />
+              )}
               {isAutoconsumoMode ? 'Volver a Compras' : 'Modo Autoconsumo'}
             </button>
           )}
@@ -327,6 +333,7 @@ export const CarritoCompras: React.FC = () => {
             onClick={handleSalir}
             className="bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95"
           >
+            <BsBoxArrowRight className="h-4 w-4" />
             Salir
           </button>
         </div>
@@ -486,7 +493,7 @@ export const CarritoCompras: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={isAutoconsumoMode ? () => setShowAutoconsumoModal(true) : realizarVenta}
+                  onClick={isAutoconsumoMode ? () => setShowAutoconsumoModal(true) : () => setShowConfirmarModal(true)}
                   disabled={loading || items.length === 0}
                   className={`w-full py-2.5 rounded-lg font-semibold transition disabled:opacity-50 text-xs mt-2 flex-shrink-0 ${
                     isAutoconsumoMode
@@ -751,6 +758,73 @@ export const CarritoCompras: React.FC = () => {
                 className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50"
               >
                 {loading ? 'Procesando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN DEL PEDIDO (RESUMEN) */}
+      {showConfirmarModal && (
+        <div className="fixed inset-0 bg-gray-900/65 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4 transform scale-105 transition duration-200">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-gray-800">Confirmar Pedido</h3>
+              <p className="text-xs text-gray-500">Revisa el resumen de tu solicitud antes de confirmar la compra.</p>
+            </div>
+
+            {/* Resumen de productos */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 max-h-56 overflow-y-auto">
+              {items.map((i) => (
+                <div key={i.producto.id} className="flex items-center justify-between px-3 py-2 bg-gray-50">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <p className="text-xs font-semibold text-gray-700 truncate">
+                      {i.producto.codigo_barras} - {i.producto.nombre}
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {i.cantidad} x ${i.producto.precio_venta.toFixed(2)}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-gray-700">
+                    ${(i.producto.precio_venta * i.cantidad).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Total */}
+            <div className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Total a descontar</span>
+              <span className="text-lg font-extrabold text-white">${totalNeto.toFixed(2)}</span>
+            </div>
+
+            {isAutoconsumoMode && (
+              <p className="text-[10px] font-semibold text-emerald-600 text-center">
+                * Autoconsumo asumido por la empresa (no se descuenta del salario).
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmarModal(false);
+                  setMensaje('');
+                }}
+                className="w-1/2 bg-gray-50 hover:bg-gray-100 text-gray-650 border border-gray-200 py-2 rounded-lg text-xs font-bold transition active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmarModal(false);
+                  realizarVenta();
+                }}
+                disabled={loading}
+                className="w-1/2 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50"
+              >
+                {loading ? 'Procesando...' : 'Confirmar Compra'}
               </button>
             </div>
           </div>
