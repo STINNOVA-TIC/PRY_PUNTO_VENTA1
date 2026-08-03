@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../api/admin.api';
+import { BsX } from 'react-icons/bs';
 
 export interface CampoFormulario {
   name: string;
@@ -120,10 +121,10 @@ export const ModalFormulario: React.FC<ModalFormularioProps> = ({
           <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">{titulo}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-xl font-bold transition"
+            className="text-gray-400 hover:text-gray-700 text-xl font-bold transition flex items-center justify-center"
             aria-label="Cerrar"
           >
-            ✕
+            <BsX className="text-2xl" />
           </button>
         </div>
 

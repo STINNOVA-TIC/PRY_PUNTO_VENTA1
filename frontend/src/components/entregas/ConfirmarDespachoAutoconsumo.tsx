@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { autoconsumoAPI } from '../../api/autoconsumo.api';
 import { adminAPI } from '../../api/admin.api';
+import { BsCheckCircle, BsExclamationTriangle, BsBoxSeam, BsArrowLeft, BsCamera, BsArrowClockwise, BsCheck } from 'react-icons/bs';
 
 export const ConfirmarDespachoAutoconsumo: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -60,7 +61,7 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
         observacion: observacion || 'Autoconsumo entregado a bodega.',
         foto_entrega: fotoUrl
       });
-      setMensaje('✅ Autoconsumo despachado y entregado con éxito');
+      setMensaje('Autoconsumo despachado y entregado con éxito');
       setTimeout(() => navigate('/entregas'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al despachar el autoconsumo');
@@ -79,7 +80,7 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
   if (!autoconsumo) {
     return (
       <div className="max-w-md mx-auto text-center py-12 bg-white border border-red-200 rounded-xl mt-8">
-        <span className="text-4xl">⚠️</span>
+        <BsExclamationTriangle className="text-4xl text-red-600 mx-auto" />
         <h3 className="text-lg font-bold text-red-700 mt-2">Error</h3>
         <p className="text-gray-500 text-sm mt-1">El autoconsumo no existe o no pudo cargarse.</p>
         <button
@@ -99,12 +100,14 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
     <div className="max-w-2xl mx-auto font-sans space-y-6">
 
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">📦 Confirmar Despacho de Autoconsumo</h2>
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <BsBoxSeam className="text-gray-600" /> Confirmar Despacho de Autoconsumo
+        </h2>
         <button
           onClick={() => navigate('/entregas')}
-          className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition"
+          className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition flex items-center gap-1"
         >
-          ← Volver al listado
+          <BsArrowLeft /> Volver al listado
         </button>
       </div>
 
@@ -193,7 +196,7 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
             <div className="mt-1">
               {!fotoUrl ? (
                 <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white rounded-xl p-5 cursor-pointer transition select-none">
-                  <span className="text-3xl">📸</span>
+                  <BsCamera className="text-3xl text-gray-400" />
                   <span className="text-xs font-bold text-gray-700 mt-2">Tomar Foto de Evidencia</span>
                   <span className="text-[9px] text-gray-400 mt-1">Presione para activar la cámara de su dispositivo</span>
                   <input
@@ -219,7 +222,7 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
                   </div>
 
                   <label className="inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer select-none">
-                    🔄 Cambiar Fotografía
+                    <BsArrowClockwise /> Cambiar Fotografía
                     <input
                       type="file"
                       accept="image/*"
@@ -254,7 +257,8 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
         )}
 
         {mensaje && (
-          <div className="p-4 rounded-lg text-sm border bg-gray-50 border-gray-200 text-gray-800">
+          <div className="p-4 rounded-lg text-sm border bg-emerald-50 border-emerald-250 text-emerald-800 flex items-center gap-2">
+            <BsCheckCircle className="text-lg shrink-0 text-emerald-600" />
             {mensaje}
           </div>
         )}
@@ -271,9 +275,9 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
             <button
               onClick={handleConfirmar}
               disabled={!fotoUrl || subiendoFoto}
-              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-lg text-sm font-semibold transition active:scale-95 shadow-sm disabled:opacity-40"
+              className="flex-grow bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-lg text-sm font-semibold transition active:scale-95 shadow-sm disabled:opacity-40 flex items-center justify-center gap-1.5"
             >
-              ✓ Confirmar y Entregar Mercancía
+              <BsCheck className="text-lg font-bold" /> Confirmar y Entregar Mercancía
             </button>
           ) : (
             <div className="flex-1 text-center py-2.5 bg-gray-100 border border-gray-200 text-gray-500 text-xs font-semibold rounded-lg">

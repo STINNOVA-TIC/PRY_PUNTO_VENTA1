@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
 import bannerEmpresa from '../../assets/banner.jpg';
+import { BsEnvelope, BsKey, BsExclamationTriangle } from 'react-icons/bs';
 
 export const Login: React.FC = () => {
   const [isEmployee, setIsEmployee] = useState(true);
@@ -140,7 +141,7 @@ export const Login: React.FC = () => {
 
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <span>⚠️</span>
+                  <BsExclamationTriangle className="text-sm shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -160,7 +161,9 @@ export const Login: React.FC = () => {
                   Correo Electrónico
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">✉️</span>
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">
+                    <BsEnvelope />
+                  </span>
                   <input
                     type="email"
                     value={email}
@@ -177,7 +180,9 @@ export const Login: React.FC = () => {
                   Contraseña
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">🔑</span>
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">
+                    <BsKey />
+                  </span>
                   <input
                     type="password"
                     value={password}
@@ -191,7 +196,7 @@ export const Login: React.FC = () => {
 
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <span>⚠️</span>
+                  <BsExclamationTriangle className="text-sm shrink-0" />
                   <span>{error}</span>
                 </div>
               )}

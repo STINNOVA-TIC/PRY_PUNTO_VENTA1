@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { useModal } from '../../context/ModalContext';
+import { BsTrash } from 'react-icons/bs';
 
 export const PanelRequerimientos: React.FC = () => {
   const { user } = useAuth();
@@ -552,7 +553,7 @@ export const PanelRequerimientos: React.FC = () => {
               <label className="block text-xs font-semibold text-gray-600">Producto (Almacén)</label>
               <input
                 type="text"
-                placeholder="🔍 Buscar por nombre o código..."
+                placeholder="Buscar por nombre o código..."
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
                 className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
@@ -738,7 +739,7 @@ export const PanelRequerimientos: React.FC = () => {
               <label className="block text-xs font-semibold text-gray-600">Centros de Costo Asignados al Producto (Puede elegir más de uno)</label>
               <input
                 type="text"
-                placeholder="🔍 Buscar centro de costos por código o nombre..."
+                placeholder="Buscar centro de costos por código o nombre..."
                 value={ccSearch}
                 onChange={(e) => setCcSearch(e.target.value)}
                 className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
@@ -1085,11 +1086,9 @@ export const PanelRequerimientos: React.FC = () => {
                           <button
                             onClick={() => handleEliminarOrden(oc.id)}
                             title="Eliminar Orden"
-                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition active:scale-95"
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition active:scale-95 flex items-center justify-center"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <BsTrash className="h-4 w-4" />
                           </button>
                         )}
                       </td>

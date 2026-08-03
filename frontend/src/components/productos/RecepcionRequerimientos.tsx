@@ -4,6 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { adminAPI } from '../../api/admin.api';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { 
+  BsExclamationTriangle, 
+  BsCheckCircle, 
+  BsX, 
+  BsXCircle, 
+  BsSearch, 
+  BsFileEarmarkPdf, 
+  BsDownload, 
+  BsPlus, 
+  BsHourglassSplit, 
+  BsFileEarmarkText 
+} from 'react-icons/bs';
 
 export const RecepcionRequerimientos: React.FC = () => {
   const { user } = useAuth();
@@ -122,7 +134,7 @@ export const RecepcionRequerimientos: React.FC = () => {
   if (!isAutorizado) {
     return (
       <div className="max-w-xl mx-auto mt-12 bg-white border border-red-200 shadow-xl rounded-2xl p-8 text-center font-sans">
-        <div className="text-red-500 text-5xl mb-4">⚠️</div>
+        <BsExclamationTriangle className="text-red-500 text-5xl mb-4 mx-auto" />
         <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
         <p className="text-sm text-gray-500 mb-6">
           No tienes permisos para acceder al módulo de recepción de requerimientos. Esta sección está reservada exclusivamente para los roles de <strong>Administración, Guardia y Operador de Inventario</strong>.
@@ -151,17 +163,17 @@ export const RecepcionRequerimientos: React.FC = () => {
       {/* Alertas */}
       {success && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fade-in">
-          <span>✅</span>
+          <BsCheckCircle className="text-base text-emerald-600 shrink-0" />
           <span className="flex-1">{success}</span>
-          <button onClick={() => setSuccess('')} className="text-emerald-500 hover:text-emerald-700">✕</button>
+          <button onClick={() => setSuccess('')} className="text-emerald-500 hover:text-emerald-700 flex items-center justify-center p-0.5"><BsX className="text-base" /></button>
         </div>
       )}
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-semibold flex items-center gap-2 animate-fade-in">
-          <span>❌</span>
+          <BsXCircle className="text-base text-red-650 shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">✕</button>
+          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700 flex items-center justify-center p-0.5"><BsX className="text-base" /></button>
         </div>
       )}
 
@@ -261,26 +273,26 @@ export const RecepcionRequerimientos: React.FC = () => {
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setDetailOrden(oc)}
-                          className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition"
+                          className="px-2.5 py-1 bg-white hover:bg-gray-55 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
                           title="Ver detalles"
                         >
-                          🔍 Detalle
+                          <BsSearch className="shrink-0" /> Detalle
                         </button>
                         
                         <button
                           onClick={() => setPrintOrden(oc)}
-                          className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition"
+                          className="px-2.5 py-1 bg-white hover:bg-gray-55 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
                           title="Descargar PDF"
                         >
-                          📄 PDF
+                          <BsFileEarmarkPdf className="shrink-0" /> PDF
                         </button>
 
                         {oc.estado !== 'entregado' && oc.estado !== 'cancelada' && (
                           <button
                             onClick={() => handleOpenReceiveModal(oc)}
-                            className="px-2.5 py-1 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-bold text-[10px] shadow-sm transition"
+                            className="px-2.5 py-1 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
                           >
-                            📥 Recibir
+                            <BsDownload className="shrink-0" /> Recibir
                           </button>
                         )}
                       </div>
@@ -304,16 +316,17 @@ export const RecepcionRequerimientos: React.FC = () => {
               </div>
               <button 
                 onClick={() => setSelectedOrden(null)}
-                className="text-gray-400 hover:text-gray-600 text-base"
+                className="text-gray-400 hover:text-gray-600 text-base flex items-center justify-center p-1"
               >
-                ✕
+                <BsX className="text-xl" />
               </button>
             </div>
 
             <form onSubmit={handleConfirmReception} className="flex-1 overflow-y-auto p-6 space-y-6">
               {receptionError && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-semibold">
-                  ❌ {receptionError}
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-semibold flex items-center gap-2">
+                  <BsXCircle className="text-base shrink-0 text-red-600" />
+                  {receptionError}
                 </div>
               )}
 
@@ -349,9 +362,9 @@ export const RecepcionRequerimientos: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleAddFacturaInput}
-                    className="px-2.5 py-1 text-[10px] font-bold bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-750 rounded-lg transition"
+                    className="px-2.5 py-1 text-[10px] font-bold bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-750 rounded-lg transition flex items-center gap-1"
                   >
-                    ➕ Agregar Factura
+                    <BsPlus className="text-xs" /> Agregar Factura
                   </button>
                 </div>
                 <p className="text-[11px] text-gray-400">Ingresa los códigos de las facturas que respaldan la recepción de estos bienes y/o servicios.</p>
@@ -372,10 +385,10 @@ export const RecepcionRequerimientos: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleRemoveFacturaInput(idx)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition"
+                          className="p-1.5 text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition flex items-center justify-center"
                           title="Eliminar"
                         >
-                          ✕
+                          <BsX className="text-base" />
                         </button>
                       )}
                     </div>
@@ -395,10 +408,18 @@ export const RecepcionRequerimientos: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50"
+                  className="px-5 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
                   disabled={receptionLoading}
                 >
-                  {receptionLoading ? '⏳ Procesando...' : '📥 Confirmar Recepción y Actualizar Stock'}
+                  {receptionLoading ? (
+                    <>
+                      <BsHourglassSplit className="animate-spin" /> Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <BsDownload /> Confirmar Recepción y Actualizar Stock
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -417,9 +438,9 @@ export const RecepcionRequerimientos: React.FC = () => {
               </div>
               <button 
                 onClick={() => setDetailOrden(null)}
-                className="text-gray-400 hover:text-gray-600 text-base"
+                className="text-gray-400 hover:text-gray-600 text-base flex items-center justify-center p-1"
               >
-                ✕
+                <BsX className="text-xl" />
               </button>
             </div>
 
@@ -467,8 +488,8 @@ export const RecepcionRequerimientos: React.FC = () => {
                   <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Facturas Asociadas</span>
                   <div className="flex flex-wrap gap-2">
                     {detailOrden.facturas.map((f: string, i: number) => (
-                      <span key={i} className="px-2.5 py-1 bg-gray-100 text-gray-750 border border-gray-200 rounded-lg font-mono text-xs font-bold">
-                        📄 {f}
+                      <span key={i} className="px-2.5 py-1 bg-gray-100 text-gray-755 border border-gray-200 rounded-lg font-mono text-xs font-bold flex items-center gap-1">
+                        <BsFileEarmarkText /> {f}
                       </span>
                     ))}
                   </div>

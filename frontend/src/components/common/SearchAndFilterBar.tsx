@@ -1,4 +1,5 @@
 import React from 'react';
+import { BsSearch, BsArrowUp, BsArrowDown } from 'react-icons/bs';
 
 export interface SelectFilterOption {
   label: string;
@@ -45,7 +46,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
   onSortOrderChange,
   totalResults,
   totalCount,
-  resultsLabel = 'elementos',
+  resultsLabel = 'resultados',
 }) => {
   return (
     <div className="space-y-3">
@@ -62,9 +63,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
         {/* 1. Buscador Principal */}
         <div className="relative">
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <BsSearch className="w-4 h-4 text-gray-400" />
           </span>
           <input
             type="text"
@@ -112,10 +111,10 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
               <button
                 type="button"
                 onClick={onSortOrderChange}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-600 font-bold"
+                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-600 font-bold flex items-center justify-center"
                 title={sortOrder === 'asc' ? 'Orden Ascendente' : 'Orden Descendente'}
               >
-                {sortOrder === 'asc' ? '↑' : '↓'}
+                {sortOrder === 'asc' ? <BsArrowUp className="w-3.5 h-3.5" /> : <BsArrowDown className="w-3.5 h-3.5" />}
               </button>
             )}
           </div>

@@ -8,6 +8,7 @@ import { SolicitudCard } from './SolicitudCard';
 import { AutoconsumoCard } from './AutoconsumoCard';
 import { useSocket } from '../../context/SocketContext';
 import { Paginacion } from '../common/Paginacion';
+import { BsDownload, BsCheckCircle, BsBuilding, BsBoxSeam, BsSearch } from 'react-icons/bs';
 
 export const SolicitudesPendientes: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudEntrega[]>([]);
@@ -188,6 +189,34 @@ export const SolicitudesPendientes: React.FC = () => {
     }).length;
   }, [solicitudes, autoconsumos, activeTab]);
 
+  // Contadores para los badges de cada pestaña
+  const pendientesPorEntregar = useMemo(
+    () => solicitudes.filter((s) => (s.estado as string) === 'pendiente').length,
+    [solicitudes]
+  );
+
+  const entregadasPendientesDevolver = useMemo(
+    () => solicitudes.filter((s) => {
+      const est = s.estado as string;
+      if (est !== 'entregado' && est !== 'completada') return false;
+      return s.devolucion_estado === 'aprobado';
+    }).length,
+    [solicitudes]
+  );
+
+  const autoconsumosPorEntregar = useMemo(
+    () => autoconsumos.filter((a) => a.estado === 'aprobado').length,
+    [autoconsumos]
+  );
+
+  const autoconsumosPendientesDevolver = useMemo(
+    () => autoconsumos.filter((a) => {
+      if (a.estado !== 'entregado') return false;
+      return a.devolucion?.estado === 'aprobado';
+    }).length,
+    [autoconsumos]
+  );
+
   // Reiniciar a la primera página al cambiar de pestaña o buscar
   useEffect(() => {
     setCurrentPage(1);
@@ -241,51 +270,61 @@ export const SolicitudesPendientes: React.FC = () => {
       <div className="flex bg-gray-100 p-1 rounded-xl gap-1 max-w-2xl w-full shadow-xs">
         <button
           onClick={() => setActiveTab('pendientes')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
             activeTab === 'pendientes'
               ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          📥 Por Entregar
+          <BsDownload className="shrink-0" /> Por Entregar
+          {pendientesPorEntregar > 0 && (
+            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+              {pendientesPorEntregar}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('entregadas')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
             activeTab === 'entregadas'
               ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          ✅ Entregadas
+          <BsCheckCircle className="shrink-0" /> Entregadas
+          {entregadasPendientesDevolver > 0 && (
+            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+              {entregadasPendientesDevolver}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('autoconsumos')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
             activeTab === 'autoconsumos'
               ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          🏢 Autoconsumos
-          {autoconsumos.filter(a => a.estado === 'aprobado').length > 0 && (
+          <BsBuilding className="shrink-0" /> Autoconsumos
+          {autoconsumosPorEntregar > 0 && (
             <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-              {autoconsumos.filter(a => a.estado === 'aprobado').length}
+              {autoconsumosPorEntregar}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('autoconsumos_entregados')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
             activeTab === 'autoconsumos_entregados'
               ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          📦 Autoconsumos Entregados
-          {autoconsumos.filter(a => a.estado === 'entregado').length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-              {autoconsumos.filter(a => a.estado === 'entregado').length}
+          <BsBoxSeam className="shrink-0" /> Autoconsumos Entregados
+          {autoconsumosPendientesDevolver > 0 && (
+            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+              {autoconsumosPendientesDevolver}
             </span>
           )}
         </button>
@@ -294,9 +333,7 @@ export const SolicitudesPendientes: React.FC = () => {
       {/* Buscador de Empleados */}
       <div className="relative max-w-md w-full">
         <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
+          <BsSearch className="w-4 h-4 text-gray-400" />
         </span>
         <input
           type="text"

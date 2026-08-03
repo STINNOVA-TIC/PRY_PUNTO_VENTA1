@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { BsFileEarmarkText, BsBarChart, BsFileEarmarkPdf, BsChevronDown } from 'react-icons/bs';
 
 interface BotonDescargarProps {
   onExportCSV: () => void;
@@ -37,15 +38,7 @@ export const BotonDescargar: React.FC<BotonDescargarProps> = ({
         className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
       >
         <span>{label}</span>
-        <svg
-          className={`h-3 w-3 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2.5"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <BsChevronDown className={`h-3 w-3 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
       </button>
 
       {showDropdown && (
@@ -58,7 +51,7 @@ export const BotonDescargar: React.FC<BotonDescargarProps> = ({
             }}
             className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
           >
-            <span className="text-gray-400">📄</span> CSV
+            <BsFileEarmarkText className="text-gray-400 text-sm shrink-0" /> CSV
           </button>
           <button
             type="button"
@@ -66,9 +59,9 @@ export const BotonDescargar: React.FC<BotonDescargarProps> = ({
               onExportXLSX();
               setShowDropdown(false);
             }}
-            className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+            className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-55 flex items-center gap-2 transition"
           >
-            <span className="text-emerald-600">📊</span> Excel
+            <BsBarChart className="text-emerald-600 text-sm shrink-0" /> Excel
           </button>
           <button
             type="button"
@@ -78,7 +71,7 @@ export const BotonDescargar: React.FC<BotonDescargarProps> = ({
             }}
             className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
           >
-            <span className="text-red-600">📕</span> PDF
+            <BsFileEarmarkPdf className="text-red-600 text-sm shrink-0" /> PDF
           </button>
         </div>
       )}

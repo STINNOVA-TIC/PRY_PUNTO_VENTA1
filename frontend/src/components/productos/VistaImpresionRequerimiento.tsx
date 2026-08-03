@@ -3,6 +3,7 @@ import logoEmpresa from '../../assets/logo.png';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useModal } from '../../context/ModalContext';
+import { BsHourglassSplit, BsDownload } from 'react-icons/bs';
 
 interface VistaImpresionRequerimientoProps {
   orden: any;
@@ -190,12 +191,20 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
           <h2 className="text-xs font-bold text-gray-800">Vista Previa de Requerimiento (Formato A4 Horizontal)</h2>
           <div className="flex gap-2">
             <button
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5"
-            >
-              {downloading ? '⏳ Generando PDF...' : '💾 Guardar / Descargar PDF'}
-            </button>
+               onClick={handleDownloadPDF}
+               disabled={downloading}
+               className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5 justify-center"
+             >
+               {downloading ? (
+                 <>
+                   <BsHourglassSplit className="animate-spin text-sm" /> Generando PDF...
+                 </>
+               ) : (
+                 <>
+                   <BsDownload className="text-sm" /> Guardar / Descargar PDF
+                 </>
+               )}
+             </button>
             <button
               onClick={onClose}
               className="px-4 py-1.5 bg-white hover:bg-gray-55 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold transition"

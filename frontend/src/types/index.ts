@@ -106,6 +106,7 @@ export interface SolicitudEntrega {
   prioridad?: 'normal' | 'alta' | 'urgente';
   empleado?: Empleado;
   producto?: Producto;
+  devolucion_estado?: 'pendiente' | 'aprobado' | 'rechazado' | 'ejecutado' | null;
 }
 
 export interface VerificacionEntrega {

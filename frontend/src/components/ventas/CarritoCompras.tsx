@@ -7,7 +7,9 @@ import { entregasAPI } from '../../api/entregas.api';
 import { Producto, CreateVentaRequest } from '../../types';
 import { CatalogoProductos } from '../productos/CatalogoProductos';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { Paginacion } from '../common/Paginacion';
 import logoEmpresa from '../../assets/logo.png';
+import { BsTrash, BsFileEarmarkText, BsCheckCircle, BsInfoCircle, BsHourglassSplit, BsXCircle } from 'react-icons/bs';
 
 interface ItemCarrito {
   producto: Producto;
@@ -33,6 +35,10 @@ export const CarritoCompras: React.FC = () => {
   
   const [historialAutoconsumo, setHistorialAutoconsumo] = useState<any[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  // Paginación del historial "Mis Pedidos y Códigos de Retiro"
+  const [currentPagePedidos, setCurrentPagePedidos] = useState(1);
+  const [itemsPerPagePedidos, setItemsPerPagePedidos] = useState(10);
 
   const cargarHistorial = async () => {
     try {
@@ -75,6 +81,7 @@ export const CarritoCompras: React.FC = () => {
       listCombined.sort((a, b) => new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime());
 
       setHistorialAutoconsumo(listCombined);
+      setCurrentPagePedidos(1);
     } catch (err) {
       console.error('Error cargando historial:', err);
     } finally {
@@ -268,6 +275,13 @@ export const CarritoCompras: React.FC = () => {
     logout();
   };
 
+  // Lista paginada de "Mis Pedidos y Códigos de Retiro"
+  const historialPaginado = React.useMemo(() => {
+    const startIndex = (currentPagePedidos - 1) * itemsPerPagePedidos;
+    const endIndex = startIndex + itemsPerPagePedidos;
+    return historialAutoconsumo.slice(startIndex, endIndex);
+  }, [historialAutoconsumo, currentPagePedidos, itemsPerPagePedidos]);
+
   return (
     <div className="flex flex-col font-sans h-[calc(100vh-3rem)] overflow-hidden space-y-4">
       
@@ -410,10 +424,8 @@ export const CarritoCompras: React.FC = () => {
               <h2 className="flex items-center gap-2">
                 Carrito de Compras
               </h2>
-              <button onClick={clearCart} title="Vaciar carrito" className="text-gray-600 hover:text-red-600 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M9 6v12m6-12v12M5 6l1 14a2 2 0 002 2h8a2 2 0 002-2l1-14" />
-                </svg>
+              <button onClick={clearCart} title="Vaciar carrito" className="text-gray-600 hover:text-red-650 transition flex items-center justify-center p-1">
+                <BsTrash className="h-5 w-5" />
               </button>
             </div>
 
@@ -523,9 +535,9 @@ export const CarritoCompras: React.FC = () => {
         {/* PANEL HISTORIAL: Mis Pedidos / Códigos */}
         <div className={`${activeTab === 'pedidos' ? 'flex flex-col md:col-span-2 lg:col-span-3' : 'hidden'} min-h-0 bg-white border border-gray-200 rounded-xl p-5 shadow-sm overflow-hidden`}>
           <div className="flex justify-between items-center pb-3 border-b border-gray-150 mb-4">
-            <div>
-              <h2 className="text-sm font-bold text-gray-800">📋 Mis Pedidos y Códigos de Retiro</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Verifica los códigos de retiro de tus solicitudes autorizadas y pendientes.</p>
+            <div className="flex items-center gap-2">
+              <BsFileEarmarkText className="text-gray-600 text-lg" />
+              <h2 className="text-sm font-bold text-gray-800">Mis Pedidos y Códigos de Retiro</h2>
             </div>
             <BotonRecargar onRefresh={cargarHistorial} loading={loadingHistorial} />
           </div>
@@ -536,7 +548,7 @@ export const CarritoCompras: React.FC = () => {
                 No tienes solicitudes registradas en tu historial.
               </div>
             ) : (
-              historialAutoconsumo.map((auto) => (
+              historialPaginado.map((auto) => (
                 <div key={auto.id} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3 shadow-none">
                   {/* Fila 1: Código, Fecha y Estado */}
                   <div className="flex flex-wrap justify-between items-center gap-2">
@@ -568,13 +580,23 @@ export const CarritoCompras: React.FC = () => {
                         ? 'bg-red-100 text-red-800 border border-red-250'
                         : 'bg-amber-100 text-amber-800 border border-amber-250'
                     }`}>
-                      {auto.estado === 'entregado' 
-                        ? '✅ Entregado' 
-                        : auto.estado === 'aprobado' 
-                        ? '🔵 Aprobado (Por Retirar)' 
-                        : auto.estado === 'pendiente' 
-                        ? '⏳ Pendiente Aprobación' 
-                        : `❌ ${auto.estado}`}
+                      {auto.estado === 'entregado' ? (
+                        <span className="flex items-center gap-1">
+                          <BsCheckCircle className="text-emerald-600 shrink-0" /> Entregado
+                        </span>
+                      ) : auto.estado === 'aprobado' ? (
+                        <span className="flex items-center gap-1">
+                          <BsInfoCircle className="text-blue-600 shrink-0" /> Aprobado (Por Retirar)
+                        </span>
+                      ) : auto.estado === 'pendiente' ? (
+                        <span className="flex items-center gap-1">
+                          <BsHourglassSplit className="text-amber-500 shrink-0" /> Pendiente Aprobación
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <BsXCircle className="text-red-600 shrink-0" /> {auto.estado}
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -600,6 +622,19 @@ export const CarritoCompras: React.FC = () => {
               ))
             )}
           </div>
+
+          {/* Paginación del historial */}
+          {historialAutoconsumo.length > 0 && (
+            <div className="pt-3 border-t border-gray-150 mt-3 flex-shrink-0">
+              <Paginacion
+                currentPage={currentPagePedidos}
+                totalItems={historialAutoconsumo.length}
+                itemsPerPage={itemsPerPagePedidos}
+                onPageChange={setCurrentPagePedidos}
+                onItemsPerPageChange={setItemsPerPagePedidos}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -607,8 +642,8 @@ export const CarritoCompras: React.FC = () => {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-gray-900/65 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white border border-gray-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-5 text-center transform scale-100 transition duration-200">
-            <div className="flex justify-center text-5xl">
-              ✅
+            <div className="flex justify-center">
+              <BsCheckCircle className="text-emerald-500 text-5xl" />
             </div>
             
             <div className="space-y-1">

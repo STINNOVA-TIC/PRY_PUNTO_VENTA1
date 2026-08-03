@@ -4,6 +4,7 @@ import { productosAPI } from '../../api/productos.api';
 import { ordenesAPI } from '../../api/ordenes.api';
 import { adminAPI } from '../../api/admin.api';
 import { Producto } from '../../types';
+import { BsFileEarmarkPdfFill, BsX } from 'react-icons/bs';
 import { ModalImportExport } from '../common/ModalImportExport';
 import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
@@ -654,7 +655,7 @@ export const PanelInventario: React.FC = () => {
               onClick={exportarPDF}
               className="px-3.5 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
             >
-              <span>📕 Descargar PDF</span>
+              <BsFileEarmarkPdfFill /> Descargar PDF
             </button>
           )}
         </div>
@@ -864,11 +865,11 @@ export const PanelInventario: React.FC = () => {
                                 Guardar
                               </button>
                               <button
-                                onClick={() => setEditingStockId(null)}
-                                className="text-xs text-gray-400 hover:text-gray-650"
-                              >
-                                ✕
-                              </button>
+                                  onClick={() => setEditingStockId(null)}
+                                  className="text-xs text-gray-400 hover:text-gray-650 flex items-center justify-center p-1"
+                                >
+                                  <BsX className="text-base" />
+                                </button>
                             </div>
                           ) : (
                             <>

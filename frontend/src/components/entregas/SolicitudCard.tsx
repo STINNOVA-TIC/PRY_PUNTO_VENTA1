@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '../../context/ModalContext';
+import { BsArrowClockwise, BsX } from 'react-icons/bs';
 
 interface SolicitudCardProps {
   solicitud: any; 
@@ -176,9 +177,15 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
                   ) : (
                     <button
                       onClick={handleOpenCancelModal}
-                      className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition text-center"
+                      className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
                     >
-                      {solicitud.estado === 'entregado' ? '🔄 Solicitar Devolución' : 'Solicitar Cancelación'}
+                      {solicitud.estado === 'entregado' ? (
+                        <>
+                          <BsArrowClockwise /> Solicitar Devolución
+                        </>
+                      ) : (
+                        'Solicitar Cancelación'
+                      )}
                     </button>
                   )}
                 </>
@@ -227,13 +234,13 @@ export const SolicitudCard: React.FC<SolicitudCardProps> = ({
             <div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-150">
                 <h3 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-1.5">
-                  🔄 Solicitar Devolución
+                  <BsArrowClockwise /> Solicitar Devolución
                 </h3>
                 <button 
                   onClick={() => { setShowCancelModal(false); setMotivoCancelacion(''); }}
-                  className="text-gray-400 hover:text-gray-650 text-xl p-1"
+                  className="text-gray-400 hover:text-gray-655 text-xl p-1 flex items-center justify-center"
                 >
-                  ✕
+                  <BsX className="text-2xl" />
                 </button>
               </div>
 

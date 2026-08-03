@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { entregasAPI } from '../../api/entregas.api';
 import { adminAPI } from '../../api/admin.api';
+import { BsCheckCircle, BsExclamationTriangle, BsCamera, BsArrowLeft, BsArrowClockwise } from 'react-icons/bs';
 
 export const RegistrarNoEntregado: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -69,7 +70,7 @@ export const RegistrarNoEntregado: React.FC = () => {
         observaciones || 'Pedido no retirado por el empleado. Retornado a stock.',
         fotoUrl
       );
-      setMensaje('✅ Pedido marcado como No Entregado con éxito y stock devuelto a bodega.');
+      setMensaje('Pedido marcado como No Entregado con éxito y stock devuelto a bodega.');
       setTimeout(() => navigate('/entregas'), 2000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al guardar la solicitud de No Entregado.');
@@ -88,7 +89,7 @@ export const RegistrarNoEntregado: React.FC = () => {
   if (!solicitud) {
     return (
       <div className="max-w-md mx-auto text-center py-12 bg-white border border-red-200 rounded-xl mt-8 font-sans">
-        <span className="text-4xl">⚠️</span>
+        <BsExclamationTriangle className="text-4xl text-red-600 mx-auto" />
         <h3 className="text-lg font-bold text-red-700 mt-2">Error</h3>
         <p className="text-gray-500 text-sm mt-1">La solicitud de entrega no existe o no pudo cargarse.</p>
         <button
@@ -104,12 +105,14 @@ export const RegistrarNoEntregado: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto font-sans space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">📸 Registrar Pedido No Entregado</h2>
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <BsCamera className="text-gray-600" /> Registrar Pedido No Entregado
+        </h2>
         <button
           onClick={() => navigate('/entregas')}
-          className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition"
+          className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition flex items-center gap-1"
         >
-          ← Volver
+          <BsArrowLeft /> Volver
         </button>
       </div>
 
@@ -175,7 +178,7 @@ export const RegistrarNoEntregado: React.FC = () => {
             <div className="mt-1">
               {!fotoUrl ? (
                 <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-455 bg-gray-50 rounded-xl p-6 cursor-pointer transition select-none">
-                  <span className="text-3xl">📸</span>
+                  <BsCamera className="text-3xl text-gray-400" />
                   <span className="text-xs font-bold text-gray-700 mt-2">Tomar Foto de Evidencia</span>
                   <span className="text-[9px] text-gray-400 mt-1">Presiona para abrir la cámara</span>
                   <input
@@ -201,7 +204,7 @@ export const RegistrarNoEntregado: React.FC = () => {
                   </div>
 
                   <label className="inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer select-none">
-                    🔄 Cambiar Foto
+                    <BsArrowClockwise /> Cambiar Foto
                     <input
                       type="file"
                       accept="image/*"
@@ -236,7 +239,8 @@ export const RegistrarNoEntregado: React.FC = () => {
           </div>
 
           {mensaje && (
-            <div className="p-4 rounded-xl text-xs font-semibold bg-emerald-50 border border-emerald-250 text-emerald-800">
+            <div className="p-4 rounded-xl text-xs font-semibold bg-emerald-50 border border-emerald-250 text-emerald-800 flex items-center gap-1.5">
+              <BsCheckCircle className="text-sm shrink-0" />
               {mensaje}
             </div>
           )}

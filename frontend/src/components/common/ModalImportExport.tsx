@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useModal } from '../../context/ModalContext';
+import { BsX, BsDownload, BsUpload, BsCheck } from 'react-icons/bs';
 
 interface ColumnConfig {
   key: string;
@@ -178,9 +179,9 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-lg transition font-bold"
+            className="text-gray-400 hover:text-gray-700 text-lg transition font-bold flex items-center justify-center"
           >
-            ✕
+            <BsX className="text-2xl" />
           </button>
         </div>
 
@@ -188,23 +189,23 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
         <div className="flex border-b border-gray-150 text-xs font-semibold">
           <button
             onClick={() => { setActiveTab('export'); setImportResult(null); setImportError(''); }}
-            className={`flex-1 py-3 text-center border-b-2 transition ${
+            className={`flex-1 py-3 text-center border-b-2 transition flex items-center justify-center gap-1.5 ${
               activeTab === 'export'
                 ? 'border-gray-800 text-gray-800 bg-gray-50/40'
                 : 'border-transparent text-gray-450 hover:text-gray-700'
             }`}
           >
-            📥 Exportar Datos
+            <BsDownload /> Exportar Datos
           </button>
           <button
             onClick={() => { setActiveTab('import'); setImportResult(null); setImportError(''); }}
-            className={`flex-1 py-3 text-center border-b-2 transition ${
+            className={`flex-1 py-3 text-center border-b-2 transition flex items-center justify-center gap-1.5 ${
               activeTab === 'import'
                 ? 'border-gray-800 text-gray-800 bg-gray-50/40'
                 : 'border-transparent text-gray-450 hover:text-gray-700'
             }`}
           >
-            📤 Importar Datos
+            <BsUpload /> Importar Datos
           </button>
         </div>
 
@@ -288,7 +289,7 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
                   onClick={handleDownloadTemplate}
                   className="mt-2 text-[10px] font-bold text-blue-700 hover:underline flex items-center gap-1"
                 >
-                  📥 Descargar Plantilla Muestra (.xlsx)
+                  <BsDownload className="text-xs" /> Descargar Plantilla Muestra (.xlsx)
                 </button>
               </div>
 
@@ -313,7 +314,9 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
                   importResult.errors.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
                 }`}>
                   <p className="font-bold text-[13px] text-gray-850">Resumen de importación:</p>
-                  <p className="text-emerald-700 font-semibold">✓ {importResult.successCount} registros importados correctamente.</p>
+                  <p className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <BsCheck className="text-base font-bold shrink-0" /> {importResult.successCount} registros importados correctamente.
+                  </p>
                   {importResult.errors.length > 0 && (
                     <div className="pt-1.5 border-t border-gray-200/50 space-y-1 max-h-[100px] overflow-y-auto">
                       <p className="text-amber-800 font-bold uppercase text-[9px]">Errores de inserción ({importResult.errors.length}):</p>

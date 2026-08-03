@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useModal } from '../../context/ModalContext';
 import { Autoconsumo } from '../../types';
+import { BsArrowClockwise, BsX } from 'react-icons/bs';
 
 interface AutoconsumoCardProps {
   auto: Autoconsumo;
@@ -162,9 +163,9 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                   ) : (
                     <button
                       onClick={handleOpenDevModal}
-                      className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition text-center"
+                      className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
                     >
-                      🔄 Solicitar Devolución
+                      <BsArrowClockwise /> Solicitar Devolución
                     </button>
                   )}
                 </>
@@ -222,13 +223,13 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
             <div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-150">
                 <h3 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-1.5">
-                  🔄 Solicitar Devolución de Autoconsumo
+                  <BsArrowClockwise /> Solicitar Devolución de Autoconsumo
                 </h3>
                 <button
                   onClick={() => { setShowDevModal(false); setMotivoDevolucion(''); }}
-                  className="text-gray-400 hover:text-gray-650 text-xl p-1"
+                  className="text-gray-400 hover:text-gray-650 text-xl p-1 flex items-center justify-center"
                 >
-                  ✕
+                  <BsX className="text-2xl" />
                 </button>
               </div>
 
