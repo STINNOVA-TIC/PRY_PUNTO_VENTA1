@@ -1555,7 +1555,9 @@ export const PanelTTHH: React.FC = () => {
                     .map((d) => (
                       <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
                         <div className="flex-1 min-w-0">
-                          <span className="font-mono text-[10px] text-gray-400 block">Codigo: {d.codigo_entrega}</span>
+                          <span className="font-mono text-[10px] text-gray-400 block">
+                            {d.autoconsumo_id ? `Autoconsumo: ${d.codigo_autoconsumo}` : `Codigo: ${d.codigo_entrega}`}
+                          </span>
                           <h4 className="font-bold text-gray-800 text-sm">{d.empleado_nombre}</h4>
                           <div className="text-gray-600 mt-1 truncate">
                             <span className="font-semibold text-gray-500">Motivo de Cancelación:</span> {d.motivo}
@@ -1612,7 +1614,9 @@ export const PanelTTHH: React.FC = () => {
                       <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3">
-                            <span className="font-mono text-[10px] text-gray-400">{d.codigo_entrega}</span>
+                            <span className="font-mono text-[10px] text-gray-400">
+                              {d.autoconsumo_id ? `Autoconsumo: ${d.codigo_autoconsumo}` : d.codigo_entrega}
+                            </span>
                             <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
                               d.estado === 'aprobado' || d.estado === 'ejecutado'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -1869,7 +1873,7 @@ export const PanelTTHH: React.FC = () => {
         isOpen={!!detalleDevolucion}
         onClose={() => setDetalleDevolucion(null)}
         title="Detalle de Devolución"
-        subtitle={detalleDevolucion?.codigo_entrega}
+        subtitle={detalleDevolucion?.autoconsumo_id ? detalleDevolucion.codigo_autoconsumo : detalleDevolucion?.codigo_entrega}
         badge={
           detalleDevolucion && (
             <span className={`inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${

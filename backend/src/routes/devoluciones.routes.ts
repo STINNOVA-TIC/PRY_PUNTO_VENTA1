@@ -12,5 +12,6 @@ router.post('/', requirePermission('entregas.ver_pendientes'), devolucionesContr
 router.get('/', requirePermission('reportes.ver'), devolucionesController.getAll);
 router.patch('/:id/aprobar', requirePermission('nomina.configurar_descuentos'), devolucionesController.aprobar);
 router.patch('/:id/rechazar', requirePermission('nomina.configurar_descuentos'), devolucionesController.rechazar);
+router.post('/:id/ejecutar-autoconsumo', requirePermission('autoconsumo.entregar'), devolucionesController.ejecutarAutoconsumo);
 
 export default router;

@@ -49,7 +49,31 @@ export const initDb = async () => {
       CREATE INDEX IF NOT EXISTS idx_autoconsumo_codigo ON autoconsumo(autoconsumo_codigo);
     `);
 
-    // 4. Sembrar nuevo rol de empleado_autorizado
+    // 4. Migración: permitir devoluciones de autoconsumos en la tabla devolucion
+    await pool.query(`
+      ALTER TABLE devolucion
+        ALTER COLUMN solicitud_entrega_id DROP NOT NULL,
+        ADD COLUMN IF NOT EXISTS autoconsumo_id INTEGER NULL;
+    `);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_devolucion_autoconsumo'
+        ) THEN
+          ALTER TABLE devolucion
+            ADD CONSTRAINT fk_devolucion_autoconsumo
+            FOREIGN KEY (autoconsumo_id) REFERENCES autoconsumo(autoconsumo_id) ON DELETE RESTRICT;
+        END IF;
+      END $$;
+    `);
+
+    // 4.1. Migración: trazar autoconsumos en movimiento_inventario
+    await pool.query(`
+      ALTER TABLE movimiento_inventario ADD COLUMN IF NOT EXISTS autoconsumo_id INTEGER NULL;
+    `);
+
+    // 5. Sembrar nuevo rol de empleado_autorizado
     await pool.query(`
       INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 
       VALUES (8, 'empleado_autorizado', 'Empleado autorizado para realizar autoconsumo', 'activo')

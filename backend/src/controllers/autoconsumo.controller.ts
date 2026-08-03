@@ -58,6 +58,13 @@ export const autoconsumoController = {
           [row.autoconsumo_id]
         );
 
+        // Buscar si tiene alguna devolución registrada
+        const devRes = await pool.query(
+          'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1',
+          [row.autoconsumo_id]
+        );
+        const devInfo = devRes.rows[0] || null;
+
         list.push({
           id: row.autoconsumo_id,
           codigo: row.autoconsumo_codigo,
@@ -70,6 +77,10 @@ export const autoconsumoController = {
           foto_entrega: row.autoconsumo_foto_entrega,
           aprobador: row.aprobador_nombre,
           despachador: row.entrega_nombre,
+          devolucion: devInfo ? {
+            id: devInfo.devolucion_id,
+            estado: devInfo.devolucion_estado
+          } : null,
           empleado: {
             id: row.empleado_id,
             nombre: `${row.empleado_nombre} ${row.empleado_apellido}`,
@@ -145,6 +156,13 @@ export const autoconsumoController = {
         [row.autoconsumo_id]
       );
 
+      // Buscar si existe alguna devolución asociada y su estado
+      const devRes = await pool.query(
+        'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1',
+        [row.autoconsumo_id]
+      );
+      const devInfo = devRes.rows[0] || null;
+
       res.json({
         success: true,
         data: {
@@ -159,6 +177,10 @@ export const autoconsumoController = {
           foto_entrega: row.autoconsumo_foto_entrega,
           aprobador: row.aprobador_nombre,
           despachador: row.entrega_nombre,
+          devolucion: devInfo ? {
+            id: devInfo.devolucion_id,
+            estado: devInfo.devolucion_estado
+          } : null,
           empleado: {
             id: row.empleado_id,
             nombre: `${row.empleado_nombre} ${row.empleado_apellido}`,

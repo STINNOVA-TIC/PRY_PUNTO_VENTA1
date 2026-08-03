@@ -12,7 +12,7 @@ import { Paginacion } from '../common/Paginacion';
 export const SolicitudesPendientes: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudEntrega[]>([]);
   const [autoconsumos, setAutoconsumos] = useState<Autoconsumo[]>([]);
-  const [activeTab, setActiveTab] = useState<'pendientes' | 'entregadas' | 'autoconsumos'>('pendientes');
+  const [activeTab, setActiveTab] = useState<'pendientes' | 'entregadas' | 'autoconsumos' | 'autoconsumos_entregados'>('pendientes');
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
@@ -110,6 +110,26 @@ export const SolicitudesPendientes: React.FC = () => {
     }
   };
 
+  const handleSolicitarDevolucionAutoconsumo = async (id: number, motivo: string, detalles?: any[]) => {
+    try {
+      await devolucionesAPI.solicitarAutoconsumo(id, motivo, detalles);
+      setMensaje('Solicitud de devolución de autoconsumo registrada. En espera de aprobación por Talento Humano.');
+      cargarSolicitudes();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al registrar devolución del autoconsumo');
+    }
+  };
+
+  const handleEjecutarDevolucionAutoconsumo = async (_autoconsumoId: number, devolucionId: number) => {
+    try {
+      await devolucionesAPI.ejecutarAutoconsumo(devolucionId);
+      setMensaje('Devolución de autoconsumo procesada y stock restaurado en inventario exitosamente.');
+      cargarSolicitudes();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al ejecutar devolución del autoconsumo');
+    }
+  };
+
   const handleDespacharAutoconsumo = (auto: Autoconsumo) => {
     navigate(`/entregas/autoconsumos/${auto.id}/despacho`);
   };
@@ -137,8 +157,10 @@ export const SolicitudesPendientes: React.FC = () => {
 
   const autoconsumosFiltrados = useMemo(() => {
     return autoconsumos.filter((a) => {
-      // El guardia solo despacha los 'aprobados' o ve los 'entregados'
-      const matchEstado = a.estado === 'aprobado' || a.estado === 'entregado';
+      // El tab de autoconsumos solo muestra aprobados (por despachar); el de entregados solo entregados
+      const matchEstado = activeTab === 'autoconsumos_entregados'
+        ? a.estado === 'entregado'
+        : a.estado === 'aprobado';
       if (!matchEstado) return false;
 
       const query = searchQuery.toLowerCase().trim();
@@ -150,11 +172,13 @@ export const SolicitudesPendientes: React.FC = () => {
 
       return nombre.includes(query) || cedula.includes(query) || codigo.includes(query);
     });
-  }, [autoconsumos, searchQuery]);
+  }, [autoconsumos, activeTab, searchQuery]);
 
   const currentCount = useMemo(() => {
-    if (activeTab === 'autoconsumos') {
-      return autoconsumos.filter(a => a.estado === 'aprobado' || a.estado === 'entregado').length;
+    if (activeTab === 'autoconsumos' || activeTab === 'autoconsumos_entregados') {
+      return autoconsumos.filter(a => activeTab === 'autoconsumos_entregados'
+        ? a.estado === 'entregado'
+        : a.estado === 'aprobado').length;
     }
     return solicitudes.filter((sol) => {
       const estadoStr = sol.estado as string;
@@ -194,6 +218,8 @@ export const SolicitudesPendientes: React.FC = () => {
               ? 'Despacho de Entregas Pendientes' 
               : activeTab === 'autoconsumos'
               ? 'Despacho de Autoconsumos'
+              : activeTab === 'autoconsumos_entregados'
+              ? 'Autoconsumos Entregados'
               : 'Historial de Entregas Realizadas'}
           </h2>
           <p className="text-xs text-gray-500 mt-1">
@@ -201,16 +227,18 @@ export const SolicitudesPendientes: React.FC = () => {
               ? 'Busca y confirma la entrega de pedidos a los empleados' 
               : activeTab === 'autoconsumos'
               ? 'Despache productos de autoconsumo autorizados por Talento Humano'
+              : activeTab === 'autoconsumos_entregados'
+              ? 'Consulte autoconsumos despachados y registre devoluciones de artículos no consumidos'
               : 'Consulte entregas anteriores y registre devoluciones de artículos no consumidos'}
           </p>
         </div>
         <span className="text-xs font-semibold px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full border border-gray-200 flex-shrink-0">
-          {currentCount} {activeTab === 'pendientes' ? 'pendientes' : activeTab === 'autoconsumos' ? 'autoconsumos' : 'entregadas'}
+          {currentCount} {activeTab === 'pendientes' ? 'pendientes' : activeTab === 'autoconsumos' ? 'por despachar' : activeTab === 'autoconsumos_entregados' ? 'entregados' : 'entregadas'}
         </span>
       </div>
 
-      {/* Tabs para alternar entre Pendientes, Historial y Autoconsumos */}
-      <div className="flex bg-gray-100 p-1 rounded-xl gap-1 max-w-lg w-full shadow-xs">
+      {/* Tabs para alternar entre Pendientes, Historial, Autoconsumos y Autoconsumos Entregados */}
+      <div className="flex bg-gray-100 p-1 rounded-xl gap-1 max-w-2xl w-full shadow-xs">
         <button
           onClick={() => setActiveTab('pendientes')}
           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${
@@ -246,6 +274,21 @@ export const SolicitudesPendientes: React.FC = () => {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('autoconsumos_entregados')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative ${
+            activeTab === 'autoconsumos_entregados'
+              ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
+              : 'text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          📦 Autoconsumos Entregados
+          {autoconsumos.filter(a => a.estado === 'entregado').length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+              {autoconsumos.filter(a => a.estado === 'entregado').length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Buscador de Empleados */}
@@ -276,10 +319,14 @@ export const SolicitudesPendientes: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'autoconsumos' ? (
+      {activeTab === 'autoconsumos' || activeTab === 'autoconsumos_entregados' ? (
         autoconsumosFiltrados.length === 0 ? (
           <div className="text-center py-16 bg-white border border-gray-200 rounded-xl shadow-sm">
-            <p className="text-gray-500 font-semibold">No se encontraron autoconsumos</p>
+            <p className="text-gray-500 font-semibold">
+              {activeTab === 'autoconsumos_entregados'
+                ? 'No se encontraron autoconsumos entregados'
+                : 'No se encontraron autoconsumos'}
+            </p>
             <p className="text-gray-400 text-xs mt-1">
               Intente con otro término o verifique si ya fueron retirados.
             </p>
@@ -291,6 +338,8 @@ export const SolicitudesPendientes: React.FC = () => {
                 key={auto.id}
                 auto={auto}
                 onDespachar={handleDespacharAutoconsumo}
+                onSolicitarDevolucion={handleSolicitarDevolucionAutoconsumo}
+                onEjecutarDevolucion={handleEjecutarDevolucionAutoconsumo}
               />
             ))}
           </div>

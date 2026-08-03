@@ -358,7 +358,8 @@ CREATE TABLE orden_compra_factura (
 -------- Devolucion
 CREATE TABLE devolucion (
     devolucion_id SERIAL PRIMARY KEY,
-    solicitud_entrega_id INTEGER NOT NULL REFERENCES solicitud_entrega(solicitud_entrega_id) ON DELETE RESTRICT,
+    solicitud_entrega_id INTEGER NULL REFERENCES solicitud_entrega(solicitud_entrega_id) ON DELETE RESTRICT,
+    autoconsumo_id INTEGER NULL,
     empleado_id INTEGER NOT NULL REFERENCES empleado(empleado_id) ON DELETE RESTRICT,
     usuario_entrega_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
     usuario_tthh_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
@@ -416,6 +417,7 @@ CREATE TABLE movimiento_inventario (
     movimiento_inventario_observacion TEXT NULL,
 
     solicitud_entrega_id INTEGER NULL REFERENCES solicitud_entrega(solicitud_entrega_id) ON DELETE SET NULL,
+    autoconsumo_id INTEGER NULL REFERENCES autoconsumo(autoconsumo_id) ON DELETE SET NULL,
     venta_id INTEGER NULL REFERENCES venta(venta_id) ON DELETE SET NULL,
     orden_compra_id INTEGER NULL REFERENCES orden_compra(orden_compra_id) ON DELETE SET NULL
 );
@@ -468,6 +470,11 @@ CREATE TABLE autoconsumo_detalle (
     autoconsumo_detalle_precio_unitario NUMERIC(10,2) NOT NULL DEFAULT 0,
     autoconsumo_detalle_subtotal NUMERIC(10,2) NOT NULL DEFAULT 0
 );
+
+-- FK para permitir devoluciones de autoconsumos
+ALTER TABLE devolucion
+    ADD CONSTRAINT fk_devolucion_autoconsumo
+    FOREIGN KEY (autoconsumo_id) REFERENCES autoconsumo(autoconsumo_id) ON DELETE RESTRICT;
 
 -- =============================================
 -- 5. ÍNDICES RECOMENDADOS (PARA RENDIMIENTO)

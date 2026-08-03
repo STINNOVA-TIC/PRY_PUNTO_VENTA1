@@ -167,6 +167,10 @@ export interface Autoconsumo {
   foto_entrega?: string;
   aprobador?: string;
   despachador?: string;
+  devolucion?: {
+    id: number;
+    estado: string;
+  } | null;
   empleado: {
     id: number;
     nombre: string;

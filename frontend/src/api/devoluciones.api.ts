@@ -6,6 +6,11 @@ export const devolucionesAPI = {
     return response.data;
   },
 
+  solicitarAutoconsumo: async (autoconsumo_id: number, motivo: string, detalles?: { producto_id: number; cantidad_devuelta: number }[]) => {
+    const response = await api.post('/devoluciones', { autoconsumo_id, motivo, detalles });
+    return response.data;
+  },
+
   getAll: async () => {
     const response = await api.get('/devoluciones');
     return response.data;
@@ -18,6 +23,11 @@ export const devolucionesAPI = {
 
   rechazar: async (id: number, observaciones: string) => {
     const response = await api.patch(`/devoluciones/${id}/rechazar`, { observaciones });
+    return response.data;
+  },
+
+  ejecutarAutoconsumo: async (id: number, motivo?: string) => {
+    const response = await api.post(`/devoluciones/${id}/ejecutar-autoconsumo`, { motivo });
     return response.data;
   }
 };
