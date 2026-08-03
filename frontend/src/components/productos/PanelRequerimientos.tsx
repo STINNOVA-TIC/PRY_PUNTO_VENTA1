@@ -568,10 +568,10 @@ export const PanelRequerimientos: React.FC = () => {
                     if (!p.activo) return false;
                     const q = productSearch.toLowerCase().trim();
                     if (!q) return true;
-                    return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q);
+                    return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
                   })
                   .map(p => (
-                    <option key={p.id} value={p.id}>{p.codigo_barras} - {p.nombre} (Stock: {p.stock_actual})</option>
+                    <option key={p.id} value={p.id}>{p.codigo_barras} - {p.nombre} - {p.descripcion || 'Sin detalle'} (Stock: {p.stock_actual})</option>
                   ))}
               </select>
             </div>
