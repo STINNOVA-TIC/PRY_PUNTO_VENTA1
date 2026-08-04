@@ -245,7 +245,8 @@ export const PanelTTHH: React.FC = () => {
       const matchEmpleado = t.empleado_nombre.toLowerCase().includes(searchEmpleado.toLowerCase()) ||
         t.empleado_cedula.includes(searchEmpleado);
       const matchProducto = t.producto_nombre.toLowerCase().includes(searchProducto.toLowerCase()) ||
-        t.producto_codigo.toLowerCase().includes(searchProducto.toLowerCase());
+        t.producto_codigo.toLowerCase().includes(searchProducto.toLowerCase()) ||
+        (t.producto_descripcion || '').toLowerCase().includes(searchProducto.toLowerCase());
       const matchDept = selectedDept ? t.departamento === selectedDept : true;
       const matchCC = selectedCC ? t.centro_costos === selectedCC : true;
       const matchCat = selectedCat ? t.categoria === selectedCat : true;
@@ -697,7 +698,7 @@ export const PanelTTHH: React.FC = () => {
       return;
     }
 
-    const headers = ['ID Venta', 'Fecha/Hora', 'Empleado', 'Cedula/ID', 'Departamento', 'Centro de Costos', 'Producto', 'Categoria', 'Codigo Producto', 'Cantidad', 'Precio Unitario', 'Total'];
+    const headers = ['ID Venta', 'Fecha/Hora', 'Empleado', 'Cedula/ID', 'Departamento', 'Centro de Costos', 'Producto', 'Detalle', 'Categoria', 'Codigo Producto', 'Cantidad', 'Precio Unitario', 'Total'];
 
     const rows = listado.map(t => [
       t.id,
@@ -707,6 +708,7 @@ export const PanelTTHH: React.FC = () => {
       t.departamento,
       t.centro_costos,
       t.producto_nombre,
+      t.producto_descripcion,
       t.categoria,
       t.producto_codigo,
       t.cantidad,
@@ -754,6 +756,7 @@ export const PanelTTHH: React.FC = () => {
       'Departamento': t.departamento,
       'Centro de Costos': t.centro_costos,
       'Producto': t.producto_nombre,
+      'Detalle': t.producto_descripcion,
       'Categoría': t.categoria,
       'Código Producto': t.producto_codigo,
       'Cantidad': t.cantidad,
@@ -798,7 +801,7 @@ export const PanelTTHH: React.FC = () => {
     doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
 
-    const headers = [['ID', 'Fecha/Hora', 'Empleado', 'Cédula', 'Dpto', 'C. Costos', 'Producto', 'Categoría', 'Cant.', 'P. Unit', 'Total']];
+    const headers = [['ID', 'Fecha/Hora', 'Empleado', 'Cédula', 'Dpto', 'C. Costos', 'Producto', 'Detalle', 'Categoría', 'Cant.', 'P. Unit', 'Total']];
 
     const rows = listado.map(t => [
       t.id,
@@ -808,6 +811,7 @@ export const PanelTTHH: React.FC = () => {
       t.departamento,
       t.centro_costos,
       t.producto_nombre,
+      t.producto_descripcion,
       t.categoria,
       t.cantidad,
       `$${t.precio_unitario.toFixed(2)}`,
@@ -829,10 +833,11 @@ export const PanelTTHH: React.FC = () => {
         4: { cellWidth: 25 },
         5: { cellWidth: 20 },
         6: { cellWidth: 35 },
-        7: { cellWidth: 22 },
-        8: { cellWidth: 12 },
-        9: { cellWidth: 16 },
-        10: { cellWidth: 18 }
+        7: { cellWidth: 30 },
+        8: { cellWidth: 22 },
+        9: { cellWidth: 12 },
+        10: { cellWidth: 16 },
+        11: { cellWidth: 18 }
       }
     });
 
@@ -1276,7 +1281,12 @@ export const PanelTTHH: React.FC = () => {
                               <td className="px-5 py-3 text-gray-400">{t.empleado_cedula}</td>
                               <td className="px-5 py-3 text-gray-500 font-sans">{t.departamento}</td>
                               <td className="px-5 py-3 text-gray-500 font-sans">{t.centro_costos}</td>
-                              <td className="px-5 py-3 font-semibold text-gray-800 font-sans">{t.producto_nombre}</td>
+                              <td className="px-5 py-3 font-semibold text-gray-800 font-sans">
+                                {t.producto_nombre}
+                                {t.producto_descripcion && t.producto_descripcion !== 'Sin detalle' && (
+                                  <span className="block text-[10px] font-normal text-gray-400">{t.producto_descripcion}</span>
+                                )}
+                              </td>
                               <td className="px-5 py-3 text-gray-500 font-sans">{t.categoria}</td>
                               <td className="px-5 py-3 text-gray-400">{t.producto_codigo}</td>
                               <td className="px-5 py-3 text-center font-bold text-gray-800">{t.cantidad}</td>
@@ -1412,8 +1422,13 @@ export const PanelTTHH: React.FC = () => {
                                   <div className="space-y-0.5 text-[10px] text-gray-600 font-mono min-w-[150px]">
                                     {a.detalles?.map((d: any) => (
                                       <div key={d.id} className="flex justify-between gap-2">
-                                        <span>• {d.producto_nombre}</span>
-                                        <span className="font-bold text-gray-750">x{d.cantidad}</span>
+                                        <div className="min-w-0">
+                                          <span>• {d.producto_nombre}</span>
+                                          {d.producto_descripcion && (
+                                            <span className="block text-[9px] text-gray-400 truncate">{d.producto_descripcion}</span>
+                                          )}
+                                        </div>
+                                        <span className="font-bold text-gray-750 shrink-0">x{d.cantidad}</span>
                                       </div>
                                     )) || '-'}
                                   </div>
@@ -1904,7 +1919,12 @@ export const PanelTTHH: React.FC = () => {
             <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-gray-50">
               {detalleDevolucion.detalles.map((det: any) => (
                 <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
-                  <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                  <div>
+                    <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                    {det.producto_descripcion && (
+                      <span className="block text-[10px] text-gray-400">{det.producto_descripcion}</span>
+                    )}
+                  </div>
                   <span className="font-mono text-gray-500">Cód: {det.producto_codigo} • x{det.cantidad}</span>
                 </div>
               ))}
@@ -1955,6 +1975,9 @@ export const PanelTTHH: React.FC = () => {
                   <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
                     <div>
                       <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                      {det.producto_descripcion && (
+                        <span className="block text-[10px] text-gray-400">{det.producto_descripcion}</span>
+                      )}
                       <span className="block font-mono text-[10px] text-gray-400">Cód: {det.producto_codigo}</span>
                     </div>
                     <div className="text-right">

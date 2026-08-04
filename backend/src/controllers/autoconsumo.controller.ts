@@ -51,7 +51,7 @@ export const autoconsumoController = {
       const list = [];
       for (const row of result.rows) {
         const detailsRes = await pool.query(
-          `SELECT ad.*, p.producto_nombre, p.producto_codigo
+          `SELECT ad.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
            FROM autoconsumo_detalle ad
            JOIN producto p ON ad.producto_id = p.producto_id
            WHERE ad.autoconsumo_id = $1`,
@@ -100,6 +100,7 @@ export const autoconsumoController = {
             producto_id: d.producto_id,
             producto_nombre: d.producto_nombre,
             producto_codigo: d.producto_codigo,
+            producto_descripcion: d.producto_descripcion || '',
             cantidad: d.autoconsumo_detalle_cantidad,
             precio_unitario: parseFloat(d.autoconsumo_detalle_precio_unitario),
             subtotal: parseFloat(d.autoconsumo_detalle_subtotal)
@@ -149,7 +150,7 @@ export const autoconsumoController = {
       }
 
       const detailsRes = await pool.query(
-        `SELECT ad.*, p.producto_nombre, p.producto_codigo
+        `SELECT ad.*, p.producto_nombre, p.producto_codigo, p.producto_descripcion
          FROM autoconsumo_detalle ad
          JOIN producto p ON ad.producto_id = p.producto_id
          WHERE ad.autoconsumo_id = $1`,
@@ -200,6 +201,7 @@ export const autoconsumoController = {
             producto_id: d.producto_id,
             producto_nombre: d.producto_nombre,
             producto_codigo: d.producto_codigo,
+            producto_descripcion: d.producto_descripcion || '',
             cantidad: d.autoconsumo_detalle_cantidad,
             precio_unitario: parseFloat(d.autoconsumo_detalle_precio_unitario),
             subtotal: parseFloat(d.autoconsumo_detalle_subtotal)
