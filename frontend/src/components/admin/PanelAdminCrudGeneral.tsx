@@ -6,6 +6,7 @@ import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
+import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 import { useModal } from '../../context/ModalContext';
 
 interface FieldConfig {
@@ -163,8 +164,37 @@ export const PanelAdminCrudGeneral: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Búsqueda y filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterEstado, setFilterEstado] = useState<'ALL' | 'activo' | 'inactivo'>('ALL');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterEstado, activeSchema]);
+
   // Caché de tablas referenciales para selects (ej: empresas, categorías)
   const [refCache, setRefCache] = useState<{ [table: string]: any[] }>({});
+
+  const rowsFiltrados = React.useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    return rows.filter((row) => {
+      if (filterEstado === 'activo' && row[`${activeSchema.table}_estado`] !== 'activo') return false;
+      if (filterEstado === 'inactivo' && row[`${activeSchema.table}_estado`] === 'activo') return false;
+
+      if (!query) return true;
+
+      const pkVal = String(row[`${activeSchema.table}_id`] ?? '');
+      const searchable = activeSchema.fields.map((f) => {
+        let val = row[f.key];
+        if (f.type === 'select' && f.refTable) {
+          const matchedOpt = (refCache[f.refTable] || []).find((opt) => opt[f.refIdKey || ''] === val);
+          if (matchedOpt) val = matchedOpt[f.refLabelKey || ''];
+        }
+        return val !== null && val !== undefined ? String(val) : '';
+      });
+      return `${pkVal} ${searchable.join(' ')}`.toLowerCase().includes(query);
+    });
+  }, [rows, activeSchema, refCache, searchQuery, filterEstado]);
 
   // Formulario
   const [isModalAbierto, setIsModalAbierto] = useState(false);
@@ -404,7 +434,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     }
   };
 
-  const rowsPaginados = rows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const rowsPaginados = rowsFiltrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="font-sans space-y-6">
@@ -460,6 +490,28 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         </div>
       )}
 
+      {/* BÚSQUEDA Y FILTROS */}
+      <SearchAndFilterBar
+        searchPlaceholder={`Buscar en ${activeSchema.label.toLowerCase()}...`}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        totalResults={rowsFiltrados.length}
+        totalCount={rows.length}
+        resultsLabel="registros"
+        selectFilters={[
+          {
+            id: 'estado',
+            placeholder: 'Todos los Estados',
+            value: filterEstado,
+            onChange: (val) => setFilterEstado(val as any),
+            options: [
+              { label: 'Activo', value: 'activo' },
+              { label: 'Inactivo', value: 'inactivo' }
+            ]
+          }
+        ]}
+      />
+
       {/* LISTADO */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -468,7 +520,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800"></div>
               <p className="text-[10px] text-gray-400">Consultando registros...</p>
             </div>
-          ) : rows.length === 0 ? (
+          ) : rowsFiltrados.length === 0 ? (
             <p className="text-center py-12 text-xs text-gray-400 font-medium">No se encontraron registros en esta tabla.</p>
           ) : (
             <table className="w-full text-left text-xs border-collapse">
@@ -546,10 +598,10 @@ export const PanelAdminCrudGeneral: React.FC = () => {
           )}
         </div>
 
-        {!loading && rows.length > 0 && (
+        {!loading && rowsFiltrados.length > 0 && (
           <Paginacion
             currentPage={currentPage}
-            totalItems={rows.length}
+            totalItems={rowsFiltrados.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}

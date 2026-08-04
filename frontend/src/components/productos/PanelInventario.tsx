@@ -51,6 +51,11 @@ export const PanelInventario: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Subsecciones y paginación del historial de órdenes
+  const [moduloActivo, setModuloActivo] = useState<'inventario' | 'historial'>('inventario');
+  const [historialPage, setHistorialPage] = useState(1);
+  const [historialItemsPerPage, setHistorialItemsPerPage] = useState(5);
+
   // Formulario de Orden de Compra
   const [showOCForm, setShowOCForm] = useState(false);
   const [ocJustificacion, setOcJustificacion] = useState('');
@@ -410,6 +415,10 @@ export const PanelInventario: React.FC = () => {
   const endIndex = startIndex + itemsPerPage;
   const productosPaginados = productosFiltrados.slice(startIndex, endIndex);
 
+  const historialStartIndex = (historialPage - 1) * historialItemsPerPage;
+  const historialEndIndex = historialStartIndex + historialItemsPerPage;
+  const ordenesPaginadas = ordenes.slice(historialStartIndex, historialEndIndex);
+
   const exportarCSV = async () => {
     const listado = productosFiltrados;
     if (listado.length === 0) {
@@ -667,6 +676,33 @@ export const PanelInventario: React.FC = () => {
         </div>
       )}
 
+      {/* Selector de Subsecciones (Tabs) */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setModuloActivo('inventario')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'inventario'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Catálogo Físico en Bodega
+        </button>
+        <button
+          onClick={() => setModuloActivo('historial')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'historial'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Historial de Órdenes de Reabastecimiento
+        </button>
+      </div>
+
+      {/* SUBMODULO 1: INVENTARIO */}
+      {moduloActivo === 'inventario' && (
+      <>
       {/* MODAL / FORMULARIO: GENERAR ORDEN DE COMPRA */}
       {showOCForm && (
         <form onSubmit={handleCreateOC} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl space-y-4">
@@ -920,7 +956,12 @@ export const PanelInventario: React.FC = () => {
           />
         </div>
       </div>
+      </>
+      )}
 
+      {/* SUBMODULO 2: HISTORIAL DE ÓRDENES DE REABASTECIMIENTO */}
+      {moduloActivo === 'historial' && (
+      <>
       {/* SECCIÓN 3: LISTADO DE ÓRDENES DE COMPRA */}
       <div className="space-y-4">
         <h2 className="text-base font-bold text-gray-800">Historial de Órdenes de Reabastecimiento</h2>
@@ -931,7 +972,7 @@ export const PanelInventario: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {ordenes.map((oc) => (
+            {ordenesPaginadas.map((oc) => (
               <div key={oc.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
@@ -971,7 +1012,17 @@ export const PanelInventario: React.FC = () => {
             ))}
           </div>
         )}
+
+        <Paginacion
+          currentPage={historialPage}
+          totalItems={ordenes.length}
+          itemsPerPage={historialItemsPerPage}
+          onPageChange={setHistorialPage}
+          onItemsPerPageChange={setHistorialItemsPerPage}
+        />
       </div>
+      </>
+      )}
 
       <ModalImportExport
         isOpen={isImportExportOpen}

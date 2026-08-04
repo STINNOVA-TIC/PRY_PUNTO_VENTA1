@@ -223,11 +223,18 @@ export const SolicitudesPendientes: React.FC = () => {
   }, [activeTab, searchQuery, itemsPerPage]);
 
   const entregadasPaginadas = useMemo(() => {
-    if (activeTab !== 'entregadas') return solicitudesFiltradas;
+    if (activeTab !== 'entregadas' && activeTab !== 'pendientes') return solicitudesFiltradas;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return solicitudesFiltradas.slice(startIndex, endIndex);
   }, [solicitudesFiltradas, activeTab, currentPage, itemsPerPage]);
+
+  const autoconsumosPaginados = useMemo(() => {
+    if (activeTab !== 'autoconsumos' && activeTab !== 'autoconsumos_entregados') return autoconsumosFiltrados;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return autoconsumosFiltrados.slice(startIndex, endIndex);
+  }, [autoconsumosFiltrados, activeTab, currentPage, itemsPerPage]);
 
   if (loading) {
     return (
@@ -369,17 +376,27 @@ export const SolicitudesPendientes: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {autoconsumosFiltrados.map((auto) => (
-              <AutoconsumoCard
-                key={auto.id}
-                auto={auto}
-                onDespachar={handleDespacharAutoconsumo}
-                onSolicitarDevolucion={handleSolicitarDevolucionAutoconsumo}
-                onEjecutarDevolucion={handleEjecutarDevolucionAutoconsumo}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {autoconsumosPaginados.map((auto) => (
+                <AutoconsumoCard
+                  key={auto.id}
+                  auto={auto}
+                  onDespachar={handleDespacharAutoconsumo}
+                  onSolicitarDevolucion={handleSolicitarDevolucionAutoconsumo}
+                  onEjecutarDevolucion={handleEjecutarDevolucionAutoconsumo}
+                />
+              ))}
+            </div>
+
+            <Paginacion
+              currentPage={currentPage}
+              totalItems={autoconsumosFiltrados.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
+          </>
         )
       ) : (
         solicitudesFiltradas.length === 0 ? (
@@ -404,7 +421,7 @@ export const SolicitudesPendientes: React.FC = () => {
               ))}
             </div>
 
-            {activeTab === 'entregadas' && (
+            {(activeTab === 'pendientes' || activeTab === 'entregadas') && (
               <Paginacion
                 currentPage={currentPage}
                 totalItems={solicitudesFiltradas.length}

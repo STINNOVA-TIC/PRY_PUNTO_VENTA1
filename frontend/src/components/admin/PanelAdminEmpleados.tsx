@@ -102,6 +102,14 @@ export const PanelAdminEmpleados: React.FC = () => {
       colSpan: 2,
       fotoAviso: 'Puedes ingresar una URL o subir/tomar una foto desde tu dispositivo.'
     },
+    {
+      name: 'firma',
+      label: 'Firma Digitalizada (Imagen PNG transparente)',
+      tipo: 'foto',
+      fotoCarpeta: 'firma',
+      colSpan: 2,
+      fotoAviso: 'Sube una imagen PNG con fondo transparente de la firma.'
+    },
     { name: 'activo', label: 'Colaborador Activo', tipo: 'checkbox' },
     { name: 'permitir_autoconsumo', label: 'Autorizar Autoconsumo (Consumo Interno)', tipo: 'checkbox' }
   ];
@@ -113,6 +121,7 @@ export const PanelAdminEmpleados: React.FC = () => {
     email: emp?.email || '',
     cargo: emp?.cargo || '',
     foto_perfil: (emp?.foto_perfil || '').startsWith('https://ui-avatars') ? '' : (emp?.foto_perfil || ''),
+    firma: emp?.firma || '',
     departamento_id: emp?.departamento_id || '',
     centro_costos_id: emp?.centro_costos_id || '',
     activo: emp?.activo !== undefined ? emp.activo : true,
@@ -127,6 +136,7 @@ export const PanelAdminEmpleados: React.FC = () => {
       email: valores.email || null,
       cargo: valores.cargo || null,
       foto_perfil: valores.foto_perfil || null,
+      firma: valores.firma || null,
       departamento_id: valores.departamento_id ? Number(valores.departamento_id) : null,
       centro_costos_id: valores.centro_costos_id ? Number(valores.centro_costos_id) : null,
       activo: !!valores.activo,

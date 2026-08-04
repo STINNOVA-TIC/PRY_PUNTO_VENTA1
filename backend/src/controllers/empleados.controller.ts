@@ -49,6 +49,7 @@ export const empleadosController = {
         cargo: row.empleado_cargo || 'Empleado',
         email: row.empleado_email || '',
         foto_perfil: row.empleado_foto || `https://ui-avatars.com/api/?name=${row.empleado_nombre}+${row.empleado_apellido}&size=128`,
+        firma: row.empleado_firma || null,
         activo: row.empleado_estado === 'activo',
         permitir_autoconsumo: row.permitir_autoconsumo || false
       }));
@@ -103,6 +104,7 @@ export const empleadosController = {
           cargo: empleado.empleado_cargo || 'Empleado',
           email: empleado.empleado_email || '',
           foto_perfil: empleado.empleado_foto || `https://ui-avatars.com/api/?name=${empleado.empleado_nombre}+${empleado.empleado_apellido}&size=128`,
+          firma: empleado.empleado_firma || null,
           activo: empleado.empleado_estado === 'activo',
           permitir_autoconsumo: empleado.permitir_autoconsumo || false
         }
@@ -164,7 +166,7 @@ export const empleadosController = {
 
   create: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo, permitir_autoconsumo } = req.body;
+      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
 
       if (!cedula || !nombre || !apellido) {
         throw new AppError('Cédula, nombre y apellido son requeridos', 400);
@@ -184,8 +186,8 @@ export const empleadosController = {
       }
 
       const insertRes = await pool.query(
-        `INSERT INTO empleado (empleado_cedula, empleado_nombre, empleado_apellido, departamento_id, centro_costos_id, empleado_email, empleado_cargo, empleado_foto, empleado_estado)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        `INSERT INTO empleado (empleado_cedula, empleado_nombre, empleado_apellido, departamento_id, centro_costos_id, empleado_email, empleado_cargo, empleado_foto, empleado_firma, empleado_estado)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
           cedula.trim(), 
           nombre.trim(), 
@@ -195,6 +197,7 @@ export const empleadosController = {
           email ? email.trim() : null, 
           cargo ? cargo.trim() : null, 
           foto_perfil || null, 
+          firma || null,
           activo !== false ? 'activo' : 'inactivo'
         ]
       );
@@ -234,7 +237,7 @@ export const empleadosController = {
   update: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, activo, permitir_autoconsumo } = req.body;
+      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
 
       if (!cedula || !nombre || !apellido) {
         throw new AppError('Cédula, nombre y apellido son requeridos', 400);
@@ -255,8 +258,8 @@ export const empleadosController = {
 
       const updateRes = await pool.query(
         `UPDATE empleado 
-         SET empleado_cedula = $1, empleado_nombre = $2, empleado_apellido = $3, departamento_id = $4, centro_costos_id = $5, empleado_email = $6, empleado_cargo = $7, empleado_foto = $8, empleado_estado = $9, empleado_fecha_modificacion = CURRENT_TIMESTAMP
-         WHERE empleado_id = $10 RETURNING *`,
+         SET empleado_cedula = $1, empleado_nombre = $2, empleado_apellido = $3, departamento_id = $4, centro_costos_id = $5, empleado_email = $6, empleado_cargo = $7, empleado_foto = $8, empleado_firma = $9, empleado_estado = $10, empleado_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE empleado_id = $11 RETURNING *`,
         [
           cedula.trim(), 
           nombre.trim(), 
@@ -266,6 +269,7 @@ export const empleadosController = {
           email ? email.trim() : null, 
           cargo ? cargo.trim() : null, 
           foto_perfil || null, 
+          firma || null,
           activo ? 'activo' : 'inactivo', 
           id
         ]

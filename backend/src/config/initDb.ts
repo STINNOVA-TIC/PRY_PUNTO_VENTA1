@@ -73,6 +73,12 @@ export const initDb = async () => {
       ALTER TABLE movimiento_inventario ADD COLUMN IF NOT EXISTS autoconsumo_id INTEGER NULL;
     `);
 
+    // 4.2. Migración: indicador de IVA por línea de detalle de orden de compra
+    await pool.query(`
+      ALTER TABLE orden_compra_detalle
+        ADD COLUMN IF NOT EXISTS orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
     // 5. Sembrar nuevo rol de empleado_autorizado
     await pool.query(`
       INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 

@@ -35,7 +35,7 @@ export const BotonDescargar: React.FC<BotonDescargarProps> = ({
       <button
         type="button"
         onClick={() => setShowDropdown(!showDropdown)}
-        className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
+        className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
       >
         <span>{label}</span>
         <BsChevronDown className={`h-3 w-3 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />

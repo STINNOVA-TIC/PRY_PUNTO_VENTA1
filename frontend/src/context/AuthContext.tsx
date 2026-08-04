@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   isShopSession: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginByCedula: (cedula: string) => Promise<void>;
+  loginByCedula: (cedula: string, isForSignatures?: boolean) => Promise<void>;
   logout: () => void;
   hasPermission: (permiso: Permiso) => boolean;
   hasAnyPermission: (...permisos: Permiso[]) => boolean;
@@ -61,16 +61,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginByCedula = async (cedula: string) => {
+  const loginByCedula = async (cedula: string, isForSignatures: boolean = false) => {
     try {
       const response = await authAPI.employeeLogin(cedula);
       const { token, usuario } = response.data;
       
+      const isShop = !isForSignatures;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(usuario));
-      localStorage.setItem('isShopSession', 'true');
+      localStorage.setItem('isShopSession', isShop ? 'true' : 'false');
       setUser(usuario);
-      setIsShopSession(true);
+      setIsShopSession(isShop);
       lastActivity.current = Date.now();
     } catch (error) {
       console.error('Error al iniciar sesión de empleado:', error);

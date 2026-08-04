@@ -29,5 +29,10 @@ export const ordenesAPI = {
   eliminar: async (id: number | string) => {
     const response = await api.delete(`/ordenes-compra/${id}`);
     return response.data;
+  },
+
+  firmar: async (id: number | string) => {
+    const response = await api.put(`/ordenes-compra/${id}/firmar`);
+    return response.data;
   }
 };

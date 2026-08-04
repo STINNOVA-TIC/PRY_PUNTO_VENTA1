@@ -6,6 +6,7 @@ import { ModalFormulario, CampoFormulario } from '../common/ModalFormulario';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
+import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 import { useModal } from '../../context/ModalContext';
 
 export const PanelAdminUsuarios: React.FC = () => {
@@ -24,6 +25,29 @@ export const PanelAdminUsuarios: React.FC = () => {
   // Paginación de operadores
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Búsqueda y filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRol, setFilterRol] = useState<number | 'ALL'>('ALL');
+  const [filterEstado, setFilterEstado] = useState<'ALL' | 'activo' | 'inactivo'>('ALL');
+
+  const usuariosFiltrados = React.useMemo(() => {
+    return usuarios.filter((u) => {
+      const query = searchQuery.toLowerCase().trim();
+      const nombre = `${u.nombre} ${u.email} ${u.rol?.nombre || ''} ${u.empleado ? u.empleado.nombre : ''}`.toLowerCase();
+      if (query && !nombre.includes(query)) return false;
+
+      if (filterRol !== 'ALL' && u.rol?.id !== filterRol) return false;
+      if (filterEstado === 'activo' && !u.activo) return false;
+      if (filterEstado === 'inactivo' && u.activo) return false;
+
+      return true;
+    });
+  }, [usuarios, searchQuery, filterRol, filterEstado]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterRol, filterEstado]);
 
   useEffect(() => {
     cargarDatos();
@@ -151,7 +175,7 @@ export const PanelAdminUsuarios: React.FC = () => {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const usuariosPaginados = usuarios.slice(startIndex, endIndex);
+  const usuariosPaginados = usuariosFiltrados.slice(startIndex, endIndex);
 
   return (
     <div className="font-sans space-y-6">
@@ -184,9 +208,41 @@ export const PanelAdminUsuarios: React.FC = () => {
         </div>
       )}
 
+      {/* BÚSQUEDA Y FILTROS */}
+      <SearchAndFilterBar
+        searchPlaceholder="Buscar por nombre, email, rol o colaborador..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        totalResults={usuariosFiltrados.length}
+        totalCount={usuarios.length}
+        resultsLabel="operadores"
+        selectFilters={[
+          {
+            id: 'rol',
+            placeholder: 'Todos los Roles',
+            value: filterRol,
+            onChange: (val) => setFilterRol(val === 'ALL' ? 'ALL' : Number(val)),
+            options: roles.map((r) => ({ label: r.nombre, value: r.id }))
+          },
+          {
+            id: 'estado',
+            placeholder: 'Todos los Estados',
+            value: filterEstado,
+            onChange: (val) => setFilterEstado(val as any),
+            options: [
+              { label: 'Activo', value: 'activo' },
+              { label: 'Inactivo', value: 'inactivo' }
+            ]
+          }
+        ]}
+      />
+
       {/* LISTADO */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
+          {usuariosFiltrados.length === 0 ? (
+            <p className="text-center py-12 text-xs text-gray-400 font-medium">No se encontraron operadores.</p>
+          ) : (
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
@@ -236,15 +292,18 @@ export const PanelAdminUsuarios: React.FC = () => {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
+        {usuariosFiltrados.length > 0 && (
         <Paginacion
           currentPage={currentPage}
-          totalItems={usuarios.length}
+          totalItems={usuariosFiltrados.length}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={setItemsPerPage}
         />
+        )}
       </div>
 
       <ModalFormulario

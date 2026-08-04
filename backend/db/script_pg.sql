@@ -147,6 +147,7 @@ CREATE TABLE empleado (
     empleado_nombre VARCHAR(100) NOT NULL,
     empleado_apellido VARCHAR(100) NOT NULL,
     empleado_foto VARCHAR(255) NULL,
+    empleado_firma VARCHAR(255) NULL,
     empleado_email VARCHAR(100) NULL,
     empleado_cargo VARCHAR(100) NULL,
     empleado_estado VARCHAR(20) DEFAULT 'activo' CHECK (empleado_estado IN ('activo', 'inactivo')),
@@ -312,6 +313,14 @@ CREATE TABLE orden_compra (
     orden_compra_aprobado_por VARCHAR(200) NULL,
     orden_compra_recibido_por VARCHAR(200) NULL,
 
+    -- Firmas digitales
+    orden_compra_firma_elaborador VARCHAR(255) NULL,
+    orden_compra_fecha_firma_elaborador TIMESTAMP NULL,
+    orden_compra_firma_aprobador VARCHAR(255) NULL,
+    orden_compra_fecha_firma_aprobador TIMESTAMP NULL,
+    orden_compra_firma_recibido VARCHAR(255) NULL,
+    orden_compra_fecha_firma_recibido TIMESTAMP NULL,
+
     -- Estados y aprobaciones
     orden_compra_estado VARCHAR(20) DEFAULT 'pendiente' CHECK (orden_compra_estado IN ('pendiente', 'aprobada', 'rechazada', 'comprada', 'recibida', 'cancelada', 'entregado')),
     orden_compra_observacion TEXT NULL,
@@ -320,6 +329,10 @@ CREATE TABLE orden_compra (
     usuario_aprobador_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
     usuario_comprador_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
     usuario_receptor_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+
+    -- Empleados que participan en el flujo de firmas
+    empleado_aprobador_id INTEGER NULL REFERENCES empleado(empleado_id) ON DELETE SET NULL,
+    empleado_receptor_id INTEGER NULL REFERENCES empleado(empleado_id) ON DELETE SET NULL,
 
     -- Auditoría
     orden_compra_fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -341,6 +354,7 @@ CREATE TABLE orden_compra_detalle (
     orden_compra_detalle_subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
     orden_compra_detalle_foto VARCHAR(255) NULL,
     orden_compra_detalle_negociacion_previa VARCHAR(20) DEFAULT 'NO' CHECK (orden_compra_detalle_negociacion_previa IN ('SI', 'NO')),
+    orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE,
     orden_compra_detalle_comentario VARCHAR(255) NULL,
 
     orden_compra_detalle_fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

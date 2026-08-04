@@ -70,7 +70,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-xs placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition"
+            className="w-full pl-9 pr-3 h-10 border border-gray-300 rounded-lg text-xs placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition"
           />
         </div>
 
@@ -80,7 +80,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
             <select
               value={filter.value}
               onChange={(e) => filter.onChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-gray-400"
+              className="w-full px-3 h-10 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-gray-400"
             >
               <option value="ALL">{filter.placeholder}</option>
               {filter.options.map((opt) => (
@@ -98,7 +98,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
             <select
               value={sortValue}
               onChange={(e) => onSortValueChange(e.target.value)}
-              className="flex-grow px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-gray-400"
+              className="flex-grow px-3 h-10 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-gray-400"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -111,7 +111,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
               <button
                 type="button"
                 onClick={onSortOrderChange}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-600 font-bold flex items-center justify-center"
+                className="h-10 w-10 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-600 font-bold flex items-center justify-center shrink-0"
                 title={sortOrder === 'asc' ? 'Orden Ascendente' : 'Orden Descendente'}
               >
                 {sortOrder === 'asc' ? <BsArrowUp className="w-3.5 h-3.5" /> : <BsArrowDown className="w-3.5 h-3.5" />}

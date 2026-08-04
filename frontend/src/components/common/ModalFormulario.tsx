@@ -10,7 +10,7 @@ export interface CampoFormulario {
   opciones?: { value: string | number; label: string }[];
   required?: boolean;
   colSpan?: 1 | 2 | 3;
-  fotoCarpeta?: 'empleado' | 'producto' | 'entrega';
+  fotoCarpeta?: 'empleado' | 'producto' | 'entrega' | 'firma' | 'firmas';
   fotoAviso?: string;
 }
 

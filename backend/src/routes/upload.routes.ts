@@ -20,6 +20,8 @@ const storage = multer.diskStorage({
       uploadPath = path.join(uploadPath, 'producto');
     } else if (type === 'entrega' || type === 'entregas') {
       uploadPath = path.join(uploadPath, 'entregas');
+    } else if (type === 'firma' || type === 'firmas') {
+      uploadPath = path.join(uploadPath, 'firmas');
     }
 
     // Asegurar que exista la carpeta
@@ -62,6 +64,8 @@ router.post('/', authenticate, upload.single('foto'), (req: any, res) => {
     pathSegment = 'empleados';
   } else if (type === 'entrega' || type === 'entregas') {
     pathSegment = 'entregas';
+  } else if (type === 'firma' || type === 'firmas') {
+    pathSegment = 'firmas';
   }
 
   const host = req.get('host') || 'localhost:5000';

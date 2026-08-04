@@ -132,6 +132,13 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
     return fecha.toLocaleDateString('es-ES', opciones);
   };
 
+  const formatFechaHora = (fechaStr: string) => {
+    if (!fechaStr) return '';
+    const fecha = new Date(fechaStr);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(fecha.getDate())}/${pad(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${pad(fecha.getHours())}:${pad(fecha.getMinutes())}:${pad(fecha.getSeconds())}`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       {/* Estilos CSS específicos de impresión y previsualización */}
@@ -526,19 +533,82 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
               </div>
             </div>
 
-            {/* 7. SECCIÓN DE FIRMAS Y RESPONSABLES */}
-            <div className="grid grid-cols-3 gap-4 pt-1 text-center">
-              <div className="border border-gray-400 p-1.5 h-11 flex flex-col justify-between rounded bg-white">
-                <div className="font-bold text-[6.5px] uppercase text-gray-500 text-left">Elaborado por:</div>
-                <div className="font-semibold text-gray-800 text-[7.5px]">{orden.orden_compra_elaborado_por || 'TIC: David Quishpe'}</div>
+            {/* 7. SECCION DE FIRMAS Y RESPONSABLES */}
+            <div className="grid grid-cols-3 gap-4 pt-1 text-center font-sans">
+              
+              {/* Elaborado por */}
+              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
+                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Elaborado por:</div>
+                {orden.orden_compra_firma_elaborador ? (
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <img 
+                      src={orden.orden_compra_firma_elaborador} 
+                      alt="Firma Elaborador" 
+                      className="h-11 object-contain" 
+                      crossOrigin="anonymous" 
+                    />
+                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                      Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_elaborador)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
+                    Pendiente de firma
+                  </div>
+                )}
+                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
+                  {orden.orden_compra_elaborado_por || 'TIC: David Quishpe'}
+                </div>
               </div>
-              <div className="border border-gray-400 p-1.5 h-11 flex flex-col justify-between rounded bg-white">
-                <div className="font-bold text-[6.5px] uppercase text-gray-500 text-left">Aprobado por:</div>
-                <div className="font-semibold text-gray-800 text-[7.5px]">{orden.orden_compra_aprobado_por || 'Gerente Financiera: Dominique Veloz'}</div>
+
+              {/* Aprobado por */}
+              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
+                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Aprobado por:</div>
+                {orden.orden_compra_firma_aprobador ? (
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <img 
+                      src={orden.orden_compra_firma_aprobador} 
+                      alt="Firma Aprobador" 
+                      className="h-11 object-contain" 
+                      crossOrigin="anonymous" 
+                    />
+                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                      Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_aprobador)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
+                    Pendiente de aprobación
+                  </div>
+                )}
+                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
+                  {orden.orden_compra_aprobado_por || 'Gerente Financiera: Dominique Veloz'}
+                </div>
               </div>
-              <div className="border border-gray-400 p-1.5 h-11 flex flex-col justify-between rounded bg-white">
-                <div className="font-bold text-[6.5px] uppercase text-gray-500 text-left">Recibido por:</div>
-                <div className="font-semibold text-gray-800 text-[7.5px]">{orden.orden_compra_recibido_por || 'Compras: Mishell Paucar'}</div>
+
+              {/* Recibido por */}
+              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
+                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Recibido por:</div>
+                {orden.orden_compra_firma_recibido ? (
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <img 
+                      src={orden.orden_compra_firma_recibido} 
+                      alt="Firma Recibido" 
+                      className="h-11 object-contain" 
+                      crossOrigin="anonymous" 
+                    />
+                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                      Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_recibido)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
+                    Pendiente de recepción
+                  </div>
+                )}
+                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
+                  {orden.orden_compra_recibido_por || 'Compras: Mishell Paucar'}
+                </div>
               </div>
             </div>
 

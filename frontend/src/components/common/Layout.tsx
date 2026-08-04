@@ -7,8 +7,8 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, isShopSession } = useAuth();
-  const hideNavbar = isShopSession || user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado';
+  const { isShopSession } = useAuth();
+  const hideNavbar = isShopSession;
 
   return (
     <div className="min-h-screen bg-gray-50">

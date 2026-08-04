@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { adminAPI } from '../../api/admin.api';
 import { BotonRecargar } from '../common/BotonRecargar';
+import { Paginacion } from '../common/Paginacion';
 import { 
   BsExclamationTriangle, 
   BsCheckCircle, 
@@ -30,6 +31,10 @@ export const RecepcionRequerimientos: React.FC = () => {
   // Filtros
   const [filterEstado, setFilterEstado] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Modal de Recepción
   const [selectedOrden, setSelectedOrden] = useState<any | null>(null);
@@ -66,6 +71,17 @@ export const RecepcionRequerimientos: React.FC = () => {
       setError('No se pudieron cargar los requerimientos del sistema.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenPrintPreview = async (oc: any) => {
+    try {
+      const res = await ordenesAPI.getById(oc.id);
+      if (res.success) {
+        setPrintOrden(res.data);
+      }
+    } catch (err) {
+      console.error('Error recuperando detalle para impresión:', err);
     }
   };
 
@@ -130,6 +146,15 @@ export const RecepcionRequerimientos: React.FC = () => {
       (oc.empleado_nombre || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchEstado && matchSearch;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterEstado, searchTerm]);
+
+  const paginatedOrdenes = filteredOrdenes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   if (!isAutorizado) {
     return (
@@ -234,7 +259,7 @@ export const RecepcionRequerimientos: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="text-gray-750 divide-y divide-y-gray-100">
-                {filteredOrdenes.map((oc) => (
+                {paginatedOrdenes.map((oc) => (
                   <tr key={oc.id} className="hover:bg-gray-50/40 transition">
                     <td className="px-6 py-4 font-mono font-bold text-gray-900">{oc.codigo}</td>
                     <td className="px-6 py-4 font-semibold">{oc.empresa_nombre || 'N/A'}</td>
@@ -280,7 +305,7 @@ export const RecepcionRequerimientos: React.FC = () => {
                         </button>
                         
                         <button
-                          onClick={() => setPrintOrden(oc)}
+                          onClick={() => handleOpenPrintPreview(oc)}
                           className="px-2.5 py-1 bg-white hover:bg-gray-55 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
                           title="Descargar PDF"
                         >
@@ -302,6 +327,14 @@ export const RecepcionRequerimientos: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          <Paginacion
+            currentPage={currentPage}
+            totalItems={filteredOrdenes.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </div>
       )}
 

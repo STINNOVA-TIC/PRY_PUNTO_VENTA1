@@ -29,7 +29,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthRequest = ['/auth/login', '/auth/employee-login', '/auth/verify-token'].some((path) =>
+      error.config?.url?.includes(path)
+    );
+    if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

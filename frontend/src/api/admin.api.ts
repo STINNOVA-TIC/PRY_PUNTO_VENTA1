@@ -26,7 +26,7 @@ export const adminAPI = {
     return response.data;
   },
 
-  uploadPhoto: async (file: File, type: 'empleado' | 'producto' | 'entrega'): Promise<{ url: string }> => {
+  uploadPhoto: async (file: File, type: 'empleado' | 'producto' | 'entrega' | 'firma' | 'firmas'): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append('foto', file);
     const response = await api.post(`/upload?type=${type}`, formData, {

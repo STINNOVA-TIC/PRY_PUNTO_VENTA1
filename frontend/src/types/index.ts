@@ -40,6 +40,7 @@ export interface Empleado {
   saldo_disponible?: number;
   limite_credito?: number;
   foto_perfil?: string;
+  firma?: string;
   email?: string;
   departamento_id?: number;
   centro_costos_id?: number;

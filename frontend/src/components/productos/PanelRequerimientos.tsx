@@ -7,11 +7,15 @@ import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { useModal } from '../../context/ModalContext';
-import { BsTrash } from 'react-icons/bs';
+import { ModalFlujoRequerimiento } from './ModalFlujoRequerimiento';
+import { BsTrash, BsDiagram3, BsFileEarmarkPdf } from 'react-icons/bs';
+import { Paginacion } from '../common/Paginacion';
 
 export const PanelRequerimientos: React.FC = () => {
   const { user } = useAuth();
   const { showConfirm } = useModal();
+  const loggedEmpleadoId = user?.empleado?.id;
+  const isEmployeeRole = user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado';
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -25,9 +29,13 @@ export const PanelRequerimientos: React.FC = () => {
 
   // Búsquedas y Tooltips
   const [productSearch, setProductSearch] = useState('');
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [ccSearch, setCcSearch] = useState('');
   const [showFotoTooltip, setShowFotoTooltip] = useState(false);
   const [itemCentrosCostoIds, setItemCentrosCostoIds] = useState<number[]>([]);
+  const [moduloActivo, setModuloActivo] = useState<'requerimiento' | 'historial'>('requerimiento');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -54,12 +62,14 @@ export const PanelRequerimientos: React.FC = () => {
   const [itemTiempoEntrega, setItemTiempoEntrega] = useState('INMEDIATO');
   const [itemComentario, setItemComentario] = useState('');
   const [itemPrecioUnitario, setItemPrecioUnitario] = useState('0.00');
+  const [itemIncluyeIva, setItemIncluyeIva] = useState(true);
   const [itemProveedorId, setItemProveedorId] = useState<number | ''>('');
   const [itemDescripcion, setItemDescripcion] = useState('');
   const [itemFoto, setItemFoto] = useState('');
 
   // Artículos agregados localmente
   const [detallesLocales, setDetallesLocales] = useState<any[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Campos adicionales generales
   const [lugarRecepcion, setLugarRecepcion] = useState('OTROS');
@@ -74,9 +84,18 @@ export const PanelRequerimientos: React.FC = () => {
   const [elaboradoPor, setElaboradoPor] = useState('');
   const [aprobadoPor, setAprobadoPor] = useState('Gerente Financiera: Dominique Veloz');
   const [recibidoPor, setRecibidoPor] = useState('Compras: Mishell Paucar');
+  const [empleadoAprobadorId, setEmpleadoAprobadorId] = useState<number | ''>('');
+  const [empleadoReceptorId, setEmpleadoReceptorId] = useState<number | ''>('');
+
+  // Combobox de Aprobador y Receptor
+  const [aprobadorSearch, setAprobadorSearch] = useState('');
+  const [receptorSearch, setReceptorSearch] = useState('');
+  const [aprobadorDropdownOpen, setAprobadorDropdownOpen] = useState(false);
+  const [receptorDropdownOpen, setReceptorDropdownOpen] = useState(false);
 
   // Estado para visualización / impresión
   const [selectedOrdenForPrint, setSelectedOrdenForPrint] = useState<any | null>(null);
+  const [selectedOrdenForFlow, setSelectedOrdenForFlow] = useState<any | null>(null);
 
   useEffect(() => {
     cargarDatos();
@@ -119,6 +138,41 @@ export const PanelRequerimientos: React.FC = () => {
       }
     }
   }, [user, departamentos, centrosCosto]);
+
+  // Pre-seleccionar Dominique Veloz y Mishell Paucar por defecto al cargar colaboradores
+  useEffect(() => {
+    if (colaboradores.length > 0) {
+      const dom = colaboradores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('dominique veloz'));
+      if (dom) {
+        setEmpleadoAprobadorId(dom.id);
+        const label = `${dom.departamento || 'General'}: ${dom.nombre} ${dom.apellido}`;
+        setAprobadoPor(label);
+        setAprobadorSearch(label);
+      } else {
+        const first = colaboradores[0];
+        setEmpleadoAprobadorId(first.id);
+        const label = `${first.departamento || 'General'}: ${first.nombre} ${first.apellido}`;
+        setAprobadoPor(label);
+        setAprobadorSearch(label);
+      }
+
+      const mish = colaboradores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('mishell paucar'));
+      if (mish) {
+        setEmpleadoReceptorId(mish.id);
+        const cc = (mish.centro_costos || '').trim() || 'Compras';
+        const label = `${cc}: ${mish.nombre} ${mish.apellido}`;
+        setRecibidoPor(label);
+        setReceptorSearch(label);
+      } else {
+        const first = colaboradores[0];
+        setEmpleadoReceptorId(first.id);
+        const cc = (first.centro_costos || '').trim() || 'Compras';
+        const label = `${cc}: ${first.nombre} ${first.apellido}`;
+        setRecibidoPor(label);
+        setReceptorSearch(label);
+      }
+    }
+  }, [colaboradores]);
 
   const cargarDatos = async () => {
     try {
@@ -230,18 +284,29 @@ export const PanelRequerimientos: React.FC = () => {
       comentario: finalComment,
       precio_unitario: price,
       subtotal,
+      incluye_iva: itemIncluyeIva,
       foto: finalFoto || null,
       proveedor_id: itemProveedorId || null
     };
 
-    setDetallesLocales([...detallesLocales, nuevoItem]);
+    if (editingIndex !== null) {
+      const updated = [...detallesLocales];
+      updated[editingIndex] = nuevoItem;
+      setDetallesLocales(updated);
+      setEditingIndex(null);
+    } else {
+      setDetallesLocales([...detallesLocales, nuevoItem]);
+    }
 
     // Limpiar formulario de ítem
     setSelectedProductId('');
+    setProductSearch('');
+    setProductDropdownOpen(false);
     setItemCantidad('1');
     setItemNegociacion('NO');
     setItemComentario('');
     setItemPrecioUnitario('0.00');
+    setItemIncluyeIva(true);
     setItemProveedorId('');
     setItemDescripcion('');
     setItemFoto('');
@@ -250,8 +315,52 @@ export const PanelRequerimientos: React.FC = () => {
     setError('');
   };
 
+  const handleEditLocalItem = (index: number) => {
+    const item = detallesLocales[index];
+    if (!item) return;
+
+    setSelectedProductId(item.producto_id || '');
+    setProductSearch(
+      item.producto_id
+        ? `${productos.find(p => p.id === item.producto_id)?.codigo_barras || ''} - ${item.descripcion}`
+        : ''
+    );
+    setItemCantidad(String(item.cantidad || 1));
+    setItemUnidadMedida(item.unidad_medida || 'UNIDAD');
+    setItemNegociacion(item.negociacion_previa || 'NO');
+    setItemFormaPago(item.forma_pago || 'CONTADO');
+    setItemPlazoPago(item.plazo_pago || 'INMEDIATO');
+    setItemTiempoEntrega(item.tiempo_entrega || 'INMEDIATO');
+    setItemComentario(item.comentario || '');
+    setItemPrecioUnitario(Number(item.precio_unitario || 0).toFixed(2));
+    setItemIncluyeIva(item.incluye_iva !== false);
+    setItemProveedorId(item.proveedor_id || '');
+    setItemDescripcion(item.producto_id ? '' : item.descripcion || '');
+    setItemFoto(item.foto || '');
+    setItemCentrosCostoIds([]);
+    setCcSearch('');
+    setEditingIndex(index);
+    setError('');
+  };
+
   const handleRemoveLocalItem = (index: number) => {
     setDetallesLocales(detallesLocales.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      setEditingIndex(null);
+      setSelectedProductId('');
+      setProductSearch('');
+      setProductDropdownOpen(false);
+      setItemCantidad('1');
+      setItemNegociacion('NO');
+      setItemComentario('');
+      setItemPrecioUnitario('0.00');
+      setItemIncluyeIva(true);
+      setItemProveedorId('');
+      setItemDescripcion('');
+      setItemFoto('');
+      setItemCentrosCostoIds([]);
+      setCcSearch('');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,6 +403,8 @@ export const PanelRequerimientos: React.FC = () => {
         elaborado_por: elaboradoPor,
         aprobado_por: aprobadoPor,
         recibido_por: recibidoPor,
+        empleado_aprobador_id: empleadoAprobadorId ? Number(empleadoAprobadorId) : null,
+        empleado_receptor_id: empleadoReceptorId ? Number(empleadoReceptorId) : null,
         detalles: detallesLocales,
         tipo_compra: tipoCompra
       };
@@ -316,6 +427,32 @@ export const PanelRequerimientos: React.FC = () => {
       setError(err.response?.data?.message || 'Error al guardar el requerimiento en el servidor.');
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleFirmar = async (ordenId: number) => {
+    const confirmed = await showConfirm({
+      title: 'Firmar Requerimiento',
+      message: '¿Estás seguro de que deseas estampar tu firma registrada en este requerimiento?',
+      confirmLabel: 'Sí, firmar',
+      cancelLabel: 'Cancelar',
+      type: 'info'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setSuccess('');
+      const res = await ordenesAPI.firmar(ordenId);
+      if (res.success) {
+        setSuccess('Requerimiento firmado exitosamente.');
+        // Recargar las órdenes
+        const ordRes = await ordenesAPI.getAll();
+        setOrdenes(ordRes.data || []);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al firmar el requerimiento.');
     }
   };
 
@@ -354,6 +491,17 @@ export const PanelRequerimientos: React.FC = () => {
     }
   };
 
+  const handleOpenFlowView = async (ordenId: number) => {
+    try {
+      const res = await ordenesAPI.getById(ordenId);
+      if (res.success) {
+        setSelectedOrdenForFlow(res.data);
+      }
+    } catch (err) {
+      console.error('Error recuperando trazabilidad:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-3 font-sans">
@@ -362,6 +510,18 @@ export const PanelRequerimientos: React.FC = () => {
       </div>
     );
   }
+
+  const ordenesFiltradas = isEmployeeRole && loggedEmpleadoId
+    ? ordenes.filter(oc => 
+        oc.empleado_id === loggedEmpleadoId || 
+        oc.empleado_aprobador_id === loggedEmpleadoId || 
+        oc.empleado_receptor_id === loggedEmpleadoId
+      )
+    : ordenes;
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const ordenesPaginadas = ordenesFiltradas.slice(startIndex, endIndex);
 
   return (
     <div className="font-sans space-y-8 max-w-6xl mx-auto">
@@ -387,7 +547,35 @@ export const PanelRequerimientos: React.FC = () => {
         </div>
       )}
 
+      {/* Selector de Subsecciones (Tabs) */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setModuloActivo('requerimiento')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'requerimiento'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Requerimiento de Bienes y/o Servicios
+        </button>
+        <button
+          onClick={() => setModuloActivo('historial')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'historial'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Historial de Órdenes de Reabastecimiento y Requerimientos
+        </button>
+      </div>
+
+      {/* SUBMODULO 1: REQUERIMIENTO */}
+      {moduloActivo === 'requerimiento' && (
+      <>
       {/* FORMULARIO DE REQUERIMIENTO */}
+      {!isEmployeeRole && (
       <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
         
         {/* SECCIÓN A: METADATOS Y CABECERA */}
@@ -404,7 +592,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={empresaId}
                 onChange={(e) => setEmpresaId(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
                 required
               >
                 <option value="">Seleccionar empresa...</option>
@@ -420,7 +608,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={sucursalId}
                 onChange={(e) => setSucursalId(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
                 required
               >
                 <option value="">Seleccionar sucursal...</option>
@@ -480,7 +668,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={tipoCompra}
                 onChange={(e) => setTipoCompra(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:ring-1 focus:ring-gray-800 focus:outline-none"
                 required
               >
                 <option value="LOCAL">LOCAL</option>
@@ -548,33 +736,70 @@ export const PanelRequerimientos: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50/50 p-4 border border-gray-200 rounded-2xl">
             
-            {/* Seleccionar Producto */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-gray-600">Producto (Almacén)</label>
-              <input
-                type="text"
-                placeholder="Buscar por nombre o código..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
-              />
-              <select
-                value={selectedProductId}
-                onChange={(e) => handleProductSelect(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
-              >
-                <option value="">-- Servicio o Artículo Personalizado --</option>
-                {productos
-                  .filter(p => {
+            {/* Seleccionar Producto (Combobox unificado) */}
+            <div className="relative">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Producto (Almacén)</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar y seleccionar producto..."
+                  value={productSearch}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setSelectedProductId('');
+                    setProductDropdownOpen(true);
+                  }}
+                  onFocus={() => setProductDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setProductDropdownOpen(false), 150)}
+                  className="w-full px-3.5 pr-8 h-10 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-800"
+                />
+                <button
+                  type="button"
+                  onClick={() => setProductDropdownOpen(!productDropdownOpen)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs font-bold"
+                  tabIndex={-1}
+                >
+                  {productDropdownOpen ? '▲' : '▼'}
+                </button>
+              </div>
+
+              {productDropdownOpen && (
+                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {productos
+                    .filter(p => {
+                      if (!p.activo) return false;
+                      const q = productSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
+                    })
+                    .map(p => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setProductSearch(`${p.codigo_barras} - ${p.nombre}`);
+                          handleProductSelect(p.id);
+                          setProductDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <span className="font-semibold text-gray-800">{p.codigo_barras} - {p.nombre}</span>
+                        <span className="block text-[10px] text-gray-400">{p.descripcion || 'Sin detalle'} (Stock: {p.stock_actual})</span>
+                      </button>
+                    ))}
+                  {productos.filter(p => {
                     if (!p.activo) return false;
                     const q = productSearch.toLowerCase().trim();
                     if (!q) return true;
                     return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
-                  })
-                  .map(p => (
-                    <option key={p.id} value={p.id}>{p.codigo_barras} - {p.nombre} - {p.descripcion || 'Sin detalle'} (Stock: {p.stock_actual})</option>
-                  ))}
-              </select>
+                  }).length === 0 && (
+                    <div className="px-3 py-3 text-xs text-gray-400 italic">
+                      Sin resultados. Escribe en "Descripción" para registrar un servicio o artículo personalizado.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Descripción (si es servicio o para editar) */}
@@ -585,7 +810,7 @@ export const PanelRequerimientos: React.FC = () => {
                 value={itemDescripcion}
                 onChange={(e) => setItemDescripcion(e.target.value)}
                 placeholder="Ej. ESIM PLAN DE DATOS"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
             </div>
 
@@ -597,7 +822,7 @@ export const PanelRequerimientos: React.FC = () => {
                 value={itemCantidad}
                 onChange={(e) => setItemCantidad(e.target.value)}
                 min="1"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
             </div>
 
@@ -607,7 +832,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemUnidadMedida}
                 onChange={(e) => setItemUnidadMedida(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
               >
                 <option value="UNIDAD">UNIDAD</option>
                 <option value="DOCENA">DOCENA</option>
@@ -629,8 +854,23 @@ export const PanelRequerimientos: React.FC = () => {
                 value={itemPrecioUnitario}
                 onChange={(e) => setItemPrecioUnitario(e.target.value)}
                 placeholder="0.00"
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
+            </div>
+
+            {/* Incluye IVA */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Incluye IVA</label>
+              <div className="h-10 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="itemIncluyeIva"
+                  checked={itemIncluyeIva}
+                  onChange={(e) => setItemIncluyeIva(e.target.checked)}
+                  className="w-4 h-4 accent-gray-800"
+                />
+                <span className="text-xs font-semibold text-gray-600 select-none">Sí</span>
+              </div>
             </div>
 
             {/* Proveedor Sugerido */}
@@ -639,7 +879,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemProveedorId}
                 onChange={(e) => setItemProveedorId(Number(e.target.value))}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
               >
                 <option value="">Seleccionar proveedor...</option>
                 {proveedores.map(p => (
@@ -654,7 +894,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemNegociacion}
                 onChange={(e) => setItemNegociacion(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
               >
                 <option value="NO">NO</option>
                 <option value="SI">SI</option>
@@ -667,7 +907,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemFormaPago}
                 onChange={(e) => setItemFormaPago(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
               >
                 <option value="CONTADO">CONTADO</option>
                 <option value="CREDITO">CRÉDITO</option>
@@ -682,7 +922,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemPlazoPago}
                 onChange={(e) => setItemPlazoPago(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
               >
                 <option value="INMEDIATO">INMEDIATO</option>
                 <option value="TRES MESES">3 MESES</option>
@@ -697,7 +937,7 @@ export const PanelRequerimientos: React.FC = () => {
               <select
                 value={itemTiempoEntrega}
                 onChange={(e) => setItemTiempoEntrega(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
               >
                 <option value="INMEDIATO">INMEDIATO</option>
                 <option value="TRES MESES">3 MESES</option>
@@ -730,7 +970,7 @@ export const PanelRequerimientos: React.FC = () => {
                 value={itemFoto}
                 onChange={(e) => setItemFoto(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
             </div>
 
@@ -742,7 +982,7 @@ export const PanelRequerimientos: React.FC = () => {
                 placeholder="Buscar centro de costos por código o nombre..."
                 value={ccSearch}
                 onChange={(e) => setCcSearch(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-350 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm focus:ring-1 focus:ring-gray-800 focus:outline-none"
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 bg-white p-3 border border-gray-300 rounded-xl max-h-40 overflow-y-auto">
                 {centrosCosto
@@ -783,7 +1023,7 @@ export const PanelRequerimientos: React.FC = () => {
                 value={itemComentario}
                 onChange={(e) => setItemComentario(e.target.value)}
                 placeholder="Ej. REPOSICION DE ESIM PARA GERENCIA..."
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white"
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
             </div>
 
@@ -792,9 +1032,9 @@ export const PanelRequerimientos: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                className={`w-full h-10 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center ${editingIndex !== null ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
               >
-                Añadir al Detalle
+                {editingIndex !== null ? 'Guardar Cambios' : 'Añadir al Detalle'}
               </button>
             </div>
 
@@ -825,16 +1065,35 @@ export const PanelRequerimientos: React.FC = () => {
                         {item.comentario && <span className="text-[10px] text-gray-400 block italic">{item.comentario}</span>}
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-600">{item.negociacion_previa}</td>
-                      <td className="px-4 py-3 font-mono">${item.precio_unitario.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-gray-800">${item.subtotal.toFixed(2)} + IVA</td>
+                      <td className="px-4 py-3 font-mono">
+                        ${item.precio_unitario.toFixed(2)}
+                        {item.incluye_iva && <span className="text-gray-400"> + IVA</span>}
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold text-gray-800">
+                        ${item.subtotal.toFixed(2)}
+                        {item.incluye_iva && <span className="text-gray-400"> + IVA</span>}
+                      </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLocalItem(index)}
-                          className="px-2.5 py-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-650 rounded-lg font-bold transition"
-                        >
-                          Quitar
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditLocalItem(index)}
+                            className={`px-2.5 py-1 text-[10px] rounded-lg font-bold transition ${
+                              editingIndex === index
+                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-650'
+                            }`}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLocalItem(index)}
+                            className="px-2.5 py-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-650 rounded-lg font-bold transition"
+                          >
+                            Quitar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -970,47 +1229,148 @@ export const PanelRequerimientos: React.FC = () => {
                 readOnly
               />
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Aprobado por (Gerente Finanzas)</label>
-              <select
-                value={aprobadoPor}
-                onChange={(e) => setAprobadoPor(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
-                required
-              >
-                <option value="Gerente Financiera: Dominique Veloz">Gerente Financiera: Dominique Veloz (Por defecto)</option>
-                {colaboradores.map(c => {
-                  const label = `${c.departamento || 'General'}: ${c.nombre} ${c.apellido}`;
-                  if (label.toLowerCase().includes('dominique veloz')) return null;
-                  return (
-                    <option key={c.id} value={label}>{label}</option>
-                  );
-                })}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar aprobador..."
+                  value={aprobadorSearch}
+                  onChange={(e) => {
+                    setAprobadorSearch(e.target.value);
+                    setEmpleadoAprobadorId('');
+                    setAprobadoPor('');
+                    setAprobadorDropdownOpen(true);
+                  }}
+                  onFocus={() => setAprobadorDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setAprobadorDropdownOpen(false), 150)}
+                  className="w-full px-3.5 pr-8 h-10 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-800"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setAprobadorDropdownOpen(!aprobadorDropdownOpen)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs font-bold"
+                  tabIndex={-1}
+                >
+                  {aprobadorDropdownOpen ? '▲' : '▼'}
+                </button>
+              </div>
+
+              {aprobadorDropdownOpen && (
+                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {colaboradores
+                    .filter(c => {
+                      const q = aprobadorSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const label = `${c.departamento || 'General'} ${c.nombre} ${c.apellido}`.toLowerCase();
+                      return label.includes(q);
+                    })
+                    .map(c => {
+                      const label = `${c.departamento || 'General'}: ${c.nombre} ${c.apellido}`;
+                      return (
+                        <button
+                          type="button"
+                          key={c.id}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setEmpleadoAprobadorId(c.id);
+                            setAprobadoPor(label);
+                            setAprobadorSearch(label);
+                            setAprobadorDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        >
+                          <span className="font-semibold text-gray-800">{label}</span>
+                          <span className="block text-[10px] text-gray-400">Cédula: {c.codigo_empleado || c.cedula || 'N/A'}</span>
+                        </button>
+                      );
+                    })}
+                  {colaboradores.filter(c => {
+                    const q = aprobadorSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    const label = `${c.departamento || 'General'} ${c.nombre} ${c.apellido}`.toLowerCase();
+                    return label.includes(q);
+                  }).length === 0 && (
+                    <div className="px-3 py-3 text-xs text-gray-400 italic">
+                      Sin resultados.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Recibido por (Ventas/Compras)</label>
-              <select
-                value={recibidoPor}
-                onChange={(e) => setRecibidoPor(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
-                required
-              >
-                <option value="Compras: Mishell Paucar">Compras: Mishell Paucar (Por defecto)</option>
-                {colaboradores
-                  .filter(c => {
-                    const cargo = (c.cargo || '').toLowerCase();
-                    return cargo.includes('compras locales') || cargo.includes('comex') || cargo.includes('compra');
-                  })
-                  .map(c => {
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar receptor..."
+                  value={receptorSearch}
+                  onChange={(e) => {
+                    setReceptorSearch(e.target.value);
+                    setEmpleadoReceptorId('');
+                    setRecibidoPor('');
+                    setReceptorDropdownOpen(true);
+                  }}
+                  onFocus={() => setReceptorDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setReceptorDropdownOpen(false), 150)}
+                  className="w-full px-3.5 pr-8 h-10 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-800"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setReceptorDropdownOpen(!receptorDropdownOpen)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs font-bold"
+                  tabIndex={-1}
+                >
+                  {receptorDropdownOpen ? '▲' : '▼'}
+                </button>
+              </div>
+
+              {receptorDropdownOpen && (
+                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {colaboradores
+                    .filter(c => {
+                      const q = receptorSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const cc = (c.centro_costos || '').trim() || 'Compras';
+                      const label = `${cc} ${c.nombre} ${c.apellido}`.toLowerCase();
+                      return label.includes(q);
+                    })
+                    .map(c => {
+                      const cc = (c.centro_costos || '').trim() || 'Compras';
+                      const label = `${cc}: ${c.nombre} ${c.apellido}`;
+                      return (
+                        <button
+                          type="button"
+                          key={c.id}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setEmpleadoReceptorId(c.id);
+                            setRecibidoPor(label);
+                            setReceptorSearch(label);
+                            setReceptorDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        >
+                          <span className="font-semibold text-gray-800">{label}</span>
+                          <span className="block text-[10px] text-gray-400">Cédula: {c.codigo_empleado || c.cedula || 'N/A'}</span>
+                        </button>
+                      );
+                    })}
+                  {colaboradores.filter(c => {
+                    const q = receptorSearch.toLowerCase().trim();
+                    if (!q) return true;
                     const cc = (c.centro_costos || '').trim() || 'Compras';
-                    const label = `${cc}: ${c.nombre} ${c.apellido}`;
-                    if (label.toLowerCase().includes('mishell paucar')) return null;
-                    return (
-                      <option key={c.id} value={label}>{label}</option>
-                    );
-                  })}
-              </select>
+                    const label = `${cc} ${c.nombre} ${c.apellido}`.toLowerCase();
+                    return label.includes(q);
+                  }).length === 0 && (
+                    <div className="px-3 py-3 text-xs text-gray-400 italic">
+                      Sin resultados.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1027,7 +1387,13 @@ export const PanelRequerimientos: React.FC = () => {
         </div>
 
       </form>
+      )}
+      </>
+      )}
 
+      {/* SUBMODULO 2: HISTORIAL */}
+      {moduloActivo === 'historial' && (
+      <>
       {/* HISTORIAL DE ÓRDENES */}
       <div className="space-y-4">
         <div>
@@ -1035,11 +1401,12 @@ export const PanelRequerimientos: React.FC = () => {
           <p className="text-xs text-gray-400">Listado de requerimientos emitidos y herramientas de descarga oficial</p>
         </div>
 
-        {ordenes.length === 0 ? (
+        {ordenesFiltradas.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl text-gray-400 text-xs font-medium">
             No se han registrado requerimientos u órdenes de compra aún.
           </div>
         ) : (
+          <>
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse font-sans">
@@ -1055,7 +1422,7 @@ export const PanelRequerimientos: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="text-gray-750">
-                  {ordenes.map((oc) => (
+                  {ordenesPaginadas.map((oc) => (
                     <tr key={oc.id} className="border-b border-gray-150 hover:bg-gray-50/30">
                       <td className="px-6 py-4 font-mono font-bold text-gray-850">{oc.codigo}</td>
                       <td className="px-6 py-4 font-medium">{oc.empresa_nombre || 'N/A'}</td>
@@ -1076,11 +1443,31 @@ export const PanelRequerimientos: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center flex items-center justify-center gap-2">
+                        {loggedEmpleadoId && (
+                          (oc.empleado_aprobador_id === loggedEmpleadoId && oc.estado === 'pendiente' && !oc.firma_aprobador) ||
+                          (oc.empleado_receptor_id === loggedEmpleadoId && oc.estado === 'aprobada' && !oc.firma_recibido)
+                        ) && (
+                          <button
+                            onClick={() => handleFirmar(oc.id)}
+                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold transition shadow-sm"
+                          >
+                            Firmar
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenPrintPreview(oc.id)}
-                          className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-[10px] font-bold transition shadow-sm"
+                          className="px-2.5 py-1 bg-white hover:bg-gray-55 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
+                          title="Descargar PDF"
                         >
-                          Ver / Imprimir PDF
+                          <BsFileEarmarkPdf className="shrink-0" /> PDF
+                        </button>
+                        <button
+                          onClick={() => handleOpenFlowView(oc.id)}
+                          className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-[10px] font-bold transition shadow-sm flex items-center gap-1"
+                          title="Ver Trazabilidad de Firmas"
+                        >
+                          <BsDiagram3 className="h-3 w-3" />
+                          Flujo
                         </button>
                         {user?.rol.nombre === 'admin' && (
                           <button
@@ -1098,8 +1485,18 @@ export const PanelRequerimientos: React.FC = () => {
               </table>
             </div>
           </div>
+          <Paginacion
+            currentPage={currentPage}
+            totalItems={ordenesFiltradas.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
+          </>
         )}
       </div>
+      </>
+      )}
 
       {/* MODAL DE IMPRESIÓN */}
       {selectedOrdenForPrint && (
@@ -1109,7 +1506,13 @@ export const PanelRequerimientos: React.FC = () => {
           onClose={() => setSelectedOrdenForPrint(null)}
         />
       )}
-
+      {/* MODAL DE TRAZABILIDAD */}
+      {selectedOrdenForFlow && (
+        <ModalFlujoRequerimiento
+          orden={selectedOrdenForFlow}
+          onClose={() => setSelectedOrdenForFlow(null)}
+        />
+      )}
     </div>
   );
 };
