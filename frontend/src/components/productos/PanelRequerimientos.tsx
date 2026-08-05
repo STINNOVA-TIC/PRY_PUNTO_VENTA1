@@ -199,11 +199,44 @@ export const PanelRequerimientos: React.FC = () => {
 
       const depData = depRes.data || [];
       setDepartamentos(depData);
-      if (depData.length > 0) setDepartamentoId(depData[0].departamento_id);
+      
+      let deptoSelectedId: number | '' = departamentoId || '';
+      if (!deptoSelectedId && user && user.empleado) {
+        const userDepto = depData.find(
+          (d: any) => d.departamento_nombre.toLowerCase().trim() === user.empleado?.departamento.toLowerCase().trim()
+        );
+        if (userDepto) {
+          deptoSelectedId = userDepto.departamento_id;
+        }
+      }
+      if (!deptoSelectedId && depData.length > 0) {
+        deptoSelectedId = depData[0].departamento_id;
+      }
+      if (deptoSelectedId) {
+        setDepartamentoId(deptoSelectedId);
+      }
 
       const ccData = ccRes.data || [];
       setCentrosCosto(ccData);
-      if (ccData.length > 0) setCentroCostosId(ccData[0].centro_costos_id);
+
+      let ccSelectedId: number | '' = centroCostosId || '';
+      if (!ccSelectedId && user && user.empleado) {
+        const userCCStr = user.empleado.centro_costos || '';
+        const userCC = ccData.find((cc: any) => {
+          return userCCStr.toLowerCase().includes(cc.centro_costos_nombre.toLowerCase().trim()) ||
+                 userCCStr.toLowerCase().includes(cc.centro_costos_codigo.toLowerCase().trim()) ||
+                 cc.centro_costos_nombre.toLowerCase().trim() === userCCStr.toLowerCase().trim();
+        });
+        if (userCC) {
+          ccSelectedId = userCC.centro_costos_id;
+        }
+      }
+      if (!ccSelectedId && ccData.length > 0) {
+        ccSelectedId = ccData[0].centro_costos_id;
+      }
+      if (ccSelectedId) {
+        setCentroCostosId(ccSelectedId);
+      }
 
       setProductos(prodRes.data || []);
       setProveedores(provRes.data || []);
