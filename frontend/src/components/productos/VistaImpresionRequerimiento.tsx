@@ -633,10 +633,10 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
             {/* 8. CONTROL DE CAMBIOS */}
             <div className="border border-gray-400 overflow-hidden">
               <div 
-                className="text-white text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
+                className="text-black text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
                 style={{ backgroundColor: '#eb763c' }}
               >
-                Control de Cambios
+                CONTROL DE CAMBIOS
               </div>
               <table className="w-full border-collapse text-[6.5px] text-center">
                 <thead>
@@ -670,10 +670,10 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
             {/* 9. REFERENCIAS */}
             <div className="border border-gray-400 overflow-hidden">
               <div 
-                className="text-white text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
+                className="text-black text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
                 style={{ backgroundColor: '#eb763c' }}
               >
-                Referencias
+                REFERENCIAS
               </div>
               <table className="w-full border-collapse text-[6.5px] text-center bg-white">
                 <tbody>
