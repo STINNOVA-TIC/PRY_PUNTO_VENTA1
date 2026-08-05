@@ -12,7 +12,7 @@ exports.ordenesController = {
     crear: async (req, res) => {
         const client = await db_1.default.connect();
         try {
-            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, detalles, tipo_compra } = req.body;
+            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, empleado_aprobador_id, empleado_receptor_id, detalles, tipo_compra } = req.body;
             if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
                 throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
             }
@@ -42,9 +42,20 @@ exports.ordenesController = {
             const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
             const seqStr = String(nextSeqNum).padStart(3, '0');
             const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
-            // Obtener el empleado del usuario actual si no está especificado
-            const userRes = await client.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user?.id]);
-            const empleadoId = userRes.rows[0]?.empleado_id || 1;
+            // Obtener el empleado del usuario actual (Elaborador)
+            let empleadoId = req.empleado?.empleado_id;
+            if (!empleadoId && req.user?.id) {
+                const userRes = await client.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id]);
+                empleadoId = userRes.rows[0]?.empleado_id;
+            }
+            if (!empleadoId) {
+                empleadoId = 1;
+            }
+            // Obtener firma del Elaborador para estamparla inmediatamente
+            const empFirmaRes = await client.query('SELECT empleado_firma, empleado_nombre, empleado_apellido FROM empleado WHERE empleado_id = $1', [empleadoId]);
+            const firmaElaborador = empFirmaRes.rows[0]?.empleado_firma || null;
+            const fechaFirmaElaborador = firmaElaborador ? new Date() : null;
+            const elaboradoPorName = empFirmaRes.rows[0] ? `${empFirmaRes.rows[0].empleado_nombre} ${empFirmaRes.rows[0].empleado_apellido}` : elaborado_por;
             const usuarioId = req.user?.id && req.user.id !== 0 ? req.user.id : 1;
             // 3. Insertar la cabecera de la orden de compra
             const ocRes = await client.query(`INSERT INTO orden_compra (
@@ -55,9 +66,11 @@ exports.ordenesController = {
            orden_compra_requiere_contrato, orden_compra_requiere_seguro, orden_compra_requiere_mantenimiento,
            orden_compra_asignado_trabajador, orden_compra_trabajador_asignado, orden_compra_caracteristicas,
            orden_compra_elaborado_por, orden_compra_aprobado_por, orden_compra_recibido_por,
-           orden_compra_estado, orden_compra_tipo_compra
+           orden_compra_estado, orden_compra_tipo_compra,
+           empleado_aprobador_id, empleado_receptor_id,
+           orden_compra_firma_elaborador, orden_compra_fecha_firma_elaborador
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente', $25) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'pendiente', $25, $26, $27, $28, $29) 
          RETURNING orden_compra_id`, [
                 empresa_id,
                 sucursal_id,
@@ -80,10 +93,14 @@ exports.ordenesController = {
                 asignado_trabajador || false,
                 trabajador_asignado || null,
                 caracteristicas || null,
-                elaborado_por || null,
+                elaboradoPorName || null,
                 aprobado_por || null,
                 recibido_por || null,
-                tipo_compra || 'LOCAL'
+                tipo_compra || 'LOCAL',
+                empleado_aprobador_id || null,
+                empleado_receptor_id || null,
+                firmaElaborador,
+                fechaFirmaElaborador
             ]);
             const ocId = ocRes.rows[0].orden_compra_id;
             // 4. Insertar los detalles
@@ -100,9 +117,10 @@ exports.ordenesController = {
              orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
              orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
              orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
+             orden_compra_detalle_incluye_iva,
              orden_compra_detalle_comentario
            ) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`, [
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [
                     ocId,
                     d.producto_id || null,
                     d.proveedor_id || null,
@@ -113,6 +131,7 @@ exports.ordenesController = {
                     d.subtotal || 0,
                     d.foto || null,
                     d.negociacion_previa || 'NO',
+                    d.incluye_iva === undefined ? true : !!d.incluye_iva,
                     d.comentario || null
                 ]);
             }
@@ -149,7 +168,9 @@ exports.ordenesController = {
                 p.proveedor_nombre, p.proveedor_codigo,
                 u.usuario_nombre,
                 emp_req.empleado_nombre || ' ' || emp_req.empleado_apellido AS empleado_nombre_completo,
-                emp_req.empleado_cargo
+                emp_req.empleado_cargo,
+                emp_aprob.empleado_nombre || ' ' || emp_aprob.empleado_apellido AS aprobador_nombre_completo,
+                emp_recib.empleado_nombre || ' ' || emp_recib.empleado_apellido AS recibidor_nombre_completo
          FROM orden_compra oc
          LEFT JOIN empresa emp ON oc.empresa_id = emp.empresa_id
          LEFT JOIN sucursal suc ON oc.sucursal_id = suc.sucursal_id
@@ -158,6 +179,8 @@ exports.ordenesController = {
          LEFT JOIN proveedor p ON oc.proveedor_id = p.proveedor_id
          LEFT JOIN usuario u ON oc.usuario_id = u.usuario_id
          LEFT JOIN empleado emp_req ON oc.empleado_id = emp_req.empleado_id
+         LEFT JOIN empleado emp_aprob ON oc.empleado_aprobador_id = emp_aprob.empleado_id
+         LEFT JOIN empleado emp_recib ON oc.empleado_receptor_id = emp_recib.empleado_id
          WHERE oc.orden_compra_id = $1`, [id]);
             if (ocRes.rows.length === 0) {
                 throw new error_middleware_1.AppError('Orden de compra no encontrada', 404);
@@ -237,13 +260,17 @@ exports.ordenesController = {
             const ocRes = await db_1.default.query(`SELECT oc.*, p.proveedor_nombre, u.usuario_nombre,
                 emp.empresa_nombre_comercial,
                 dept.departamento_nombre,
-                emp_req.empleado_nombre || ' ' || emp_req.empleado_apellido AS empleado_nombre_completo
+                emp_req.empleado_nombre || ' ' || emp_req.empleado_apellido AS empleado_nombre_completo,
+                emp_aprob.empleado_nombre || ' ' || emp_aprob.empleado_apellido AS aprobador_nombre_completo,
+                emp_recib.empleado_nombre || ' ' || emp_recib.empleado_apellido AS recibidor_nombre_completo
          FROM orden_compra oc
          LEFT JOIN proveedor p ON oc.proveedor_id = p.proveedor_id
          LEFT JOIN usuario u ON oc.usuario_id = u.usuario_id
          LEFT JOIN empresa emp ON oc.empresa_id = emp.empresa_id
          LEFT JOIN departamento dept ON oc.departamento_id = dept.departamento_id
          LEFT JOIN empleado emp_req ON oc.empleado_id = emp_req.empleado_id
+         LEFT JOIN empleado emp_aprob ON oc.empleado_aprobador_id = emp_aprob.empleado_id
+         LEFT JOIN empleado emp_recib ON oc.empleado_receptor_id = emp_recib.empleado_id
          ORDER BY oc.orden_compra_fecha_solicitud DESC`);
             const items = [];
             for (const row of ocRes.rows) {
@@ -263,6 +290,17 @@ exports.ordenesController = {
                     empresa_nombre: row.empresa_nombre_comercial,
                     departamento_nombre: row.departamento_nombre,
                     empleado_nombre: row.empleado_nombre_completo,
+                    // New signature fields
+                    empleado_aprobador_id: row.empleado_aprobador_id,
+                    aprobador_nombre: row.aprobador_nombre_completo,
+                    empleado_receptor_id: row.empleado_receptor_id,
+                    recibidor_nombre: row.recibidor_nombre_completo,
+                    firma_elaborador: row.orden_compra_firma_elaborador,
+                    fecha_firma_elaborador: row.orden_compra_fecha_firma_elaborador,
+                    firma_aprobador: row.orden_compra_firma_aprobador,
+                    fecha_firma_aprobador: row.orden_compra_fecha_firma_aprobador,
+                    firma_recibido: row.orden_compra_firma_recibido,
+                    fecha_firma_recibido: row.orden_compra_fecha_firma_recibido,
                     facturas: facturasRes.rows.map((f) => f.factura_codigo),
                     detalles: detailsRes.rows.map(d => ({
                         id: d.orden_compra_detalle_id,
@@ -271,7 +309,8 @@ exports.ordenesController = {
                         producto_codigo: d.producto_codigo || 'N/A',
                         cantidad: d.orden_compra_detalle_cantidad,
                         precio_unitario: d.orden_compra_detalle_precio_unitario,
-                        subtotal: d.orden_compra_detalle_subtotal
+                        subtotal: d.orden_compra_detalle_subtotal,
+                        incluye_iva: d.orden_compra_detalle_incluye_iva !== false
                     }))
                 });
             }
@@ -319,6 +358,17 @@ exports.ordenesController = {
             }
             if (oc.orden_compra_estado === 'cancelada') {
                 throw new error_middleware_1.AppError('No se puede entregar un requerimiento cancelado', 400);
+            }
+            // 2.1. Validar que el requerimiento esté firmado por todas las partes
+            if (!oc.orden_compra_firma_elaborador || !oc.orden_compra_firma_aprobador || !oc.orden_compra_firma_recibido) {
+                const faltantes = [];
+                if (!oc.orden_compra_firma_elaborador)
+                    faltantes.push('Elaborador');
+                if (!oc.orden_compra_firma_aprobador)
+                    faltantes.push('Aprobador');
+                if (!oc.orden_compra_firma_recibido)
+                    faltantes.push('Receptor');
+                throw new error_middleware_1.AppError(`El requerimiento no puede ser recibido: falta la firma de ${faltantes.join(', ')}.`, 400);
             }
             // 3. Registrar códigos de factura
             for (const facCodigo of cleanFacturas) {
@@ -412,6 +462,75 @@ exports.ordenesController = {
         }
         finally {
             client.release();
+        }
+    },
+    // Firmar orden de compra (Aprobador o Receptor)
+    firmar: async (req, res) => {
+        try {
+            const { id } = req.params;
+            // Obtener el empleado del usuario actual
+            let empleadoId = req.empleado?.empleado_id;
+            if (!empleadoId && req.user?.id) {
+                const userRes = await db_1.default.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id]);
+                empleadoId = userRes.rows[0]?.empleado_id;
+            }
+            if (!empleadoId) {
+                throw new error_middleware_1.AppError('No estás registrado como empleado. No puedes firmar este documento.', 403);
+            }
+            // Obtener la firma del empleado
+            const empRes = await db_1.default.query('SELECT empleado_firma, empleado_nombre, empleado_apellido FROM empleado WHERE empleado_id = $1', [empleadoId]);
+            const empleado = empRes.rows[0];
+            if (!empleado || !empleado.empleado_firma) {
+                throw new error_middleware_1.AppError('No tienes una firma registrada. Por favor, solicita al Administrador que suba tu firma.', 400);
+            }
+            // Obtener el requerimiento
+            const ocRes = await db_1.default.query('SELECT * FROM orden_compra WHERE orden_compra_id = $1', [id]);
+            const oc = ocRes.rows[0];
+            if (!oc) {
+                throw new error_middleware_1.AppError('El requerimiento no existe', 404);
+            }
+            const isAprobador = oc.empleado_aprobador_id === empleadoId;
+            const isReceptor = oc.empleado_receptor_id === empleadoId;
+            if (!isAprobador && !isReceptor) {
+                throw new error_middleware_1.AppError('No estás autorizado para firmar este requerimiento.', 403);
+            }
+            const signatureDate = new Date();
+            const empleadoNombreCompleto = `${empleado.empleado_nombre} ${empleado.empleado_apellido}`;
+            if (isAprobador) {
+                if (oc.orden_compra_estado !== 'pendiente') {
+                    throw new error_middleware_1.AppError('El requerimiento no está en estado pendiente de aprobación.', 400);
+                }
+                await db_1.default.query(`UPDATE orden_compra 
+           SET orden_compra_firma_aprobador = $1, 
+               orden_compra_fecha_firma_aprobador = $2, 
+               orden_compra_aprobado_por = $3,
+               orden_compra_estado = 'aprobada',
+               orden_compra_fecha_aprobacion = $2,
+               orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $4`, [empleado.empleado_firma, signatureDate, empleadoNombreCompleto, id]);
+            }
+            else if (isReceptor) {
+                if (oc.orden_compra_estado !== 'aprobada') {
+                    throw new error_middleware_1.AppError('El requerimiento debe estar aprobado antes de ser recibido.', 400);
+                }
+                await db_1.default.query(`UPDATE orden_compra 
+           SET orden_compra_firma_recibido = $1, 
+               orden_compra_fecha_firma_recibido = $2, 
+               orden_compra_recibido_por = $3,
+               orden_compra_estado = 'recibida',
+               orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $4`, [empleado.empleado_firma, signatureDate, empleadoNombreCompleto, id]);
+            }
+            res.json({
+                success: true,
+                message: 'Requerimiento firmado exitosamente.'
+            });
+            return;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al firmar requerimiento', 500);
         }
     }
 };

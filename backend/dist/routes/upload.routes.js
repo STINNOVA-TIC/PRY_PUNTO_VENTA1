@@ -25,6 +25,9 @@ const storage = multer_1.default.diskStorage({
         else if (type === 'entrega' || type === 'entregas') {
             uploadPath = path_1.default.join(uploadPath, 'entregas');
         }
+        else if (type === 'firma' || type === 'firmas') {
+            uploadPath = path_1.default.join(uploadPath, 'firmas');
+        }
         // Asegurar que exista la carpeta
         if (!fs_1.default.existsSync(uploadPath)) {
             fs_1.default.mkdirSync(uploadPath, { recursive: true });
@@ -63,6 +66,9 @@ router.post('/', auth_middleware_1.authenticate, upload.single('foto'), (req, re
     }
     else if (type === 'entrega' || type === 'entregas') {
         pathSegment = 'entregas';
+    }
+    else if (type === 'firma' || type === 'firmas') {
+        pathSegment = 'firmas';
     }
     const host = req.get('host') || 'localhost:5000';
     const fileUrl = `http://${host}/img/${pathSegment}/${req.file.filename}`;

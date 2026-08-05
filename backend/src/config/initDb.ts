@@ -79,6 +79,46 @@ export const initDb = async () => {
         ADD COLUMN IF NOT EXISTS orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE;
     `);
 
+    // 4.3. Migración: firma digital en empleado
+    await pool.query(`
+      ALTER TABLE empleado
+        ADD COLUMN IF NOT EXISTS empleado_firma VARCHAR(255) NULL;
+    `);
+
+    // 4.4. Migración: firmas digitales y empleados de aprobación/recepción en orden_compra
+    await pool.query(`
+      ALTER TABLE orden_compra
+        ADD COLUMN IF NOT EXISTS orden_compra_firma_elaborador VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_fecha_firma_elaborador TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_firma_aprobador VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_fecha_firma_aprobador TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_firma_recibido VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_fecha_firma_recibido TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS empleado_aprobador_id INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS empleado_receptor_id INTEGER NULL;
+    `);
+
+    // 4.5. Migración: claves foráneas de empleados en orden_compra
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_orden_compra_empleado_aprobador'
+        ) THEN
+          ALTER TABLE orden_compra
+            ADD CONSTRAINT fk_orden_compra_empleado_aprobador
+            FOREIGN KEY (empleado_aprobador_id) REFERENCES empleado(empleado_id) ON DELETE SET NULL;
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_orden_compra_empleado_receptor'
+        ) THEN
+          ALTER TABLE orden_compra
+            ADD CONSTRAINT fk_orden_compra_empleado_receptor
+            FOREIGN KEY (empleado_receptor_id) REFERENCES empleado(empleado_id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
     // 5. Sembrar nuevo rol de empleado_autorizado
     await pool.query(`
       INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 
