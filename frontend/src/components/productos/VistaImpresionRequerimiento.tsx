@@ -677,10 +677,18 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
               </div>
               <table className="w-full border-collapse text-[6.5px] text-center bg-white">
                 <tbody>
-                  <tr className="bg-gray-100 border-b border-gray-400 text-gray-750 font-semibold">
-                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">ISO 9001:2015 Sistema Gestión de Calidad</td>
-                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">CAP 7 Apoyo</td>
-                    <td className="py-0.5 w-[33.33%]">7.1 Recursos</td>
+                  <tr className="bg-gray-100 border-b border-gray-400 text-gray-750 font-semibold text-[6.5px]">
+                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">
+                      <span className="font-bold text-gray-900">ISO 9001:2015</span> Sistema Gestión de Calidad
+                    </td>
+                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">
+                      <span className="font-bold text-gray-900">CAP 7</span> Apoyo
+                    </td>
+                    <td className="py-0.5 w-[33.33%] leading-tight">
+                      <span className="font-bold text-gray-900">7.1</span> Recursos
+                      <br />
+                      <span className="font-bold text-gray-900">7.1.1</span> Generalidades
+                    </td>
                   </tr>
                   <tr className="text-gray-800">
                     <td className="border-r border-gray-400">
