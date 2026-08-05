@@ -537,145 +537,179 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
             <div className="grid grid-cols-3 gap-4 pt-1 text-center font-sans">
               
               {/* Elaborado por */}
-              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
-                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Elaborado por:</div>
-                {orden.orden_compra_firma_elaborador ? (
-                  <div className="flex-1 flex flex-col justify-center items-center">
+              <div className="border border-gray-400 p-1 h-28 rounded bg-white relative">
+                <div className="font-bold text-[6.5px] uppercase text-gray-400 text-left select-none">Elaborado por:</div>
+                
+                {/* Imagen de la firma centrada y de fondo (capa z-0) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none py-2 z-0">
+                  {orden.orden_compra_firma_elaborador ? (
                     <img 
                       src={orden.orden_compra_firma_elaborador} 
                       alt="Firma Elaborador" 
-                      className="h-11 object-contain" 
+                      className="h-20 object-contain opacity-95" 
                       crossOrigin="anonymous" 
                     />
-                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                  ) : (
+                    <div className="text-gray-300 italic text-[7px] select-none mt-4">Pendiente de firma</div>
+                  )}
+                </div>
+
+                {/* Textos sobrepuestos al frente (capa z-10) */}
+                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_elaborado_por}>
+                    {orden.orden_compra_elaborado_por || 'TIC: David Quishpe'}
+                  </div>
+                  {orden.orden_compra_firma_elaborador && (
+                    <div className="text-[5.5px] text-gray-500 font-mono mt-0.5 leading-none select-none">
                       Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_elaborador)}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
-                    Pendiente de firma
-                  </div>
-                )}
-                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
-                  {orden.orden_compra_elaborado_por || 'TIC: David Quishpe'}
+                  )}
                 </div>
               </div>
 
               {/* Aprobado por */}
-              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
-                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Aprobado por:</div>
-                {orden.orden_compra_firma_aprobador ? (
-                  <div className="flex-1 flex flex-col justify-center items-center">
+              <div className="border border-gray-400 p-1 h-28 rounded bg-white relative">
+                <div className="font-bold text-[6.5px] uppercase text-gray-400 text-left select-none">Aprobado por:</div>
+                
+                {/* Imagen de la firma centrada y de fondo (capa z-0) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none py-2 z-0">
+                  {orden.orden_compra_firma_aprobador ? (
                     <img 
                       src={orden.orden_compra_firma_aprobador} 
                       alt="Firma Aprobador" 
-                      className="h-11 object-contain" 
+                      className="h-20 object-contain opacity-95" 
                       crossOrigin="anonymous" 
                     />
-                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                  ) : (
+                    <div className="text-gray-300 italic text-[7px] select-none mt-4">Pendiente de aprobación</div>
+                  )}
+                </div>
+
+                {/* Textos sobrepuestos al frente (capa z-10) */}
+                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_aprobado_por}>
+                    {orden.orden_compra_aprobado_por || 'Gerente Financiera: Dominique Veloz'}
+                  </div>
+                  {orden.orden_compra_firma_aprobador && (
+                    <div className="text-[5.5px] text-gray-500 font-mono mt-0.5 leading-none select-none">
                       Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_aprobador)}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
-                    Pendiente de aprobación
-                  </div>
-                )}
-                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
-                  {orden.orden_compra_aprobado_por || 'Gerente Financiera: Dominique Veloz'}
+                  )}
                 </div>
               </div>
 
               {/* Recibido por */}
-              <div className="border border-gray-400 p-1 h-24 flex flex-col justify-between rounded bg-white relative">
-                <div className="font-bold text-[6px] uppercase text-gray-500 text-left">Recibido por:</div>
-                {orden.orden_compra_firma_recibido ? (
-                  <div className="flex-1 flex flex-col justify-center items-center">
+              <div className="border border-gray-400 p-1 h-28 rounded bg-white relative">
+                <div className="font-bold text-[6.5px] uppercase text-gray-400 text-left select-none">Recibido por:</div>
+                
+                {/* Imagen de la firma centrada y de fondo (capa z-0) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none py-2 z-0">
+                  {orden.orden_compra_firma_recibido ? (
                     <img 
                       src={orden.orden_compra_firma_recibido} 
                       alt="Firma Recibido" 
-                      className="h-11 object-contain" 
+                      className="h-20 object-contain opacity-95" 
                       crossOrigin="anonymous" 
                     />
-                    <div className="text-[5.5px] text-gray-400 mt-0.5 font-mono">
+                  ) : (
+                    <div className="text-gray-300 italic text-[7px] select-none mt-4">Pendiente de recepción</div>
+                  )}
+                </div>
+
+                {/* Textos sobrepuestos al frente (capa z-10) */}
+                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_recibido_por}>
+                    {orden.orden_compra_recibido_por || 'Compras: Mishell Paucar'}
+                  </div>
+                  {orden.orden_compra_firma_recibido && (
+                    <div className="text-[5.5px] text-gray-500 font-mono mt-0.5 leading-none select-none">
                       Firma el: {formatFechaHora(orden.orden_compra_fecha_firma_recibido)}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-350 italic text-[7px]">
-                    Pendiente de recepción
-                  </div>
-                )}
-                <div className="font-bold text-gray-800 text-[7px] border-t border-gray-200 pt-0.5 truncate">
-                  {orden.orden_compra_recibido_por || 'Compras: Mishell Paucar'}
+                  )}
                 </div>
               </div>
             </div>
 
             {/* 8. CONTROL DE CAMBIOS */}
-            <div className="border border-gray-400 rounded overflow-hidden">
-              <div className="bg-amber-500 text-black text-center py-0.5 font-bold uppercase text-[7px]">
+            <div className="border border-gray-400 overflow-hidden">
+              <div 
+                className="text-white text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
+                style={{ backgroundColor: '#eb763c' }}
+              >
                 Control de Cambios
               </div>
               <table className="w-full border-collapse text-[6.5px] text-center">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-300 font-semibold uppercase">
-                    <th className="border-r border-gray-300 py-0.5 w-[10%]">Versión</th>
-                    <th className="border-r border-gray-300 py-0.5 w-[25%]">Fecha de creación / actualización</th>
-                    <th className="border-r border-gray-300 py-0.5 w-[40%]">Motivo del cambio</th>
-                    <th className="border-r border-gray-300 py-0.5 w-[15%]">Aprobado por</th>
-                    <th className="py-0.5 w-[10%]">Fecha de aprobación</th>
+                  <tr className="bg-gray-100 border-b border-gray-400 font-semibold text-gray-750 uppercase">
+                    <th className="border-r border-gray-400 py-0.5 w-[8%] text-[6.5px] font-bold">Versión</th>
+                    <th className="border-r border-gray-400 py-0.5 w-[22%] text-[6.5px] font-bold">Fecha de creación / actualización</th>
+                    <th className="border-r border-gray-400 py-0.5 w-[42%] text-[6.5px] font-bold">Motivo del cambio</th>
+                    <th className="border-r border-gray-400 py-0.5 w-[18%] text-[6.5px] font-bold">Aprobado por</th>
+                    <th className="py-0.5 w-[10%] text-[6.5px] font-bold">Fecha de aprobación</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-gray-250">
-                    <td className="border-r border-gray-300 p-0.5 font-semibold">00</td>
-                    <td className="border-r border-gray-300 p-0.5">31/10/2024</td>
-                    <td className="border-r border-gray-300 p-0.5 text-left">Versión inicial - Creación del documento</td>
-                    <td className="border-r border-gray-300 p-0.5">Gerente de Operaciones</td>
+                  <tr className="border-b border-gray-400 text-gray-800">
+                    <td className="border-r border-gray-400 p-0.5 font-semibold font-mono">00</td>
+                    <td className="border-r border-gray-400 p-0.5">31/10/2024</td>
+                    <td className="border-r border-gray-400 p-0.5 text-center">Versión inicial - Creación del documento</td>
+                    <td className="border-r border-gray-400 p-0.5">Gerente de Operaciones</td>
                     <td className="p-0.5">31/10/2024</td>
                   </tr>
-                  <tr>
-                    <td className="border-r border-gray-300 p-0.5 font-semibold">01</td>
-                    <td className="border-r border-gray-300 p-0.5">22/05/2025</td>
-                    <td className="border-r border-gray-300 p-0.5 text-left">Estandarización del formato y se modifica al encargado de aprobar el documento conforme a la estructura</td>
-                    <td className="border-r border-gray-300 p-0.5">Gerente de Operaciones</td>
-                    <td className="p-0.5">26/05/2025</td>
+                  <tr className="text-gray-800">
+                    <td className="border-r border-gray-400 p-0.5 font-semibold font-mono">01</td>
+                    <td className="border-r border-gray-400 p-0.5">22/5/2025</td>
+                    <td className="border-r border-gray-400 p-0.5 text-center">Estandarización del formato y se modifica al encargado de aprobar el documento conforme a la estructura organizacional vigente a la fecha</td>
+                    <td className="border-r border-gray-400 p-0.5">Gerente Administrativa Financiera</td>
+                    <td className="p-0.5">26/5/2025</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             {/* 9. REFERENCIAS */}
-            <div className="border border-gray-400 rounded overflow-hidden">
-              <div className="bg-amber-500 text-black text-center py-0.5 font-bold uppercase text-[7px]">
+            <div className="border border-gray-400 overflow-hidden">
+              <div 
+                className="text-white text-center py-0.5 font-bold uppercase text-[7px] tracking-wider"
+                style={{ backgroundColor: '#eb763c' }}
+              >
                 Referencias
               </div>
-              <div className="grid grid-cols-3 text-[6.5px] text-center bg-gray-50 py-0.5 border-b border-gray-300">
-                <div className="border-r border-gray-300">
-                  <span className="font-bold">ISO 9001:2015</span> Sistema Gestión de Calidad
-                </div>
-                <div className="border-r border-gray-300">
-                  <span className="font-bold">CAP 7</span> Apoyo
-                </div>
-                <div>
-                  <span className="font-bold">7.1</span> Recursos <span className="font-bold">7.1.1</span> Generalidades
-                </div>
-              </div>
-              <div className="grid grid-cols-3 text-[6.5px] text-center bg-white py-0.5">
-                <div className="border-r border-gray-300">
-                  <span className="font-semibold block text-[5px] text-gray-450 uppercase">Elaborado por:</span>
-                  Ejecutivo de Compras Locales
-                </div>
-                <div className="border-r border-gray-300">
-                  <span className="font-semibold block text-[5px] text-gray-450 uppercase">Revisado por:</span>
-                  Gerente de Operaciones
-                </div>
-                <div>
-                  <span className="font-semibold block text-[5px] text-gray-450 uppercase">Aprobado por:</span>
-                  Gerente de Operaciones
-                </div>
-              </div>
+              <table className="w-full border-collapse text-[6.5px] text-center bg-white">
+                <tbody>
+                  <tr className="bg-gray-100 border-b border-gray-400 text-gray-750 font-semibold">
+                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">ISO 9001:2015 Sistema Gestión de Calidad</td>
+                    <td className="border-r border-gray-400 py-0.5 w-[33.33%]">CAP 7 Apoyo</td>
+                    <td className="py-0.5 w-[33.33%]">7.1 Recursos</td>
+                  </tr>
+                  <tr className="text-gray-800">
+                    <td className="border-r border-gray-400">
+                      <div className="py-0.5 border-b border-gray-400 font-bold text-[5px] text-gray-500 uppercase bg-white">
+                        Elaborado por:
+                      </div>
+                      <div className="py-0.5 text-[6.5px] bg-white">
+                        Analista de Adquisiciones
+                      </div>
+                    </td>
+                    <td className="border-r border-gray-400">
+                      <div className="py-0.5 border-b border-gray-400 font-bold text-[5px] text-gray-500 uppercase bg-white">
+                        Revisado por:
+                      </div>
+                      <div className="py-0.5 text-[6.5px] bg-white">
+                        Especialista de Adquisiciones
+                      </div>
+                    </td>
+                    <td>
+                      <div className="py-0.5 border-b border-gray-400 font-bold text-[5px] text-gray-500 uppercase bg-white">
+                        Aprobado por:
+                      </div>
+                      <div className="py-0.5 text-[6.5px] bg-white">
+                        Gerente Administrativa Financiera
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             {/* FOOTER */}
