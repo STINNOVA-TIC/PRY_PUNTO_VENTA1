@@ -30,8 +30,8 @@ function Home() {
     return <CarritoCompras />;
   }
 
-  if (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado') {
-    return <CarritoCompras />;
+  if (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar') {
+    return <Navigate to="/requerimientos" replace />;
   }
   if (user?.rol.nombre === 'admin') {
     return <Navigate to="/admin/empleados" replace />;

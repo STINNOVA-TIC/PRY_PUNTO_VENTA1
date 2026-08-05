@@ -30,26 +30,7 @@ export const Login: React.FC = () => {
     }
   };
 
-  /* {HIDDEN_TEMP_DEPLOY} Handler oculto temporalmente para despliegue: descomentar para reactivar la bandeja de firmas
-  const handleEmployeeSignaturesSubmit = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!cedula.trim()) {
-      setError('Por favor, ingrese su número de cédula para firmar.');
-      return;
-    }
-    setError('');
-    setLoading(true);
 
-    try {
-      await loginByCedula(cedula, true);
-      navigate('/requerimientos');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Cédula no registrada o inválida');
-    } finally {
-      setLoading(false);
-    }
-  };
-  */
 
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,18 +161,6 @@ export const Login: React.FC = () => {
                 {loading ? 'Validando Cédula...' : 'Ingresar a Comprar'}
               </button>
 
-              {/* {HIDDEN_TEMP_DEPLOY} Botón oculto temporalmente para despliegue: descomentar para reactivar la bandeja de firmas
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={handleEmployeeSignaturesSubmit}
-                  disabled={loading}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold transition duration-150 active:scale-[0.98] disabled:opacity-50 text-sm border border-gray-300"
-                >
-                  Firmar Requerimientos
-                </button>
-              </div>
-              */}
             </form>
           ) : (
             <form onSubmit={handleAdminSubmit} className="space-y-5">

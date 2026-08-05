@@ -545,6 +545,8 @@ export const PanelInventario: React.FC = () => {
       return;
     }
 
+    const esGuardia = rol === 'guardia';
+
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -552,12 +554,14 @@ export const PanelInventario: React.FC = () => {
     });
 
     doc.setFontSize(16);
-    doc.text('Reporte de Stock e Inventario Valorado', 14, 15);
+    doc.text(esGuardia ? 'Reporte de Stock' : 'Reporte de Stock e Inventario Valorado', 14, 15);
     doc.setFontSize(10);
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 21);
     doc.text(`Filtros: Busqueda: "${searchTerm || 'Todas'}" | Categoria: ${filterCategory === 'ALL' ? 'Todas' : categorias.find(c => c.id === filterCategory)?.nombre || 'Todas'}`, 14, 26);
 
-    const headers = [['Código', 'Producto', 'Descripción', 'P. Costo', 'P. Venta', 'Stock', 'Val. Costo', 'Val. Venta']];
+    const headers = esGuardia
+      ? [['Código', 'Producto', 'Descripción', 'Stock']]
+      : [['Código', 'Producto', 'Descripción', 'P. Costo', 'P. Venta', 'Stock', 'Val. Costo', 'Val. Venta']];
     let totalStock = 0;
     let totalValCosto = 0;
     let totalValVenta = 0;
@@ -568,6 +572,15 @@ export const PanelInventario: React.FC = () => {
       totalStock += p.stock_actual;
       totalValCosto += valCosto;
       totalValVenta += valVenta;
+
+      if (esGuardia) {
+        return [
+          p.codigo_barras,
+          p.nombre,
+          p.descripcion || '-',
+          p.stock_actual.toString()
+        ];
+      }
 
       return [
         p.codigo_barras,
@@ -582,16 +595,18 @@ export const PanelInventario: React.FC = () => {
     });
 
     // Fila de totales
-    rows.push([
-      'TOTALES',
-      `${listado.length} productos`,
-      '',
-      '',
-      '',
-      totalStock.toString(),
-      `$${totalValCosto.toFixed(2)}`,
-      `$${totalValVenta.toFixed(2)}`
-    ]);
+    rows.push(esGuardia
+      ? ['TOTALES', `${listado.length} productos`, '', totalStock.toString()]
+      : [
+          'TOTALES',
+          `${listado.length} productos`,
+          '',
+          '',
+          '',
+          totalStock.toString(),
+          `$${totalValCosto.toFixed(2)}`,
+          `$${totalValVenta.toFixed(2)}`
+        ]);
 
     autoTable(doc, {
       head: headers,
@@ -662,7 +677,7 @@ export const PanelInventario: React.FC = () => {
           ) : (
             <button
               onClick={exportarPDF}
-              className="px-3.5 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
+              className="h-8 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5 shrink-0"
             >
               <BsFileEarmarkPdfFill /> Descargar PDF
             </button>

@@ -3,7 +3,7 @@ import { Permiso, GruposPermisos } from '../types/permisos';
 
 export interface IRol {
   id: number;
-  nombre: 'admin' | 'guardia' | 'empleado' | 'inventario' | 'contador' | 'gerente' | 'tthh' | 'empleado_autorizado';
+  nombre: 'admin' | 'guardia' | 'empleado' | 'inventario' | 'contador' | 'gerente' | 'tthh' | 'empleado_autorizado' | 'empleado_autorizado_firmar';
   descripcion: string;
   permisos: Permiso[];
   nivel: number; // Para jerarquía (mayor = más permisos)
@@ -87,5 +87,14 @@ export const rolesData: IRol[] = [
       'autoconsumo.crear'
     ],
     nivel: 25
+  },
+  {
+    id: 9,
+    nombre: 'empleado_autorizado_firmar',
+    descripcion: 'Colaborador autorizado para firmar requerimientos',
+    permisos: [
+      ...GruposPermisos.EMPLEADO
+    ],
+    nivel: 26
   }
 ];

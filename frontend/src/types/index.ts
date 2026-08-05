@@ -11,6 +11,7 @@ export interface Usuario {
     permisos: Permiso[];
   };
   permitir_autoconsumo?: boolean;
+  permitir_firmas?: boolean;
   empleado?: {
     id: number;
     codigo_empleado: string;
@@ -46,6 +47,7 @@ export interface Empleado {
   centro_costos_id?: number;
   activo: boolean;
   permitir_autoconsumo?: boolean;
+  permitir_firmas?: boolean;
 }
 
 export interface Producto {

@@ -14,6 +14,42 @@ export const ModalFlujoRequerimiento: React.FC<ModalFlujoRequerimientoProps> = (
     return `${pad(fecha.getDate())}/${pad(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${pad(fecha.getHours())}:${pad(fecha.getMinutes())}:${pad(fecha.getSeconds())}`;
   };
 
+  const parseNombreYDepartamento = (str: string) => {
+    if (!str) return { nombre: 'N/A', departamento: '' };
+    const parts = str.split(':');
+    if (parts.length > 1) {
+      const departamento = parts[0].trim().toUpperCase();
+      const nombreCompleto = parts[1].trim();
+      
+      const nombreParts = nombreCompleto.split(/\s+/).filter(Boolean);
+      let primerNombre = nombreParts[0] || '';
+      let primerApellido = '';
+      
+      if (nombreParts.length > 1) {
+        if (nombreParts.length >= 4) {
+          primerApellido = nombreParts[2];
+        } else {
+          primerApellido = nombreParts[1];
+        }
+      }
+      
+      const nombreFormateado = `${primerNombre} ${primerApellido}`.trim().toUpperCase();
+      return { nombre: nombreFormateado, departamento };
+    }
+    
+    const nombreParts = str.trim().split(/\s+/).filter(Boolean);
+    let primerNombre = nombreParts[0] || '';
+    let primerApellido = '';
+    if (nombreParts.length > 1) {
+      if (nombreParts.length >= 4) {
+        primerApellido = nombreParts[2];
+      } else {
+        primerApellido = nombreParts[1];
+      }
+    }
+    return { nombre: `${primerNombre} ${primerApellido}`.trim().toUpperCase(), departamento: '' };
+  };
+
   // Determinar estados de cada nodo
   // Nodo 1: Elaborado
   const nodoElaborado = {
@@ -45,6 +81,10 @@ export const ModalFlujoRequerimiento: React.FC<ModalFlujoRequerimientoProps> = (
     firma: orden.orden_compra_firma_recibido,
     fecha: orden.orden_compra_fecha_firma_recibido
   };
+
+  const datosElab = parseNombreYDepartamento(nodoElaborado.nombre);
+  const datosAprob = parseNombreYDepartamento(nodoAprobador.nombre);
+  const datosRecep = parseNombreYDepartamento(nodoReceptor.nombre);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
@@ -96,10 +136,15 @@ export const ModalFlujoRequerimiento: React.FC<ModalFlujoRequerimientoProps> = (
 
               {/* Footer del Nodo */}
               <div className="border-t border-gray-100 pt-2 mt-2">
-                <div className="font-bold text-gray-700 text-xs truncate" title={nodoElaborado.nombre}>
-                  {nodoElaborado.nombre}
+                <div className="font-extrabold text-gray-800 text-[11px] tracking-wide truncate" title={datosElab.nombre}>
+                  {datosElab.nombre}
                 </div>
-                <div className="text-[9px] text-gray-400 mt-0.5 font-mono">
+                {datosElab.departamento && (
+                  <div className="text-[9.5px] font-bold text-indigo-600/80 uppercase tracking-wider mt-0.5 truncate" title={datosElab.departamento}>
+                    {datosElab.departamento}
+                  </div>
+                )}
+                <div className="text-[9px] text-gray-400 mt-1 font-mono">
                   {nodoElaborado.fecha ? formatFechaHora(nodoElaborado.fecha) : 'N/A'}
                 </div>
               </div>
@@ -160,10 +205,15 @@ export const ModalFlujoRequerimiento: React.FC<ModalFlujoRequerimientoProps> = (
 
               {/* Footer del Nodo */}
               <div className="border-t border-gray-100 pt-2 mt-2">
-                <div className="font-bold text-gray-700 text-xs truncate" title={nodoAprobador.nombre}>
-                  {nodoAprobador.nombre}
+                <div className="font-extrabold text-gray-800 text-[11px] tracking-wide truncate" title={datosAprob.nombre}>
+                  {datosAprob.nombre}
                 </div>
-                <div className="text-[9px] text-gray-400 mt-0.5 font-mono">
+                {datosAprob.departamento && (
+                  <div className="text-[9.5px] font-bold text-indigo-600/80 uppercase tracking-wider mt-0.5 truncate" title={datosAprob.departamento}>
+                    {datosAprob.departamento}
+                  </div>
+                )}
+                <div className="text-[9px] text-gray-400 mt-1 font-mono">
                   {nodoAprobador.completado && nodoAprobador.fecha ? formatFechaHora(nodoAprobador.fecha) : '—'}
                 </div>
               </div>
@@ -224,10 +274,15 @@ export const ModalFlujoRequerimiento: React.FC<ModalFlujoRequerimientoProps> = (
 
               {/* Footer del Nodo */}
               <div className="border-t border-gray-100 pt-2 mt-2">
-                <div className="font-bold text-gray-700 text-xs truncate" title={nodoReceptor.nombre}>
-                  {nodoReceptor.nombre}
+                <div className="font-extrabold text-gray-800 text-[11px] tracking-wide truncate" title={datosRecep.nombre}>
+                  {datosRecep.nombre}
                 </div>
-                <div className="text-[9px] text-gray-400 mt-0.5 font-mono">
+                {datosRecep.departamento && (
+                  <div className="text-[9.5px] font-bold text-indigo-600/80 uppercase tracking-wider mt-0.5 truncate" title={datosRecep.departamento}>
+                    {datosRecep.departamento}
+                  </div>
+                )}
+                <div className="text-[9px] text-gray-400 mt-1 font-mono">
                   {nodoReceptor.completado && nodoReceptor.fecha ? formatFechaHora(nodoReceptor.fecha) : '—'}
                 </div>
               </div>

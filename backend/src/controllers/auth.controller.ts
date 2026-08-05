@@ -61,7 +61,9 @@ export const authController = {
       if (userRolesRes.rows.length > 0) {
         userId = userRolesRes.rows[0].usuario_id;
         const rolesList = userRolesRes.rows.map(r => r.rol_id);
-        const matchedRoles = rolesData.filter(r => rolesList.includes(r.id));
+        // Restricción de seguridad: Limitar Cédula únicamente a roles de colaborador (3, 8, 9)
+        const colaboradorRolesList = rolesList.filter(id => [3, 8, 9].includes(id));
+        const matchedRoles = rolesData.filter(r => colaboradorRolesList.includes(r.id));
         matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
         if (matchedRoles.length > 0) {
           rolId = matchedRoles[0].id;
@@ -81,6 +83,16 @@ export const authController = {
         [empleado.empleado_id]
       );
       const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+
+      // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+      const firmasCheck = await pool.query(
+        `SELECT 1 FROM usuario u
+         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+         WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+         LIMIT 1`,
+        [empleado.empleado_id]
+      );
+      const permitirFirmas = firmasCheck.rows.length > 0;
 
       // Generar Token JWT con el rol y el ID real/virtual
       const token = jwt.sign(
@@ -107,6 +119,7 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
+            permitir_firmas: permitirFirmas,
             empleado: {
               id: empleado.empleado_id,
               codigo_empleado: empleado.empleado_cedula,
@@ -177,6 +190,16 @@ export const authController = {
         throw new AppError('Rol de usuario no encontrado', 500);
       }
 
+      // Restricción de Seguridad: Colaboradores no pueden ingresar por este portal (usuario y contraseña)
+      const rolesNombres = rolRes.rows.map(r => r.rol_nombre);
+      const tieneRolOperador = rolesNombres.some(nombre => 
+        ['admin', 'guardia', 'inventario', 'contador', 'gerente', 'tthh'].includes(nombre)
+      );
+
+      if (!tieneRolOperador) {
+        throw new AppError('Acceso denegado. Este portal es de uso exclusivo para operadores y administradores.', 403);
+      }
+
       // Mapear permisos según rol dinámicamente desde static rolesData
       const staticRole = rolesData.find(r => r.id === rol.rol_id);
       const rolNombre = staticRole?.nombre || 'empleado';
@@ -214,6 +237,14 @@ export const authController = {
       );
       const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
 
+      // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+      const firmasCheck = await pool.query(
+        `SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 9`,
+        [user.usuario_id]
+      );
+      const permitirFirmas = firmasCheck.rows.length > 0;
+
       // Generar Token JWT
       const token = jwt.sign(
         { 
@@ -238,6 +269,7 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
+            permitir_firmas: permitirFirmas,
             empleado
           }
         }
@@ -306,6 +338,7 @@ export const authController = {
 
       // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
       let permitirAutoconsumo = false;
+      let permitirFirmas = false;
       const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0 
         ? (await pool.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id 
         : null);
@@ -319,6 +352,15 @@ export const authController = {
           [targetEmpId]
         );
         permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+
+        const firmasCheck = await pool.query(
+          `SELECT 1 FROM usuario u
+           JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+           WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+           LIMIT 1`,
+          [targetEmpId]
+        );
+        permitirFirmas = firmasCheck.rows.length > 0;
       }
 
       res.json({
@@ -333,6 +375,7 @@ export const authController = {
             permisos
           },
           permitir_autoconsumo: permitirAutoconsumo,
+          permitir_firmas: permitirFirmas,
           empleado
         }
       });
@@ -384,7 +427,9 @@ export const authController = {
           if (userRolesRes.rows.length > 0) {
             userId = userRolesRes.rows[0].usuario_id;
             const rolesList = userRolesRes.rows.map(r => r.rol_id);
-            const matchedRoles = rolesData.filter(r => rolesList.includes(r.id));
+            // Restricción de seguridad: Limitar Cédula únicamente a roles de colaborador (3, 8, 9)
+            const colaboradorRolesList = rolesList.filter(id => [3, 8, 9].includes(id));
+            const matchedRoles = rolesData.filter(r => colaboradorRolesList.includes(r.id));
             matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
             if (matchedRoles.length > 0) {
               rolId = matchedRoles[0].id;
@@ -405,6 +450,16 @@ export const authController = {
          );
          const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
 
+         // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+         const firmasCheck = await pool.query(
+           `SELECT 1 FROM usuario u
+            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+            WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+            LIMIT 1`,
+           [empleado.empleado_id]
+         );
+         const permitirFirmas = firmasCheck.rows.length > 0;
+
          res.json({
            success: true,
            data: {
@@ -419,6 +474,7 @@ export const authController = {
                  permisos: permisos
                },
                permitir_autoconsumo: permitirAutoconsumo,
+               permitir_firmas: permitirFirmas,
                empleado: {
                  id: empleado.empleado_id,
                  codigo_empleado: empleado.empleado_cedula,
@@ -453,6 +509,14 @@ export const authController = {
       );
       const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
 
+      // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+      const firmasCheck = await pool.query(
+        `SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 9`,
+        [user.usuario_id]
+      );
+      const permitirFirmas = firmasCheck.rows.length > 0;
+
       res.json({
         success: true,
         data: {
@@ -466,7 +530,8 @@ export const authController = {
               nombre: rolNombre,
               permisos
             },
-            permitir_autoconsumo: permitirAutoconsumo
+            permitir_autoconsumo: permitirAutoconsumo,
+            permitir_firmas: permitirFirmas
           }
         }
       });

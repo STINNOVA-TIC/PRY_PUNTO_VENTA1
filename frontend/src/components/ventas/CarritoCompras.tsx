@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ventasAPI } from '../../api/ventas.api';
 import { empleadosAPI } from '../../api/empleados.api';
@@ -17,7 +18,8 @@ interface ItemCarrito {
 }
 
 export const CarritoCompras: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, setIsShopSession } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<ItemCarrito[]>([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
@@ -219,6 +221,7 @@ export const CarritoCompras: React.FC = () => {
   }, [isAutoconsumoMode]);
 
   const canCreateAutoconsumo = !!user?.permitir_autoconsumo;
+  const canSignRequirements = !!user?.permitir_firmas;
 
   const realizarAutoconsumo = async () => {
     if (items.length === 0) {
@@ -316,6 +319,19 @@ export const CarritoCompras: React.FC = () => {
                 <BsCartPlus className="h-4 w-4" />
               )}
               {isAutoconsumoMode ? 'Volver a Compras' : 'Modo Autoconsumo'}
+            </button>
+          )}
+          {canSignRequirements && (
+            <button
+              onClick={() => {
+                localStorage.setItem('isShopSession', 'false');
+                setIsShopSession(false);
+                navigate('/requerimientos');
+              }}
+              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition flex items-center gap-1 active:scale-95"
+            >
+              <BsFileEarmarkText className="h-4 w-4" />
+              Bandeja de Firmas
             </button>
           )}
           {/* Botón de Mis Pedidos al lado de Salir (solo visible en computadora) */}

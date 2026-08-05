@@ -8,6 +8,7 @@ interface AuthContextType {
   user: Usuario | null;
   loading: boolean;
   isShopSession: boolean;
+  setIsShopSession: (isShop: boolean) => void;
   login: (email: string, password: string) => Promise<void>;
   loginByCedula: (cedula: string, isForSignatures?: boolean) => Promise<void>;
   logout: () => void;
@@ -119,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Monitorear inactividad del usuario administrador/operador (10 minutos)
   useEffect(() => {
-    if (!user || user.rol.nombre === 'empleado') return;
+    if (!user || user.rol.nombre === 'empleado' || user.rol.nombre === 'empleado_autorizado' || user.rol.nombre === 'empleado_autorizado_firmar') return;
 
     const actualizarActividad = () => {
       lastActivity.current = Date.now();
@@ -164,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       loading,
       isShopSession,
+      setIsShopSession,
       login,
       loginByCedula,
       logout,

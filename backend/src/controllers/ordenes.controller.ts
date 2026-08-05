@@ -6,6 +6,24 @@ import { AppError } from '../middleware/error.middleware';
 import { rolesData } from '../models/roles.data';
 
 
+const obtenerNombreResponsable = (responsableStr: string | null, fallback: string): string => {
+  if (!responsableStr) return fallback;
+  const parts = responsableStr.split(':');
+  const nombreCompleto = parts.length > 1 ? parts[1].trim() : responsableStr.trim();
+  
+  const nombreParts = nombreCompleto.split(/\s+/).filter(Boolean);
+  const primerNombre = nombreParts[0] || '';
+  let primerApellido = '';
+  if (nombreParts.length > 1) {
+    if (nombreParts.length >= 4) {
+      primerApellido = nombreParts[2];
+    } else {
+      primerApellido = nombreParts[1];
+    }
+  }
+  return `${primerNombre} ${primerApellido}`.trim() || fallback;
+};
+
 export const ordenesController = {
   // Crear una nueva orden de compra (generada por el rol de Stock / Inventario / Admin)
   crear: async (req: AuthRequest, res: Response): Promise<void> => {
@@ -460,9 +478,15 @@ export const ordenesController = {
       // 2.1. Validar que el requerimiento esté firmado por todas las partes
       if (!oc.orden_compra_firma_elaborador || !oc.orden_compra_firma_aprobador || !oc.orden_compra_firma_recibido) {
         const faltantes = [];
-        if (!oc.orden_compra_firma_elaborador) faltantes.push('Elaborador');
-        if (!oc.orden_compra_firma_aprobador) faltantes.push('Aprobador');
-        if (!oc.orden_compra_firma_recibido) faltantes.push('Receptor');
+        if (!oc.orden_compra_firma_elaborador) {
+          faltantes.push(obtenerNombreResponsable(oc.orden_compra_elaborado_por, 'Elaborador'));
+        }
+        if (!oc.orden_compra_firma_aprobador) {
+          faltantes.push(obtenerNombreResponsable(oc.orden_compra_aprobado_por, 'Aprobador'));
+        }
+        if (!oc.orden_compra_firma_recibido) {
+          faltantes.push(obtenerNombreResponsable(oc.orden_compra_recibido_por, 'Receptor'));
+        }
         throw new AppError(`El requerimiento no puede ser recibido: falta la firma de ${faltantes.join(', ')}.`, 400);
       }
 

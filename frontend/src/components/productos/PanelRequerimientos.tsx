@@ -15,7 +15,7 @@ export const PanelRequerimientos: React.FC = () => {
   const { user } = useAuth();
   const { showConfirm } = useModal();
   const loggedEmpleadoId = user?.empleado?.id;
-  const isEmployeeRole = user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado';
+  const isEmployeeRole = user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar';
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -138,6 +138,13 @@ export const PanelRequerimientos: React.FC = () => {
       }
     }
   }, [user, departamentos, centrosCosto]);
+
+  // Forzar moduloActivo a 'historial' para empleados
+  useEffect(() => {
+    if (isEmployeeRole) {
+      setModuloActivo('historial');
+    }
+  }, [isEmployeeRole]);
 
   // Pre-seleccionar Dominique Veloz y Mishell Paucar por defecto al cargar colaboradores
   useEffect(() => {
@@ -581,28 +588,30 @@ export const PanelRequerimientos: React.FC = () => {
       )}
 
       {/* Selector de Subsecciones (Tabs) */}
-      <div className="flex border-b border-gray-200">
-        <button
-          onClick={() => setModuloActivo('requerimiento')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
-            moduloActivo === 'requerimiento'
-              ? 'border-gray-800 text-gray-800'
-              : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          Requerimiento de Bienes y/o Servicios
-        </button>
-        <button
-          onClick={() => setModuloActivo('historial')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
-            moduloActivo === 'historial'
-              ? 'border-gray-800 text-gray-800'
-              : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          Historial de Órdenes de Reabastecimiento y Requerimientos
-        </button>
-      </div>
+      {!isEmployeeRole && (
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setModuloActivo('requerimiento')}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+              moduloActivo === 'requerimiento'
+                ? 'border-gray-800 text-gray-800'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Requerimiento de Bienes y/o Servicios
+          </button>
+          <button
+            onClick={() => setModuloActivo('historial')}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+              moduloActivo === 'historial'
+                ? 'border-gray-800 text-gray-800'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Historial de Órdenes de Reabastecimiento y Requerimientos
+          </button>
+        </div>
+      )}
 
       {/* SUBMODULO 1: REQUERIMIENTO */}
       {moduloActivo === 'requerimiento' && (

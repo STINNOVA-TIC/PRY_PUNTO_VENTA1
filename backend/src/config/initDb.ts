@@ -126,6 +126,13 @@ export const initDb = async () => {
       ON CONFLICT (rol_nombre) DO NOTHING;
     `);
 
+    // 5.1 Sembrar nuevo rol de empleado_autorizado_firmar
+    await pool.query(`
+      INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 
+      VALUES (9, 'empleado_autorizado_firmar', 'Empleado autorizado para firmar requerimientos', 'activo')
+      ON CONFLICT (rol_nombre) DO NOTHING;
+    `);
+
     // Ajustar secuencia de rol
     await pool.query(`
       SELECT setval('rol_rol_id_seq', COALESCE((SELECT MAX(rol_id)+1 FROM rol), 1), false);

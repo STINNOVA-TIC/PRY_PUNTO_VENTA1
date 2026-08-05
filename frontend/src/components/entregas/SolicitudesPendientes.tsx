@@ -9,11 +9,13 @@ import { AutoconsumoCard } from './AutoconsumoCard';
 import { useSocket } from '../../context/SocketContext';
 import { Paginacion } from '../common/Paginacion';
 import { BsDownload, BsCheckCircle, BsBuilding, BsBoxSeam, BsSearch } from 'react-icons/bs';
+import { FiltroFecha, DateFilterType } from '../common/FiltroFecha';
 
 export const SolicitudesPendientes: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudEntrega[]>([]);
   const [autoconsumos, setAutoconsumos] = useState<Autoconsumo[]>([]);
   const [activeTab, setActiveTab] = useState<'pendientes' | 'entregadas' | 'autoconsumos' | 'autoconsumos_entregados'>('pendientes');
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('todos');
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
@@ -135,6 +137,39 @@ export const SolicitudesPendientes: React.FC = () => {
     navigate(`/entregas/autoconsumos/${auto.id}/despacho`);
   };
 
+  const matchDate = (dateStr: any, filter: DateFilterType) => {
+    if (filter === 'todos') return true;
+    if (!dateStr) return false;
+    
+    const recordDate = new Date(dateStr);
+    const today = new Date();
+    
+    const recordDateZero = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate());
+    const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    if (filter === 'hoy') {
+      return recordDateZero.getTime() === todayZero.getTime();
+    }
+    
+    if (filter === 'ayer') {
+      const yesterdayZero = new Date(todayZero);
+      yesterdayZero.setDate(yesterdayZero.getDate() - 1);
+      return recordDateZero.getTime() === yesterdayZero.getTime();
+    }
+    
+    if (filter === 'semana') {
+      const sevenDaysAgoZero = new Date(todayZero);
+      sevenDaysAgoZero.setDate(sevenDaysAgoZero.getDate() - 7);
+      return recordDateZero >= sevenDaysAgoZero && recordDateZero <= todayZero;
+    }
+    
+    if (filter === 'mes') {
+      return recordDate.getFullYear() === today.getFullYear() && recordDate.getMonth() === today.getMonth();
+    }
+    
+    return true;
+  };
+
   // Filtrado de solicitudes en base a pestaña y buscador
   const solicitudesFiltradas = useMemo(() => {
     return solicitudes.filter((sol) => {
@@ -143,6 +178,12 @@ export const SolicitudesPendientes: React.FC = () => {
         ? estadoStr === 'pendiente' 
         : (estadoStr === 'entregado' || estadoStr === 'no_entregado' || estadoStr === 'cancelado' || estadoStr === 'cancelada' || estadoStr === 'completada');
       if (!matchEstado) return false;
+
+      // Filtro de fecha (si aplica)
+      if (activeTab === 'entregadas') {
+        const recordDate = sol.fecha_entrega || sol.fecha_solicitud;
+        if (!matchDate(recordDate, dateFilter)) return false;
+      }
 
       const query = searchQuery.toLowerCase().trim();
       if (!query) return true;
@@ -154,7 +195,7 @@ export const SolicitudesPendientes: React.FC = () => {
 
       return nombre.includes(query) || cedula.includes(query) || codigoEntrega.includes(query) || idStr.includes(query);
     });
-  }, [solicitudes, activeTab, searchQuery]);
+  }, [solicitudes, activeTab, searchQuery, dateFilter]);
 
   const autoconsumosFiltrados = useMemo(() => {
     return autoconsumos.filter((a) => {
@@ -163,6 +204,12 @@ export const SolicitudesPendientes: React.FC = () => {
         ? a.estado === 'entregado'
         : a.estado === 'aprobado';
       if (!matchEstado) return false;
+
+      // Filtro de fecha (si aplica)
+      if (activeTab === 'autoconsumos_entregados') {
+        const recordDate = a.fecha_entrega || a.fecha_solicitud;
+        if (!matchDate(recordDate, dateFilter)) return false;
+      }
 
       const query = searchQuery.toLowerCase().trim();
       if (!query) return true;
@@ -173,7 +220,7 @@ export const SolicitudesPendientes: React.FC = () => {
 
       return nombre.includes(query) || cedula.includes(query) || codigo.includes(query);
     });
-  }, [autoconsumos, activeTab, searchQuery]);
+  }, [autoconsumos, activeTab, searchQuery, dateFilter]);
 
   const currentCount = useMemo(() => {
     if (activeTab === 'autoconsumos' || activeTab === 'autoconsumos_entregados') {
@@ -217,10 +264,10 @@ export const SolicitudesPendientes: React.FC = () => {
     [autoconsumos]
   );
 
-  // Reiniciar a la primera página al cambiar de pestaña o buscar
+  // Reiniciar a la primera página al cambiar de pestaña, buscar o filtrar por fecha
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery, itemsPerPage]);
+  }, [activeTab, searchQuery, dateFilter, itemsPerPage]);
 
   const entregadasPaginadas = useMemo(() => {
     if (activeTab !== 'entregadas' && activeTab !== 'pendientes') return solicitudesFiltradas;
@@ -337,18 +384,27 @@ export const SolicitudesPendientes: React.FC = () => {
         </button>
       </div>
 
-      {/* Buscador de Empleados */}
-      <div className="relative max-w-md w-full">
-        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <BsSearch className="w-4 h-4 text-gray-400" />
-        </span>
-        <input
-          type="text"
-          placeholder="Buscar empleado por nombre o cédula..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition bg-white shadow-sm"
-        />
+      {/* Buscador de Empleados y Filtro de Fecha */}
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+        <div className="relative max-w-md w-full">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <BsSearch className="w-4 h-4 text-gray-400" />
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar empleado por nombre o cédula..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition bg-white shadow-sm"
+          />
+        </div>
+
+        {(activeTab === 'entregadas' || activeTab === 'autoconsumos_entregados') && (
+          <FiltroFecha
+            value={dateFilter}
+            onChange={setDateFilter}
+          />
+        )}
       </div>
 
       {mensaje && (
