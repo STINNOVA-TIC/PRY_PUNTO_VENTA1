@@ -546,7 +546,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     <img 
                       src={orden.orden_compra_firma_elaborador} 
                       alt="Firma Elaborador" 
-                      className="h-20 object-contain opacity-95" 
+                      className="h-20 object-contain opacity-95 mix-blend-multiply" 
                       crossOrigin="anonymous" 
                     />
                   ) : (
@@ -554,9 +554,9 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                   )}
                 </div>
 
-                {/* Textos sobrepuestos al frente (capa z-10) */}
-                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
-                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_elaborado_por}>
+                {/* Textos sobrepuestos al frente (capa z-30) */}
+                <div className="absolute bottom-5 left-0 right-0 z-30 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-normal drop-shadow-sm" title={orden.orden_compra_elaborado_por}>
                     {orden.orden_compra_elaborado_por || 'TIC: David Quishpe'}
                   </div>
                   {orden.orden_compra_firma_elaborador && (
@@ -577,7 +577,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     <img 
                       src={orden.orden_compra_firma_aprobador} 
                       alt="Firma Aprobador" 
-                      className="h-20 object-contain opacity-95" 
+                      className="h-20 object-contain opacity-95 mix-blend-multiply" 
                       crossOrigin="anonymous" 
                     />
                   ) : (
@@ -585,9 +585,9 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                   )}
                 </div>
 
-                {/* Textos sobrepuestos al frente (capa z-10) */}
-                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
-                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_aprobado_por}>
+                {/* Textos sobrepuestos al frente (capa z-30) */}
+                <div className="absolute bottom-5 left-0 right-0 z-30 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-normal drop-shadow-sm" title={orden.orden_compra_aprobado_por}>
                     {orden.orden_compra_aprobado_por || 'Gerente Financiera: Dominique Veloz'}
                   </div>
                   {orden.orden_compra_firma_aprobador && (
@@ -608,7 +608,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     <img 
                       src={orden.orden_compra_firma_recibido} 
                       alt="Firma Recibido" 
-                      className="h-20 object-contain opacity-95" 
+                      className="h-20 object-contain opacity-95 mix-blend-multiply" 
                       crossOrigin="anonymous" 
                     />
                   ) : (
@@ -616,9 +616,9 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                   )}
                 </div>
 
-                {/* Textos sobrepuestos al frente (capa z-10) */}
-                <div className="absolute bottom-2 left-0 right-0 z-10 text-center px-2">
-                  <div className="font-bold text-gray-900 text-[7.5px] leading-tight drop-shadow-sm truncate" title={orden.orden_compra_recibido_por}>
+                {/* Textos sobrepuestos al frente (capa z-30) */}
+                <div className="absolute bottom-5 left-0 right-0 z-30 text-center px-2">
+                  <div className="font-bold text-gray-900 text-[7.5px] leading-normal drop-shadow-sm" title={orden.orden_compra_recibido_por}>
                     {orden.orden_compra_recibido_por || 'Compras: Mishell Paucar'}
                   </div>
                   {orden.orden_compra_firma_recibido && (

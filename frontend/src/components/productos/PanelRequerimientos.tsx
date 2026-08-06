@@ -93,9 +93,50 @@ export const PanelRequerimientos: React.FC = () => {
   const [aprobadorDropdownOpen, setAprobadorDropdownOpen] = useState(false);
   const [receptorDropdownOpen, setReceptorDropdownOpen] = useState(false);
 
-  // Estado para visualización / impresión
   const [selectedOrdenForPrint, setSelectedOrdenForPrint] = useState<any | null>(null);
   const [selectedOrdenForFlow, setSelectedOrdenForFlow] = useState<any | null>(null);
+
+  // Estados para firma digital propia
+  const [currentFirma, setCurrentFirma] = useState(user?.empleado?.firma || '');
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
+
+  useEffect(() => {
+    if (user?.empleado?.firma) {
+      setCurrentFirma(user.empleado.firma);
+    }
+  }, [user]);
+
+  const handleFirmaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && loggedEmpleadoId) {
+      const file = e.target.files[0];
+      try {
+        setSubiendoFirma(true);
+        setError('');
+        setSuccess('');
+        
+        // 1. Subir la imagen de la firma
+        const res = await adminAPI.uploadPhoto(file, 'firma');
+        
+        // 2. Asociar firma al empleado
+        await empleadosAPI.updateSignature(loggedEmpleadoId, res.url);
+        
+        // 3. Actualizar estado local
+        setCurrentFirma(res.url);
+        
+        // 4. Actualizar context si existe
+        if (user && user.empleado) {
+          user.empleado.firma = res.url;
+        }
+        
+        setSuccess('Tu firma digitalizada ha sido actualizada exitosamente.');
+      } catch (err: any) {
+        console.error('Error al subir firma:', err);
+        setError(err.response?.data?.message || err.message || 'Error al subir la firma');
+      } finally {
+        setSubiendoFirma(false);
+      }
+    }
+  };
 
   useEffect(() => {
     cargarDatos();
@@ -1438,6 +1479,47 @@ export const PanelRequerimientos: React.FC = () => {
       <>
       {/* HISTORIAL DE ÓRDENES */}
       <div className="space-y-4">
+        {/* MI FIRMA DIGITALIZADA */}
+        {loggedEmpleadoId && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden relative group">
+              {currentFirma ? (
+                <img 
+                  src={currentFirma} 
+                  alt="Mi Firma" 
+                  className="w-full h-full object-contain p-1"
+                />
+              ) : (
+                <span className="text-2xl text-gray-400">🖋️</span>
+              )}
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">Mi Firma Digitalizada</h3>
+              <p className="text-xs text-gray-400 max-w-lg">
+                Esta firma se estampará automáticamente en los requerimientos que elabores, apruebes o recibas. Sube una imagen PNG con fondo transparente de tu firma física.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              id="upload-firma-input" 
+              accept="image/png,image/jpeg" 
+              className="hidden" 
+              onChange={handleFirmaUpload}
+            />
+            <button
+              onClick={() => document.getElementById('upload-firma-input')?.click()}
+              disabled={subiendoFirma}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shadow-sm"
+            >
+              {subiendoFirma ? 'Subiendo...' : currentFirma ? 'Actualizar Firma' : 'Subir mi Firma'}
+            </button>
+          </div>
+        </div>
+        )}
+
         <div>
           <h2 className="text-lg font-bold text-gray-800">Historial de Órdenes de Reabastecimiento y Requerimientos</h2>
           <p className="text-xs text-gray-400">Listado de requerimientos emitidos y herramientas de descarga oficial</p>

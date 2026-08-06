@@ -59,6 +59,13 @@ router.put(
   empleadosController.update
 );
 
+// PUT /api/empleados/:id/firma - Editar la firma de un empleado (el mismo empleado o alguien con permiso)
+router.put(
+  '/:id/firma',
+  requireSelfOrPermission('empleados.editar'),
+  empleadosController.updateSignature
+);
+
 // DELETE /api/empleados/:id - Eliminar empleado
 // Requiere: empleados.eliminar
 router.delete(

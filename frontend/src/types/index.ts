@@ -23,6 +23,7 @@ export interface Usuario {
     foto_perfil?: string;
     saldo_disponible?: number;
     limite_credito?: number;
+    firma?: string;
   };
 }
 

@@ -27,6 +27,11 @@ export const empleadosAPI = {
     return response.data;
   },
 
+  updateSignature: async (id: number, firma: string) => {
+    const response = await api.put(`/empleados/${id}/firma`, { firma });
+    return response.data;
+  },
+
   delete: async (id: number) => {
     const response = await api.delete(`/empleados/${id}`);
     return response.data;

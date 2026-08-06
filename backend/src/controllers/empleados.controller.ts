@@ -390,6 +390,38 @@ export const empleadosController = {
     }
   },
 
+  updateSignature: async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const id = parseInt(req.params.id);
+      const { firma } = req.body;
+
+      if (!firma) {
+        throw new AppError('La firma es requerida', 400);
+      }
+
+      const updateRes = await pool.query(
+        `UPDATE empleado 
+         SET empleado_firma = $1, empleado_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE empleado_id = $2 RETURNING *`,
+        [firma, id]
+      );
+
+      if (updateRes.rows.length === 0) {
+        throw new AppError('Empleado no encontrado', 404);
+      }
+
+      res.json({
+        success: true,
+        data: updateRes.rows[0],
+        message: 'Firma digitalizada actualizada exitosamente'
+      });
+      return;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Error al actualizar la firma del empleado', 500);
+    }
+  },
+
   getDepartamentos: async (_req: AuthRequest, res: Response): Promise<void> => {
     try {
       const depRes = await pool.query("SELECT departamento_id as id, departamento_nombre as nombre FROM departamento WHERE departamento_estado = 'activo' ORDER BY departamento_nombre ASC");
