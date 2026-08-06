@@ -74,10 +74,10 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
       const pdfWidth = pdf.internal.pageSize.getWidth(); // 297
       const pdfHeight = pdf.internal.pageSize.getHeight(); // 210
 
-      // Margen de 10mm en todos los lados
-      const margin = 15; // increased margin for better whitespace
-      const maxAvailableWidth = pdfWidth - margin * 2; // 277mm
-      const maxAvailableHeight = pdfHeight - margin * 2; // 190mm
+      // Margen mínimo de 2mm en todos los lados para aprovechar al máximo absoluto el espacio de la hoja
+      const margin = 2; 
+      const maxAvailableWidth = pdfWidth - margin * 2; // 293mm
+      const maxAvailableHeight = pdfHeight - margin * 2; // 206mm
 
       // Proporción del canvas
       const canvasRatio = canvas.width / canvas.height;
@@ -225,7 +225,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
         <div className="p-4 md:p-6 overflow-auto flex-1 bg-gray-100 flex justify-center">
           <div
             id="print-area"
-            className="bg-white p-5 border border-gray-400 text-[8px] text-gray-800 font-sans space-y-2 w-[297mm] shadow-none" // reduced base font size
+            className="bg-white p-5 text-[8px] text-gray-800 font-sans space-y-2 w-[297mm] shadow-none" // reduced base font size
           >
             
             {/* 1. CABECERA PRINCIPAL */}
@@ -721,9 +721,9 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
             </div>
 
             {/* FOOTER */}
-            <div className="flex justify-between items-center text-[6px] text-gray-400 pt-0.5 border-t border-gray-150">
+            <div className="relative text-center text-[6px] text-gray-400 pt-0.5 border-t border-gray-150 w-full">
               <span>Una vez impreso el documento será considerado como COPIA NO CONTROLADA.</span>
-              <span className="font-semibold">Página 1 de 1</span>
+              <span className="absolute right-0 bottom-0 font-semibold">Página 1 de 1</span>
             </div>
 
           </div>
