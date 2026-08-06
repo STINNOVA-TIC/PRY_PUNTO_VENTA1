@@ -12,5 +12,6 @@ router.get('/secuencial/siguiente', ordenes_controller_1.ordenesController.getSi
 router.get('/:id', ordenes_controller_1.ordenesController.getById);
 router.put('/:id/entregar', ordenes_controller_1.ordenesController.entregar);
 router.put('/:id/firmar', ordenes_controller_1.ordenesController.firmar);
+router.put('/:id', ordenes_controller_1.ordenesController.update);
 router.delete('/:id', ordenes_controller_1.ordenesController.eliminar);
 exports.default = router;

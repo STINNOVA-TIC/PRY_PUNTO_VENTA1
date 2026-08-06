@@ -17,7 +17,12 @@ exports.empleadosController = {
                  SELECT 1 FROM usuario u 
                  JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
                  WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
-               ) as permitir_autoconsumo
+               ) as permitir_autoconsumo,
+               EXISTS (
+                 SELECT 1 FROM usuario u 
+                 JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
+                 WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+               ) as permitir_firmas
         FROM empleado e
         LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
         LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
@@ -50,7 +55,8 @@ exports.empleadosController = {
                 foto_perfil: row.empleado_foto || `https://ui-avatars.com/api/?name=${row.empleado_nombre}+${row.empleado_apellido}&size=128`,
                 firma: row.empleado_firma || null,
                 activo: row.empleado_estado === 'activo',
-                permitir_autoconsumo: row.permitir_autoconsumo || false
+                permitir_autoconsumo: row.permitir_autoconsumo || false,
+                permitir_firmas: row.permitir_firmas || false
             }));
             res.json({
                 success: true,
@@ -71,7 +77,12 @@ exports.empleadosController = {
                   SELECT 1 FROM usuario u 
                   JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
                   WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
-                ) as permitir_autoconsumo
+                ) as permitir_autoconsumo,
+                EXISTS (
+                  SELECT 1 FROM usuario u 
+                  JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
+                  WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+                ) as permitir_firmas
          FROM empleado e 
          LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
          WHERE e.empleado_id = $1`, [id]);
@@ -98,7 +109,8 @@ exports.empleadosController = {
                     foto_perfil: empleado.empleado_foto || `https://ui-avatars.com/api/?name=${empleado.empleado_nombre}+${empleado.empleado_apellido}&size=128`,
                     firma: empleado.empleado_firma || null,
                     activo: empleado.empleado_estado === 'activo',
-                    permitir_autoconsumo: empleado.permitir_autoconsumo || false
+                    permitir_autoconsumo: empleado.permitir_autoconsumo || false,
+                    permitir_firmas: empleado.permitir_firmas || false
                 }
             });
             return;
@@ -151,7 +163,7 @@ exports.empleadosController = {
     },
     create: async (req, res) => {
         try {
-            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
+            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo, permitir_firmas } = req.body;
             if (!cedula || !nombre || !apellido) {
                 throw new error_middleware_1.AppError('Cédula, nombre y apellido son requeridos', 400);
             }
@@ -179,16 +191,21 @@ exports.empleadosController = {
                 activo !== false ? 'activo' : 'inactivo'
             ]);
             const empleado = insertRes.rows[0];
-            if (permitir_autoconsumo) {
+            if (permitir_autoconsumo || permitir_firmas) {
                 const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
            VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
                     `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
-                    empleado.empleado_email || `autoconsumo_${empleado.empleado_cedula}@empresa.local`,
+                    empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
                     '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82', // bcrypt hash for 'autoconsumo123'
                     empleado.empleado_id
                 ]);
                 const userId = userRes.rows[0].usuario_id;
-                await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`, [userId]);
+                if (permitir_autoconsumo) {
+                    await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`, [userId]);
+                }
+                if (permitir_firmas) {
+                    await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 9)`, [userId]);
+                }
             }
             res.status(201).json({
                 success: true,
@@ -206,7 +223,7 @@ exports.empleadosController = {
     update: async (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
+            const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo, permitir_firmas } = req.body;
             if (!cedula || !nombre || !apellido) {
                 throw new error_middleware_1.AppError('Cédula, nombre y apellido son requeridos', 400);
             }
@@ -239,35 +256,42 @@ exports.empleadosController = {
                 throw new error_middleware_1.AppError('Empleado no encontrado', 404);
             }
             const empleado = updateRes.rows[0];
-            if (permitir_autoconsumo) {
+            if (permitir_autoconsumo || permitir_firmas) {
                 // Buscar si existe el usuario para este empleado
                 const userCheck = await db_1.default.query('SELECT usuario_id FROM usuario WHERE empleado_id = $1', [id]);
+                let userId;
                 if (userCheck.rows.length === 0) {
-                    // Crear usuario nuevo con rol 8
+                    // Crear usuario nuevo
                     const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
              VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
                         `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
-                        empleado.empleado_email || `autoconsumo_${empleado.empleado_cedula}@empresa.local`,
-                        '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82', // bcrypt hash for 'autoconsumo123'
+                        empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
+                        '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',
                         id
                     ]);
-                    const userId = userRes.rows[0].usuario_id;
-                    await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`, [userId]);
+                    userId = userRes.rows[0].usuario_id;
                 }
                 else {
-                    const userId = userCheck.rows[0].usuario_id;
+                    userId = userCheck.rows[0].usuario_id;
                     // Reactivar usuario si estuviera inactivo
                     await db_1.default.query("UPDATE usuario SET usuario_estado = 'activo' WHERE usuario_id = $1", [userId]);
-                    // Quitar para reinsertar o simplemente upsert
-                    await db_1.default.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 8', [userId]);
+                }
+                // Manejar rol 8 (autoconsumo)
+                await db_1.default.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 8', [userId]);
+                if (permitir_autoconsumo) {
                     await db_1.default.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)', [userId]);
+                }
+                // Manejar rol 9 (firmas)
+                await db_1.default.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 9', [userId]);
+                if (permitir_firmas) {
+                    await db_1.default.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 9)', [userId]);
                 }
             }
             else {
-                // Si se quita el check, borrar la asociación al rol de autoconsumo
+                // Si se quitan ambos checks, borrar asociación a los dos roles
                 await db_1.default.query(`DELETE FROM usuario_rol 
            WHERE usuario_id IN (SELECT usuario_id FROM usuario WHERE empleado_id = $1) 
-           AND rol_id = 8`, [id]);
+           AND rol_id IN (8, 9)`, [id]);
             }
             res.json({
                 success: true,
@@ -311,6 +335,32 @@ exports.empleadosController = {
             if (error instanceof error_middleware_1.AppError)
                 throw error;
             throw new error_middleware_1.AppError('Error al eliminar empleado', 500);
+        }
+    },
+    updateSignature: async (req, res) => {
+        try {
+            const id = parseInt(req.params.id);
+            const { firma } = req.body;
+            if (!firma) {
+                throw new error_middleware_1.AppError('La firma es requerida', 400);
+            }
+            const updateRes = await db_1.default.query(`UPDATE empleado 
+         SET empleado_firma = $1, empleado_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE empleado_id = $2 RETURNING *`, [firma, id]);
+            if (updateRes.rows.length === 0) {
+                throw new error_middleware_1.AppError('Empleado no encontrado', 404);
+            }
+            res.json({
+                success: true,
+                data: updateRes.rows[0],
+                message: 'Firma digitalizada actualizada exitosamente'
+            });
+            return;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al actualizar la firma del empleado', 500);
         }
     },
     getDepartamentos: async (_req, res) => {

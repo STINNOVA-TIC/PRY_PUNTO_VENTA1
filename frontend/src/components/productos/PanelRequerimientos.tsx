@@ -8,7 +8,7 @@ import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { useModal } from '../../context/ModalContext';
 import { ModalFlujoRequerimiento } from './ModalFlujoRequerimiento';
-import { BsTrash, BsDiagram3, BsFileEarmarkPdf } from 'react-icons/bs';
+import { BsTrash, BsDiagram3, BsFileEarmarkPdf, BsPencil } from 'react-icons/bs';
 import { Paginacion } from '../common/Paginacion';
 
 export const PanelRequerimientos: React.FC = () => {
@@ -99,6 +99,9 @@ export const PanelRequerimientos: React.FC = () => {
   // Estados para firma digital propia
   const [currentFirma, setCurrentFirma] = useState(user?.empleado?.firma || '');
   const [subiendoFirma, setSubiendoFirma] = useState(false);
+
+  // Estado para edición de requerimiento (solo admin)
+  const [editingOrdenId, setEditingOrdenId] = useState<number | null>(null);
 
   useEffect(() => {
     if (user?.empleado?.firma) {
@@ -490,9 +493,10 @@ export const PanelRequerimientos: React.FC = () => {
         tipo_compra: tipoCompra
       };
 
-      const res = await ordenesAPI.crear(payload);
-      if (res.success) {
-        setSuccess(`¡Requerimiento creado exitosamente con el código: ${res.data.codigo}!`);
+      if (editingOrdenId) {
+        await ordenesAPI.update(editingOrdenId, payload);
+        setSuccess('¡Requerimiento actualizado exitosamente!');
+        setEditingOrdenId(null);
         setJustificacion('');
         setDetallesLocales([]);
         setCaracteristicas('');
@@ -503,9 +507,90 @@ export const PanelRequerimientos: React.FC = () => {
         // Recargar el historial
         const ordRes = await ordenesAPI.getAll();
         setOrdenes(ordRes.data || []);
+        setModuloActivo('historial');
+      } else {
+        const res = await ordenesAPI.crear(payload);
+        if (res.success) {
+          setSuccess(`¡Requerimiento creado exitosamente con el código: ${res.data.codigo}!`);
+          setJustificacion('');
+          setDetallesLocales([]);
+          setCaracteristicas('');
+          setAsignadoTrabajador(false);
+          setTrabajadorAsignado('');
+          setTipoCompra('LOCAL');
+          
+          // Recargar el historial
+          const ordRes = await ordenesAPI.getAll();
+          setOrdenes(ordRes.data || []);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al guardar el requerimiento en el servidor.');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleEdit = async (ocShort: any) => {
+    try {
+      setSubmitLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const res = await ordenesAPI.getById(ocShort.id);
+      if (!res.success || !res.data) {
+        throw new Error('No se pudo cargar la información del requerimiento');
+      }
+      
+      const oc = res.data;
+      setEditingOrdenId(oc.orden_compra_id);
+      
+      // Cargar metadatos
+      setEmpresaId(oc.empresa_id || '');
+      setSucursalId(oc.sucursal_id || '');
+      setDepartamentoId(oc.departamento_id || '');
+      setCentroCostosId(oc.centro_costos_id || '');
+      setJustificacion(oc.orden_compra_justificacion || '');
+      setTipoArticulo(oc.orden_compra_tipo_articulo || 'OTROS');
+      setTipoCompra(oc.orden_compra_tipo_compra || 'LOCAL');
+      setLugarRecepcion(oc.orden_compra_lugar_recepcion || 'OTROS');
+      setRequiereContrato(!!oc.orden_compra_requiere_contrato);
+      setRequiereSeguro(!!oc.orden_compra_requiere_seguro);
+      setRequiereMantenimiento(!!oc.orden_compra_requiere_mantenimiento);
+      setAsignadoTrabajador(!!oc.orden_compra_asignado_trabajador);
+      setTrabajadorAsignado(oc.orden_compra_trabajador_asignado || '');
+      setCaracteristicas(oc.orden_compra_caracteristicas || '');
+      setElaboradoPor(oc.orden_compra_elaborado_por || '');
+      
+      // Firmas y responsables
+      setAprobadoPor(oc.orden_compra_aprobado_por || '');
+      setAprobadorSearch(oc.orden_compra_aprobado_por || '');
+      setEmpleadoAprobadorId(oc.empleado_aprobador_id || '');
+      
+      setRecibidoPor(oc.orden_compra_recibido_por || '');
+      setReceptorSearch(oc.orden_compra_recibido_por || '');
+      setEmpleadoReceptorId(oc.empleado_receptor_id || '');
+      
+      // Cargar detalles
+      const parsedDetalles = (oc.detalles || []).map((d: any) => ({
+        producto_id: d.producto_id || null,
+        proveedor_id: d.proveedor_id || null,
+        descripcion: d.orden_compra_detalle_descripcion || d.descripcion || '',
+        cantidad: Number(d.orden_compra_detalle_cantidad || d.cantidad || 1),
+        unidad_medida: d.orden_compra_detalle_unidad_medida || d.unidad_medida || 'UNIDAD',
+        precio_unitario: Number(d.orden_compra_detalle_precio_unitario || d.precio_unitario || 0),
+        subtotal: Number(d.orden_compra_detalle_subtotal || d.subtotal || 0),
+        foto: d.orden_compra_detalle_foto || d.foto || '',
+        negociacion_previa: d.orden_compra_detalle_negociacion_previa || d.negociacion_previa || 'NO',
+        incluye_iva: d.orden_compra_detalle_incluye_iva === undefined ? (d.incluye_iva === undefined ? true : !!d.incluye_iva) : !!d.orden_compra_detalle_incluye_iva,
+        comentario: d.orden_compra_detalle_comentario || d.comentario || ''
+      }));
+      
+      setDetallesLocales(parsedDetalles);
+      setModuloActivo('requerimiento');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Error al obtener los detalles del requerimiento.');
     } finally {
       setSubmitLoading(false);
     }
@@ -1459,13 +1544,34 @@ export const PanelRequerimientos: React.FC = () => {
         </div>
 
         {/* BOTÓN DE ACCIÓN PRINCIPAL */}
-        <div className="flex justify-end pt-4 border-t border-gray-100">
+        <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-100">
+          {editingOrdenId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingOrdenId(null);
+                setJustificacion('');
+                setDetallesLocales([]);
+                setCaracteristicas('');
+                setAsignadoTrabajador(false);
+                setTrabajadorAsignado('');
+                setTipoCompra('LOCAL');
+                setModuloActivo('historial');
+              }}
+              className="px-5 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl text-xs font-bold transition shadow-sm active:scale-95"
+            >
+              Cancelar Edición
+            </button>
+          )}
           <button
             type="submit"
             disabled={submitLoading}
-            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50"
+            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 active:scale-95"
           >
-            {submitLoading ? 'Registrando Requerimiento...' : 'Crear Requerimiento de Compra'}
+            {submitLoading 
+              ? (editingOrdenId ? 'Guardando Cambios...' : 'Registrando Requerimiento...') 
+              : (editingOrdenId ? 'Guardar Cambios del Requerimiento' : 'Crear Requerimiento de Compra')
+            }
           </button>
         </div>
 
@@ -1594,13 +1700,22 @@ export const PanelRequerimientos: React.FC = () => {
                           Flujo
                         </button>
                         {user?.rol.nombre === 'admin' && (
+                          <>
+                          <button
+                            onClick={() => handleEdit(oc)}
+                            title="Editar Requerimiento"
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg border border-amber-200 transition active:scale-95 flex items-center justify-center"
+                          >
+                            <BsPencil className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => handleEliminarOrden(oc.id)}
                             title="Eliminar Orden"
-                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition active:scale-95 flex items-center justify-center"
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-lg border border-red-250 transition active:scale-95 flex items-center justify-center"
                           >
                             <BsTrash className="h-4 w-4" />
                           </button>
+                          </>
                         )}
                       </td>
                     </tr>

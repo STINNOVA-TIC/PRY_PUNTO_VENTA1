@@ -45,7 +45,9 @@ exports.authController = {
             if (userRolesRes.rows.length > 0) {
                 userId = userRolesRes.rows[0].usuario_id;
                 const rolesList = userRolesRes.rows.map(r => r.rol_id);
-                const matchedRoles = roles_data_1.rolesData.filter(r => rolesList.includes(r.id));
+                // Restricción de seguridad: Limitar Cédula únicamente a roles de colaborador (3, 8, 9)
+                const colaboradorRolesList = rolesList.filter(id => [3, 8, 9].includes(id));
+                const matchedRoles = roles_data_1.rolesData.filter(r => colaboradorRolesList.includes(r.id));
                 matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
                 if (matchedRoles.length > 0) {
                     rolId = matchedRoles[0].id;
@@ -60,6 +62,12 @@ exports.authController = {
          WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
          LIMIT 1`, [empleado.empleado_id]);
             const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+            // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+            const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
+         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+         WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+         LIMIT 1`, [empleado.empleado_id]);
+            const permitirFirmas = firmasCheck.rows.length > 0;
             // Generar Token JWT con el rol y el ID real/virtual
             const token = jsonwebtoken_1.default.sign({
                 id: userId,
@@ -80,6 +88,7 @@ exports.authController = {
                             permisos
                         },
                         permitir_autoconsumo: permitirAutoconsumo,
+                        permitir_firmas: permitirFirmas,
                         empleado: {
                             id: empleado.empleado_id,
                             codigo_empleado: empleado.empleado_cedula,
@@ -136,6 +145,12 @@ exports.authController = {
             if (!rol) {
                 throw new error_middleware_1.AppError('Rol de usuario no encontrado', 500);
             }
+            // Restricción de Seguridad: Colaboradores no pueden ingresar por este portal (usuario y contraseña)
+            const rolesNombres = rolRes.rows.map(r => r.rol_nombre);
+            const tieneRolOperador = rolesNombres.some(nombre => ['admin', 'guardia', 'inventario', 'contador', 'gerente', 'tthh'].includes(nombre));
+            if (!tieneRolOperador) {
+                throw new error_middleware_1.AppError('Acceso denegado. Este portal es de uso exclusivo para operadores y administradores.', 403);
+            }
             // Mapear permisos según rol dinámicamente desde static rolesData
             const staticRole = roles_data_1.rolesData.find(r => r.id === rol.rol_id);
             const rolNombre = staticRole?.nombre || 'empleado';
@@ -164,6 +179,10 @@ exports.authController = {
             const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
          WHERE usuario_id = $1 AND rol_id = 8`, [user.usuario_id]);
             const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+            // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+            const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 9`, [user.usuario_id]);
+            const permitirFirmas = firmasCheck.rows.length > 0;
             // Generar Token JWT
             const token = jsonwebtoken_1.default.sign({
                 id: user.usuario_id,
@@ -183,6 +202,7 @@ exports.authController = {
                             permisos
                         },
                         permitir_autoconsumo: permitirAutoconsumo,
+                        permitir_firmas: permitirFirmas,
                         empleado
                     }
                 }
@@ -247,6 +267,7 @@ exports.authController = {
             }
             // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
             let permitirAutoconsumo = false;
+            let permitirFirmas = false;
             const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0
                 ? (await db_1.default.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id
                 : null);
@@ -256,6 +277,11 @@ exports.authController = {
            WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
            LIMIT 1`, [targetEmpId]);
                 permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+                const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
+           JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+           WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+           LIMIT 1`, [targetEmpId]);
+                permitirFirmas = firmasCheck.rows.length > 0;
             }
             res.json({
                 success: true,
@@ -269,6 +295,7 @@ exports.authController = {
                         permisos
                     },
                     permitir_autoconsumo: permitirAutoconsumo,
+                    permitir_firmas: permitirFirmas,
                     empleado
                 }
             });
@@ -309,7 +336,9 @@ exports.authController = {
                 if (userRolesRes.rows.length > 0) {
                     userId = userRolesRes.rows[0].usuario_id;
                     const rolesList = userRolesRes.rows.map(r => r.rol_id);
-                    const matchedRoles = roles_data_1.rolesData.filter(r => rolesList.includes(r.id));
+                    // Restricción de seguridad: Limitar Cédula únicamente a roles de colaborador (3, 8, 9)
+                    const colaboradorRolesList = rolesList.filter(id => [3, 8, 9].includes(id));
+                    const matchedRoles = roles_data_1.rolesData.filter(r => colaboradorRolesList.includes(r.id));
                     matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
                     if (matchedRoles.length > 0) {
                         rolId = matchedRoles[0].id;
@@ -324,6 +353,12 @@ exports.authController = {
             WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
             LIMIT 1`, [empleado.empleado_id]);
                 const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+                // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+                const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
+            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
+            WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+            LIMIT 1`, [empleado.empleado_id]);
+                const permitirFirmas = firmasCheck.rows.length > 0;
                 res.json({
                     success: true,
                     data: {
@@ -338,6 +373,7 @@ exports.authController = {
                                 permisos: permisos
                             },
                             permitir_autoconsumo: permitirAutoconsumo,
+                            permitir_firmas: permitirFirmas,
                             empleado: {
                                 id: empleado.empleado_id,
                                 codigo_empleado: empleado.empleado_cedula,
@@ -365,6 +401,10 @@ exports.authController = {
             const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
          WHERE usuario_id = $1 AND rol_id = 8`, [user.usuario_id]);
             const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
+            // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
+            const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
+         WHERE usuario_id = $1 AND rol_id = 9`, [user.usuario_id]);
+            const permitirFirmas = firmasCheck.rows.length > 0;
             res.json({
                 success: true,
                 data: {
@@ -378,7 +418,8 @@ exports.authController = {
                             nombre: rolNombre,
                             permisos
                         },
-                        permitir_autoconsumo: permitirAutoconsumo
+                        permitir_autoconsumo: permitirAutoconsumo,
+                        permitir_firmas: permitirFirmas
                     }
                 }
             });

@@ -721,9 +721,9 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
             </div>
 
             {/* FOOTER */}
-            <div className="relative text-center text-[6px] text-gray-400 pt-0.5 border-t border-gray-150 w-full">
+            <div className="flex flex-col items-center justify-center text-[6px] text-gray-400 pt-0.5 border-t border-gray-150 w-full">
               <span>Una vez impreso el documento será considerado como COPIA NO CONTROLADA.</span>
-              <span className="absolute right-0 bottom-0 font-semibold">Página 1 de 1</span>
+              <span className="font-semibold mt-0.5">Página 1 de 1</span>
             </div>
 
           </div>

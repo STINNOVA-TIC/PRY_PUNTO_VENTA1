@@ -25,6 +25,8 @@ router.post('/', (0, permisos_middleware_1.requirePermission)('empleados.crear')
 // PUT /api/empleados/:id - Editar empleado
 // Requiere: empleados.editar
 router.put('/:id', (0, permisos_middleware_1.requirePermission)('empleados.editar'), empleados_controller_1.empleadosController.update);
+// PUT /api/empleados/:id/firma - Editar la firma de un empleado (el mismo empleado o alguien con permiso)
+router.put('/:id/firma', (0, permisos_middleware_1.requireSelfOrPermission)('empleados.editar'), empleados_controller_1.empleadosController.updateSignature);
 // DELETE /api/empleados/:id - Eliminar empleado
 // Requiere: empleados.eliminar
 router.delete('/:id', (0, permisos_middleware_1.requirePermission)('empleados.eliminar'), empleados_controller_1.empleadosController.delete);

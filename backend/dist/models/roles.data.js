@@ -79,5 +79,14 @@ exports.rolesData = [
             'autoconsumo.crear'
         ],
         nivel: 25
+    },
+    {
+        id: 9,
+        nombre: 'empleado_autorizado_firmar',
+        descripcion: 'Colaborador autorizado para firmar requerimientos',
+        permisos: [
+            ...permisos_1.GruposPermisos.EMPLEADO
+        ],
+        nivel: 26
     }
 ];

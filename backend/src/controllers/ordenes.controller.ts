@@ -632,7 +632,7 @@ export const ordenesController = {
       const empRes = await pool.query('SELECT empleado_firma, empleado_nombre, empleado_apellido FROM empleado WHERE empleado_id = $1', [empleadoId]);
       const empleado = empRes.rows[0];
       if (!empleado || !empleado.empleado_firma) {
-        throw new AppError('No tienes una firma registrada. Por favor, solicita al Administrador que suba tu firma.', 400);
+        throw new AppError('No tienes una firma registrada. Sube tu firma desde tu panel o solicita al Administrador que la registre.', 400);
       }
 
       // Obtener el requerimiento
@@ -691,6 +691,193 @@ export const ordenesController = {
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Error al firmar requerimiento', 500);
+    }
+  },
+
+  update: async (req: AuthRequest, res: Response): Promise<void> => {
+    if (req.user?.rol_id !== 1) {
+      throw new AppError('No autorizado. Solo el Administrador puede editar requerimientos.', 403);
+    }
+
+    const id = parseInt(req.params.id);
+    const client = await pool.connect();
+    try {
+      const {
+        empresa_id,
+        sucursal_id,
+        departamento_id,
+        centro_costos_id,
+        proveedor_id,
+        justificacion,
+        tipo_articulo,
+        negociacion_previa,
+        forma_pago,
+        plazo_pago,
+        tiempo_entrega,
+        lugar_recepcion,
+        requiere_contrato,
+        requiere_seguro,
+        requiere_mantenimiento,
+        asignado_trabajador,
+        trabajador_asignado,
+        caracteristicas,
+        aprobado_por,
+        recibido_por,
+        empleado_aprobador_id,
+        empleado_receptor_id,
+        detalles,
+        tipo_compra
+      } = req.body;
+
+      if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
+        throw new AppError('Datos de orden de compra incompletos', 400);
+      }
+
+      await client.query('BEGIN');
+
+      const checkRes = await client.query(
+        `SELECT empleado_aprobador_id, empleado_receptor_id, 
+                orden_compra_firma_aprobador, orden_compra_fecha_firma_aprobador,
+                orden_compra_firma_recibido, orden_compra_fecha_firma_recibido,
+                orden_compra_estado 
+         FROM orden_compra WHERE orden_compra_id = $1`, 
+        [id]
+      );
+      if (checkRes.rows.length === 0) {
+        throw new AppError('Requerimiento no encontrado', 404);
+      }
+
+      const ocDb = checkRes.rows[0];
+
+      const oldAprobadorId = ocDb.empleado_aprobador_id ? Number(ocDb.empleado_aprobador_id) : null;
+      const oldReceptorId = ocDb.empleado_receptor_id ? Number(ocDb.empleado_receptor_id) : null;
+
+      const valNewAprobadorId = empleado_aprobador_id ? Number(empleado_aprobador_id) : null;
+      const valNewReceptorId = empleado_receptor_id ? Number(empleado_receptor_id) : null;
+
+      let newFirmaAprobador = ocDb.orden_compra_firma_aprobador;
+      let newFechaFirmaAprobador = ocDb.orden_compra_fecha_firma_aprobador;
+      let newFirmaRecibido = ocDb.orden_compra_firma_recibido;
+      let newFechaFirmaRecibido = ocDb.orden_compra_fecha_firma_recibido;
+      let newEstado = ocDb.orden_compra_estado;
+
+      // Si cambia el aprobador, se borran ambas firmas y el estado vuelve a pendiente
+      if (oldAprobadorId !== valNewAprobadorId) {
+        newFirmaAprobador = null;
+        newFechaFirmaAprobador = null;
+        newFirmaRecibido = null;
+        newFechaFirmaRecibido = null;
+        newEstado = 'pendiente';
+      }
+
+      // Si cambia el recibidor, se borra su firma. Si estaba recibida, vuelve a aprobada.
+      if (oldReceptorId !== valNewReceptorId) {
+        newFirmaRecibido = null;
+        newFechaFirmaRecibido = null;
+        if (newEstado === 'recibida') {
+          newEstado = 'aprobada';
+        }
+      }
+
+      await client.query(
+        `UPDATE orden_compra 
+         SET empresa_id = $1, sucursal_id = $2, departamento_id = $3, centro_costos_id = $4, 
+             proveedor_id = $5, orden_compra_justificacion = $6, orden_compra_tipo_articulo = $7, 
+             orden_compra_negociacion_previa = $8, orden_compra_forma_pago = $9, orden_compra_plazo_pago = $10, 
+             orden_compra_tiempo_entrega = $11, orden_compra_lugar_recepcion = $12, orden_compra_requiere_contrato = $13, 
+             orden_compra_requiere_seguro = $14, orden_compra_requiere_mantenimiento = $15, orden_compra_asignado_trabajador = $16, 
+             orden_compra_trabajador_asignado = $17, orden_compra_caracteristicas = $18, orden_compra_tipo_compra = $19,
+             empleado_aprobador_id = $20, empleado_receptor_id = $21,
+             orden_compra_aprobado_por = $22, orden_compra_recibido_por = $23,
+             orden_compra_firma_aprobador = $24, orden_compra_fecha_firma_aprobador = $25,
+             orden_compra_firma_recibido = $26, orden_compra_fecha_firma_recibido = $27,
+             orden_compra_estado = $28,
+             orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE orden_compra_id = $29`,
+        [
+          empresa_id,
+          sucursal_id,
+          departamento_id,
+          centro_costos_id,
+          proveedor_id || null,
+          justificacion.trim(),
+          tipo_articulo || 'OTROS',
+          negociacion_previa || 'NO',
+          forma_pago || null,
+          plazo_pago || null,
+          tiempo_entrega || null,
+          lugar_recepcion || null,
+          requiere_contrato || false,
+          requiere_seguro || false,
+          requiere_mantenimiento || false,
+          asignado_trabajador || false,
+          trabajador_asignado || null,
+          caracteristicas || null,
+          tipo_compra || 'LOCAL',
+          valNewAprobadorId,
+          valNewReceptorId,
+          aprobado_por || null,
+          recibido_por || null,
+          newFirmaAprobador,
+          newFechaFirmaAprobador,
+          newFirmaRecibido,
+          newFechaFirmaRecibido,
+          newEstado,
+          id
+        ]
+      );
+
+      await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
+
+      for (const d of detalles) {
+        let productoNombre = d.descripcion || d.orden_compra_detalle_descripcion;
+        if (d.producto_id) {
+          const prodRes = await client.query('SELECT producto_nombre FROM producto WHERE producto_id = $1', [d.producto_id]);
+          if (prodRes.rows.length > 0) {
+            productoNombre = prodRes.rows[0].producto_nombre;
+          }
+        }
+
+        await client.query(
+          `INSERT INTO orden_compra_detalle (
+             orden_compra_id, producto_id, proveedor_id, orden_compra_detalle_descripcion, 
+             orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
+             orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
+             orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
+             orden_compra_detalle_incluye_iva,
+             orden_compra_detalle_comentario
+           ) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            id,
+            d.producto_id || null,
+            d.proveedor_id || null,
+            productoNombre || 'Artículo de Consumo',
+            d.cantidad || d.orden_compra_detalle_cantidad,
+            d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
+            d.precio_unitario || d.orden_compra_detalle_precio_unitario || 0,
+            d.subtotal || d.orden_compra_detalle_subtotal || 0,
+            d.foto || d.orden_compra_detalle_foto || null,
+            d.negociacion_previa || d.orden_compra_detalle_negociacion_previa || 'NO',
+            d.incluye_iva === undefined ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva) : !!d.incluye_iva,
+            d.comentario || d.orden_compra_detalle_comentario || null
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Requerimiento actualizado exitosamente.'
+      });
+      return;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error instanceof AppError) throw error;
+      throw new AppError('Error al actualizar el requerimiento', 500);
+    } finally {
+      client.release();
     }
   }
 };

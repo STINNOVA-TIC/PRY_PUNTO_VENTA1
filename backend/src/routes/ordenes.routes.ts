@@ -13,6 +13,7 @@ router.get('/secuencial/siguiente', ordenesController.getSiguienteSecuencial);
 router.get('/:id', ordenesController.getById);
 router.put('/:id/entregar', ordenesController.entregar);
 router.put('/:id/firmar', ordenesController.firmar);
+router.put('/:id', ordenesController.update);
 router.delete('/:id', ordenesController.eliminar);
 
 export default router;

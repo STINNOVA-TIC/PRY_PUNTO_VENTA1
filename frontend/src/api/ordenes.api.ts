@@ -34,5 +34,10 @@ export const ordenesAPI = {
   firmar: async (id: number | string) => {
     const response = await api.put(`/ordenes-compra/${id}/firmar`);
     return response.data;
+  },
+
+  update: async (id: number | string, data: any) => {
+    const response = await api.put(`/ordenes-compra/${id}`, data);
+    return response.data;
   }
 };
