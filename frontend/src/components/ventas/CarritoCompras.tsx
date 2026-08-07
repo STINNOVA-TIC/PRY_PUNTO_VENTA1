@@ -10,7 +10,7 @@ import { CatalogoProductos } from '../productos/CatalogoProductos';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { Paginacion } from '../common/Paginacion';
 import logoEmpresa from '../../assets/logo.png';
-import { BsTrash, BsFileEarmarkText, BsCheckCircle, BsInfoCircle, BsHourglassSplit, BsXCircle, BsCartPlus, BsCart, BsBoxArrowRight } from 'react-icons/bs';
+import { BsTrash, BsFileEarmarkText, BsCheckCircle, BsInfoCircle, BsHourglassSplit, BsXCircle, BsCartPlus, BsCart, BsBoxArrowRight, BsShop, BsListCheck } from 'react-icons/bs';
 
 interface ItemCarrito {
   producto: Producto;
@@ -343,7 +343,17 @@ export const CarritoCompras: React.FC = () => {
                 : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
             }`}
           >
-            {activeTab === 'pedidos' ? '🛍️ Ver Catálogo' : '📋 Mis Pedidos / Códigos'}
+            {activeTab === 'pedidos' ? (
+              <>
+                <BsShop className="h-4 w-4" />
+                Volver al Catálogo
+              </>
+            ) : (
+              <>
+                <BsListCheck className="h-4 w-4" />
+                Mis Pedidos y Códigos
+              </>
+            )}
           </button>
           <button
             onClick={handleSalir}
@@ -360,24 +370,26 @@ export const CarritoCompras: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('productos')}
-          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all ${
+          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 ${
             activeTab === 'productos'
               ? 'bg-white text-gray-800 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          🛍️ Productos
+          <BsShop className="h-4 w-4" />
+          Productos
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('carrito')}
-          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all relative ${
+          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all relative flex items-center justify-center gap-1 ${
             activeTab === 'carrito'
               ? 'bg-white text-gray-800 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          🛒 Mi Carrito {items.length > 0 && (
+          <BsCart className="h-4 w-4" />
+          Mi Carrito {items.length > 0 && (
             <span className="absolute -top-1 -right-1 bg-gray-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
               {items.reduce((acc, curr) => acc + curr.cantidad, 0)}
             </span>
@@ -386,13 +398,14 @@ export const CarritoCompras: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('pedidos')}
-          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all ${
+          className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 ${
             activeTab === 'pedidos'
               ? 'bg-white text-gray-800 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          📋 Mis Pedidos
+          <BsListCheck className="h-4 w-4" />
+          Mis Pedidos
         </button>
       </div>
 
@@ -404,7 +417,7 @@ export const CarritoCompras: React.FC = () => {
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0">
             <div className="text-center space-y-3">
               <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Comprador Activo
+                Información del Empleado
               </h2>
               <div className="flex justify-center">
                 <img
@@ -432,10 +445,10 @@ export const CarritoCompras: React.FC = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-gray-400">Centro de Costos:</span>
-                <span className="font-bold text-gray-700">{user?.empleado?.centro_costos || 'N/A'}</span>
+                <span className="font-bold text-gray-700">{user?.empleado?.centro_costos?.split(' - ')[0] || 'N/A'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-gray-400">Cédula / ID:</span>
+                <span className="font-semibold text-gray-400">Cédula:</span>
                 <span className="font-mono font-bold text-gray-700">{user?.empleado?.codigo_empleado || 'N/A'}</span>
               </div>
             </div>
