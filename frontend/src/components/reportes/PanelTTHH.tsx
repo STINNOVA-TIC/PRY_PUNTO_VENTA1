@@ -555,7 +555,7 @@ export const PanelTTHH: React.FC = () => {
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join(' | ') || '-';
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join(' | ') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
@@ -606,7 +606,7 @@ export const PanelTTHH: React.FC = () => {
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join(', ') || '-';
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join(', ') || '-';
       return {
         'Código': a.codigo,
         'Fecha Solicitud': new Date(a.fecha_solicitud).toLocaleString(),
@@ -663,7 +663,7 @@ export const PanelTTHH: React.FC = () => {
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad})`).join('\n') || '-';
+      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join('\n') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
@@ -1429,16 +1429,18 @@ export const PanelTTHH: React.FC = () => {
                                   {a.justificacion}
                                 </td>
                                 <td className="px-5 py-4">
-                                  <div className="space-y-0.5 text-[10px] text-gray-600 font-mono min-w-[150px]">
+                                  <div className="space-y-1 text-[10px] text-gray-600 font-mono min-w-[185px]">
                                     {a.detalles?.map((d: any) => (
-                                      <div key={d.id} className="flex justify-between gap-2">
+                                      <div key={d.id} className="flex justify-between items-center gap-2 border-b border-gray-50 pb-0.5 last:border-b-0">
                                         <div className="min-w-0">
-                                          <span>• {d.producto_nombre}</span>
+                                          <span className="font-semibold text-gray-800">• {d.producto_nombre}</span>
                                           {d.producto_descripcion && (
-                                            <span className="block text-[9px] text-gray-400 truncate">{d.producto_descripcion}</span>
+                                            <span className="block text-[8px] text-gray-400 truncate">{d.producto_descripcion}</span>
                                           )}
                                         </div>
-                                        <span className="font-bold text-gray-700 shrink-0">x{d.cantidad}</span>
+                                        <span className="text-gray-750 font-bold shrink-0">
+                                          (x{d.cantidad}) - ${d.subtotal.toFixed(2)}
+                                        </span>
                                       </div>
                                     )) || '-'}
                                   </div>

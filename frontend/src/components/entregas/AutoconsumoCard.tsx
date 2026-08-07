@@ -151,14 +151,14 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                       onClick={() => onEjecutarDevolucion?.(auto.id, auto.devolucion!.id)}
                       className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-bold transition text-center"
                     >
-                      Ejecutar Devolución Aprobada
+                      Ejecutar Devolución
                     </button>
                   ) : isDevPendiente ? (
                     <button
                       disabled
                       className="w-full sm:w-auto bg-gray-100 text-gray-400 border border-gray-200 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed text-center"
                     >
-                      Devolución Pendiente TTHH
+                      Devolución Pendiente
                     </button>
                   ) : (
                     <button
