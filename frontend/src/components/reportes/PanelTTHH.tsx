@@ -10,7 +10,8 @@ import autoTable from 'jspdf-autotable';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonDescargar } from '../common/BotonDescargar';
 import { Paginacion } from '../common/Paginacion';
-import { BotonAccion } from '../common/BotonAccion';
+import { TarjetaAprobacion } from '../common/TarjetaAprobacion';
+import { TarjetaHistorial } from '../common/TarjetaHistorial';
 import { ModalDetalle } from '../common/ModalDetalle';
 import { useModal } from '../../context/ModalContext';
 
@@ -561,7 +562,7 @@ export const PanelTTHH: React.FC = () => {
         a.empleado.nombre,
         a.empleado.cedula,
         a.departamento.nombre,
-        a.centro_costos?.nombre || '-',
+        a.centro_costos?.codigo || '-',
         a.justificacion,
         productsText,
         a.estado,
@@ -612,7 +613,7 @@ export const PanelTTHH: React.FC = () => {
         'Empleado': a.empleado.nombre,
         'Cédula': a.empleado.cedula,
         'Departamento': a.departamento.nombre,
-        'Centro de Costos': a.centro_costos?.nombre || '-',
+        'Centro de Costos': a.centro_costos?.codigo || '-',
         'Justificación': a.justificacion,
         'Productos': productsText,
         'Estado': a.estado,
@@ -669,7 +670,7 @@ export const PanelTTHH: React.FC = () => {
         a.empleado.nombre,
         a.empleado.cedula,
         a.departamento.nombre,
-        a.centro_costos?.nombre || '-',
+        a.centro_costos?.codigo || '-',
         a.justificacion.length > 25 ? a.justificacion.substring(0, 23) + '..' : a.justificacion,
         productsText,
         a.estado.toUpperCase(),
@@ -1115,7 +1116,7 @@ export const PanelTTHH: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pb-2 sm:pb-0">
+              <div className="flex flex-wrap items-center gap-2 pb-2 sm:pb-3">
                 {activeTab === 'detalle' ? (
                   <BotonDescargar
                     onExportCSV={exportarCSV}
@@ -1178,7 +1179,7 @@ export const PanelTTHH: React.FC = () => {
                         ))}
                         {reporteConsumoFiltrado.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="text-center py-8 text-gray-400">
+                            <td colSpan={6} className="text-center py-8 text-gray-400">
                               No hay consumos que coincidan con los filtros y periodo seleccionados.
                             </td>
                           </tr>
@@ -1217,12 +1218,12 @@ export const PanelTTHH: React.FC = () => {
                         <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                              <tr className="bg-gray-105 border-b border-gray-200 text-gray-500 font-semibold uppercase">
-                                <th className="px-5 py-2.5">Colaborador</th>
-                                <th className="px-5 py-2.5">Cedula</th>
-                                <th className="px-5 py-2.5">Departamento</th>
-                                <th className="px-5 py-2.5 text-center">No. Compras</th>
-                                <th className="px-5 py-2.5 text-right">Total a Descontar</th>
+                              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                                <th className="px-5 py-3.5">Colaborador</th>
+                                <th className="px-5 py-3.5">Cedula</th>
+                                <th className="px-5 py-3.5">Departamento</th>
+                                <th className="px-5 py-3.5 text-center">No. Compras</th>
+                                <th className="px-5 py-3.5 text-right">Total a Descontar</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -1232,7 +1233,7 @@ export const PanelTTHH: React.FC = () => {
                                   <td className="px-5 py-3 font-mono text-gray-400">{row.codigo}</td>
                                   <td className="px-5 py-3 text-gray-500">{row.departamento}</td>
                                   <td className="px-5 py-3 text-center text-gray-600 font-medium">{row.total_compras}</td>
-                                  <td className="px-5 py-3 text-right font-semibold text-gray-850">
+                                  <td className="px-5 py-3 text-right font-semibold text-gray-800">
                                     ${row.total_gastado.toFixed(2)}
                                   </td>
                                 </tr>
@@ -1259,8 +1260,12 @@ export const PanelTTHH: React.FC = () => {
                 {/* RENDER AGRUPADO O INDIVIDUAL */}
                 {groupBy === 'none' ? (
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
+                      <span>Registro detallado de transacciones</span>
+                      <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
+                    </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-[11px] border-collapse">
+                      <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
                             <th className="px-5 py-3.5">Fecha</th>
@@ -1338,17 +1343,17 @@ export const PanelTTHH: React.FC = () => {
 
                         {expandedGroups[group.name] && (
                           <div className="overflow-x-auto">
-                            <table className="w-full text-left text-[11px] border-collapse">
+                            <table className="w-full text-left text-xs border-collapse">
                               <thead>
-                                <tr className="bg-gray-100 border-b border-gray-200 text-gray-400 font-bold uppercase">
-                                  <th className="px-5 py-2.5">Fecha</th>
-                                  <th className="px-5 py-2.5">Colaborador</th>
-                                  <th className="px-5 py-2.5">Dpto</th>
-                                  <th className="px-5 py-2.5">Producto</th>
-                                  <th className="px-5 py-2.5">Art. Codigo</th>
-                                  <th className="px-5 py-2.5 text-center">Cant</th>
-                                  <th className="px-5 py-2.5 text-right">P. Unitario</th>
-                                  <th className="px-5 py-2.5 text-right">Total</th>
+                                <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                                  <th className="px-5 py-3.5">Fecha</th>
+                                  <th className="px-5 py-3.5">Colaborador</th>
+                                  <th className="px-5 py-3.5">Dpto</th>
+                                  <th className="px-5 py-3.5">Producto</th>
+                                  <th className="px-5 py-3.5">Art. Codigo</th>
+                                  <th className="px-5 py-3.5 text-center">Cant</th>
+                                  <th className="px-5 py-3.5 text-right">P. Unitario</th>
+                                  <th className="px-5 py-3.5 text-right">Total</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100 font-mono text-gray-600">
@@ -1382,25 +1387,25 @@ export const PanelTTHH: React.FC = () => {
               groupBy === 'none' ? (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
-                    <span>Listado de consumos internos (asumidos por la empresa)</span>
+                    <span>Listado de consumos internos</span>
                     <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-gray-100 text-gray-600 uppercase tracking-wider text-[9px] font-bold border-b border-gray-200">
-                          <th className="px-5 py-3">Código</th>
-                          <th className="px-5 py-3">Fecha</th>
-                          <th className="px-5 py-3">Empleado</th>
-                          <th className="px-5 py-3">Departamento</th>
-                          <th className="px-5 py-3">Centro de Costos</th>
-                          <th className="px-5 py-3">Justificación</th>
-                          <th className="px-5 py-3">Productos</th>
-                          <th className="px-5 py-3">Estado</th>
-                          <th className="px-5 py-3 text-right">Total</th>
+                        <tr className="bg-gray-50 text-gray-500 font-semibold uppercase border-b border-gray-200">
+                          <th className="px-5 py-3.5">Código</th>
+                          <th className="px-5 py-3.5">Fecha</th>
+                          <th className="px-5 py-3.5">Empleado</th>
+                          <th className="px-5 py-3.5">Departamento</th>
+                          <th className="px-5 py-3.5">Centro de Costos</th>
+                          <th className="px-5 py-3.5">Justificación</th>
+                          <th className="px-5 py-3.5">Productos</th>
+                          <th className="px-5 py-3.5">Estado</th>
+                          <th className="px-5 py-3.5 text-right">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-gray-100">
                         {autoconsumosFiltrados.length === 0 ? (
                           <tr>
                             <td colSpan={9} className="px-5 py-8 text-center text-gray-400">
@@ -1418,8 +1423,8 @@ export const PanelTTHH: React.FC = () => {
                                   <span className="font-bold text-gray-800">{a.empleado.nombre}</span>
                                   <span className="block text-[9px] text-gray-400">{a.empleado.cedula}</span>
                                 </td>
-                                <td className="px-5 py-4 text-gray-650">{a.departamento.nombre}</td>
-                                <td className="px-5 py-4 text-gray-650">{a.centro_costos?.nombre || '-'}</td>
+                                <td className="px-5 py-4 text-gray-600">{a.departamento.nombre}</td>
+                                <td className="px-5 py-4 text-gray-600">{a.centro_costos?.codigo || '-'}</td>
                                 <td className="px-5 py-4 text-gray-500 max-w-[150px] truncate" title={a.justificacion}>
                                   {a.justificacion}
                                 </td>
@@ -1433,7 +1438,7 @@ export const PanelTTHH: React.FC = () => {
                                             <span className="block text-[9px] text-gray-400 truncate">{d.producto_descripcion}</span>
                                           )}
                                         </div>
-                                        <span className="font-bold text-gray-750 shrink-0">x{d.cantidad}</span>
+                                        <span className="font-bold text-gray-700 shrink-0">x{d.cantidad}</span>
                                       </div>
                                     )) || '-'}
                                   </div>
@@ -1488,18 +1493,18 @@ export const PanelTTHH: React.FC = () => {
                         <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                              <tr className="bg-gray-100 border-b border-gray-200 text-gray-650 uppercase tracking-wider text-[9px] font-bold">
-                                <th className="px-5 py-2.5">Código</th>
-                                <th className="px-5 py-2.5">Fecha</th>
-                                <th className="px-5 py-2.5">Empleado</th>
-                                <th className="px-5 py-2.5">Departamento</th>
-                                <th className="px-5 py-2.5">Centro de Costos</th>
-                                <th className="px-5 py-2.5">Justificación</th>
-                                <th className="px-5 py-2.5">Estado</th>
-                                <th className="px-5 py-2.5 text-right">Total</th>
+                              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                                <th className="px-5 py-3.5">Código</th>
+                                <th className="px-5 py-3.5">Fecha</th>
+                                <th className="px-5 py-3.5">Empleado</th>
+                                <th className="px-5 py-3.5">Departamento</th>
+                                <th className="px-5 py-3.5">Centro de Costos</th>
+                                <th className="px-5 py-3.5">Justificación</th>
+                                <th className="px-5 py-3.5">Estado</th>
+                                <th className="px-5 py-3.5 text-right">Total</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200">
+                            <tbody className="divide-y divide-gray-100">
                               {group.items.map((a: any) => {
                                 const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
                                 return (
@@ -1511,7 +1516,7 @@ export const PanelTTHH: React.FC = () => {
                                       <span className="block text-[9px] text-gray-400">{a.empleado.cedula}</span>
                                     </td>
                                     <td className="px-5 py-3 text-gray-500">{a.departamento.nombre}</td>
-                                    <td className="px-5 py-3 text-gray-500">{a.centro_costos?.nombre || '-'}</td>
+                                    <td className="px-5 py-3 text-gray-500">{a.centro_costos?.codigo || '-'}</td>
                                     <td className="px-5 py-3 text-gray-500 max-w-[200px] truncate" title={a.justificacion}>
                                       {a.justificacion}
                                     </td>
@@ -1573,36 +1578,18 @@ export const PanelTTHH: React.FC = () => {
                   {pendientes
                     .slice((currentPagePendientes - 1) * itemsPerPagePendientes, currentPagePendientes * itemsPerPagePendientes)
                     .map((d) => (
-                      <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-                        <div className="flex-1 min-w-0">
-                          <span className="font-mono text-[10px] text-gray-400 block">
-                            {d.autoconsumo_id ? `Autoconsumo: ${d.codigo_autoconsumo}` : `Codigo: ${d.codigo_entrega}`}
-                          </span>
-                          <h4 className="font-bold text-gray-800 text-sm">{d.empleado_nombre}</h4>
-                          <div className="text-gray-600 mt-1 truncate">
-                            <span className="font-semibold text-gray-500">Motivo de Cancelación:</span> {d.motivo}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <BotonAccion
-                            tipo="ver_detalle"
-                            onClick={() => setDetalleDevolucion(d)}
-                          />
-                          <button
-                            onClick={() => handleAprobar(d.id)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm"
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            onClick={() => openRechazoModal(d.id)}
-                            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 rounded-lg text-xs font-semibold transition"
-                          >
-                            Rechazar
-                          </button>
-                        </div>
-                      </div>
+                      <TarjetaAprobacion
+                        key={d.id}
+                        codigo={d.autoconsumo_id ? d.codigo_autoconsumo : d.codigo_entrega}
+                        fecha={d.fecha_solicitud}
+                        nombre={d.empleado_nombre}
+                        cedula={d.empleado_cedula}
+                        descripcionLabel="Motivo de Cancelación"
+                        descripcion={d.motivo}
+                        onVerDetalle={() => setDetalleDevolucion(d)}
+                        onAprobar={() => handleAprobar(d.id)}
+                        onRechazar={() => openRechazoModal(d.id)}
+                      />
                     ))}
                 </div>
 
@@ -1631,32 +1618,18 @@ export const PanelTTHH: React.FC = () => {
                   {historico
                     .slice((currentPageHistorial - 1) * itemsPerPageHistorial, currentPageHistorial * itemsPerPageHistorial)
                     .map((d) => (
-                      <div key={d.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[10px] text-gray-400">
-                              {d.autoconsumo_id ? `Autoconsumo: ${d.codigo_autoconsumo}` : d.codigo_entrega}
-                            </span>
-                            <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                              d.estado === 'aprobado' || d.estado === 'ejecutado'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : 'bg-red-50 text-red-700 border-red-100'
-                            }`}>
-                              {d.estado}
-                            </span>
-                          </div>
-                          <h4 className="font-bold text-gray-800 mt-1">{d.empleado_nombre}</h4>
-                          <div className="text-gray-500 mt-0.5 truncate">
+                      <TarjetaHistorial
+                        key={d.id}
+                        codigo={d.autoconsumo_id ? `Autoconsumo: ${d.codigo_autoconsumo}` : d.codigo_entrega}
+                        estado={d.estado}
+                        nombre={d.empleado_nombre}
+                        descripcion={
+                          <>
                             <span className="font-semibold">Motivo:</span> {d.motivo}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <BotonAccion
-                            tipo="ver_detalle"
-                            onClick={() => setDetalleDevolucion(d)}
-                          />
-                        </div>
-                      </div>
+                          </>
+                        }
+                        onVerDetalle={() => setDetalleDevolucion(d)}
+                      />
                     ))}
                 </div>
 
@@ -1690,42 +1663,18 @@ export const PanelTTHH: React.FC = () => {
                     .filter((a) => a.estado === 'pendiente')
                     .slice((currentPagePendientes - 1) * itemsPerPagePendientes, currentPagePendientes * itemsPerPagePendientes)
                     .map((a) => (
-                      <div key={a.id} className="bg-white border border-gray-250/70 rounded-xl px-5 py-4 shadow-xs flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">
-                              {a.codigo}
-                            </span>
-                            <span className="text-gray-400 text-[10px] font-medium">
-                              {new Date(a.fecha_solicitud).toLocaleString()}
-                            </span>
-                          </div>
-                          <h4 className="font-bold text-gray-800 mt-1.5 text-sm">{a.empleado.nombre}</h4>
-                          <span className="text-[10px] text-gray-400 block font-mono">C.I. {a.empleado.cedula}</span>
-                          <div className="text-gray-600 mt-1 truncate">
-                            <span className="font-semibold text-gray-500">Justificación:</span> {a.justificacion}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <BotonAccion
-                            tipo="ver_detalle"
-                            onClick={() => setDetalleAutoconsumo(a)}
-                          />
-                          <button
-                            onClick={() => openRechazoAutoModal(a.id)}
-                            className="px-3.5 py-1.5 border border-red-200 hover:bg-red-50 text-red-650 rounded-lg text-xs font-semibold transition"
-                          >
-                            Rechazar
-                          </button>
-                          <button
-                            onClick={() => handleAprobarAutoconsumo(a.id)}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
-                          >
-                            Aprobar Solicitud
-                          </button>
-                        </div>
-                      </div>
+                      <TarjetaAprobacion
+                        key={a.id}
+                        codigo={a.codigo}
+                        fecha={a.fecha_solicitud}
+                        nombre={a.empleado.nombre}
+                        cedula={a.empleado.cedula}
+                        descripcionLabel="Justificación"
+                        descripcion={a.justificacion}
+                        onVerDetalle={() => setDetalleAutoconsumo(a)}
+                        onAprobar={() => handleAprobarAutoconsumo(a.id)}
+                        onRechazar={() => openRechazoAutoModal(a.id)}
+                      />
                     ))}
                 </div>
 
@@ -1755,35 +1704,19 @@ export const PanelTTHH: React.FC = () => {
                     .filter((a) => a.estado !== 'pendiente')
                     .slice((currentPageHistorial - 1) * itemsPerPageHistorial, currentPageHistorial * itemsPerPageHistorial)
                     .map((a) => (
-                      <div key={a.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[9px] text-gray-400">{a.codigo}</span>
-                            <span
-                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                                a.estado === 'entregado'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : a.estado === 'aprobado'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                  : 'bg-red-50 text-red-700 border-red-100'
-                              }`}
-                            >
-                              {a.estado}
-                            </span>
-                          </div>
-                          <h4 className="font-bold text-gray-800 mt-1">{a.empleado.nombre}</h4>
-                          <div className="text-gray-500 mt-0.5 truncate">
-                            <span className="font-semibold text-gray-400">Dpto / CC:</span> {a.departamento.nombre} •{' '}
-                            {a.centro_costos.nombre}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <BotonAccion
-                            tipo="ver_detalle"
-                            onClick={() => setDetalleAutoconsumo(a)}
-                          />
-                        </div>
-                      </div>
+                      <TarjetaHistorial
+                        key={a.id}
+                        codigo={a.codigo}
+                        estado={a.estado}
+                        nombre={a.empleado.nombre}
+                        descripcion={
+                          <>
+                            <span className="font-semibold">Dpto / CC:</span> {a.departamento.nombre} •{' '}
+                            {a.centro_costos.codigo}
+                          </>
+                        }
+                        onVerDetalle={() => setDetalleAutoconsumo(a)}
+                      />
                     ))}
                 </div>
 
