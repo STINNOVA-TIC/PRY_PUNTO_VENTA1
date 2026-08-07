@@ -17,10 +17,12 @@ exports.reportesController = {
           e.empleado_apellido, 
           e.empleado_cedula as codigo,
           d.departamento_nombre as departamento,
+          cc.centro_costos_codigo,
           COUNT(v.venta_id) as total_compras,
           COALESCE(SUM(v.venta_total), 0) as total_gastado
         FROM empleado e
         LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
+        LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
         LEFT JOIN venta v ON e.empleado_id = v.empleado_id AND v.venta_estado = 'completada'
       `;
             const params = [];
@@ -29,7 +31,7 @@ exports.reportesController = {
                 params.push(fecha_inicio, fecha_fin);
             }
             query += `
-        GROUP BY e.empleado_id, e.empleado_nombre, e.empleado_apellido, e.empleado_cedula, d.departamento_nombre
+        GROUP BY e.empleado_id, e.empleado_nombre, e.empleado_apellido, e.empleado_cedula, d.departamento_nombre, cc.centro_costos_codigo
         ORDER BY total_gastado DESC
       `;
             const result = await db_1.default.query(query, params);
@@ -40,6 +42,7 @@ exports.reportesController = {
                     empleado: `${row.empleado_nombre} ${row.empleado_apellido}`,
                     codigo: row.codigo,
                     departamento: row.departamento || 'Sin Departamento',
+                    centro_costos: row.centro_costos_codigo || 'N/A',
                     total_compras: totalCompras,
                     total_gastado: totalGastado,
                     promedio: totalCompras > 0 ? totalGastado / totalCompras : 0

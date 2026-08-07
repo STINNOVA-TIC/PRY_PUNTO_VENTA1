@@ -429,11 +429,12 @@ export const PanelTTHH: React.FC = () => {
       return;
     }
 
-    const headers = ['Colaborador', 'Cedula', 'Departamento', 'No. Compras', 'Total a Descontar'];
+    const headers = ['Colaborador', 'Cedula', 'Departamento', 'Centro de Costos', 'No. Compras', 'Total a Descontar'];
     const rows = listado.map(row => [
       row.empleado,
       row.codigo,
       row.departamento,
+      row.centro_costos || 'N/A',
       row.total_compras,
       row.total_gastado.toFixed(2)
     ]);
@@ -474,6 +475,7 @@ export const PanelTTHH: React.FC = () => {
       'Colaborador': row.empleado,
       'Cédula': row.codigo,
       'Departamento': row.departamento,
+      'Centro de Costos': row.centro_costos || 'N/A',
       'No. Compras': row.total_compras,
       'Total a Descontar': row.total_gastado
     }));
@@ -514,11 +516,12 @@ export const PanelTTHH: React.FC = () => {
     doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
 
-    const headers = [['Colaborador', 'Cédula', 'Departamento', 'No. Compras', 'Total a Descontar']];
+    const headers = [['Colaborador', 'Cédula', 'Departamento', 'Centro de Costos', 'No. Compras', 'Total a Descontar']];
     const rows = listado.map(row => [
       row.empleado,
       row.codigo,
       row.departamento,
+      row.centro_costos || 'N/A',
       row.total_compras,
       `$${row.total_gastado.toFixed(2)}`
     ]);
@@ -1088,7 +1091,7 @@ export const PanelTTHH: React.FC = () => {
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  Consumo Acumulado (Nomina)
+                  Consumo Acumulado
                 </button>
                 <button
                   onClick={() => setActiveTab('detalle')}
@@ -1098,7 +1101,7 @@ export const PanelTTHH: React.FC = () => {
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  Registro Detallado (Transacciones)
+                  Registro Detallado 
                 </button>
                 <button
                   onClick={() => setActiveTab('autoconsumos_reporte')}
@@ -1108,7 +1111,7 @@ export const PanelTTHH: React.FC = () => {
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  Autoconsumos (Consumo Interno)
+                  Autoconsumos
                 </button>
               </div>
 
@@ -1155,6 +1158,7 @@ export const PanelTTHH: React.FC = () => {
                           <th className="px-5 py-3.5">Colaborador</th>
                           <th className="px-5 py-3.5">Cedula</th>
                           <th className="px-5 py-3.5">Departamento</th>
+                          <th className="px-5 py-3.5">Centro de Costos</th>
                           <th className="px-5 py-3.5 text-center">No. Compras</th>
                           <th className="px-5 py-3.5 text-right">Total a Descontar</th>
                         </tr>
@@ -1165,6 +1169,7 @@ export const PanelTTHH: React.FC = () => {
                             <td className="px-5 py-4 font-bold text-gray-800">{row.empleado}</td>
                             <td className="px-5 py-4 font-mono text-gray-400">{row.codigo}</td>
                             <td className="px-5 py-4 text-gray-500">{row.departamento}</td>
+                            <td className="px-5 py-4 font-mono text-gray-500">{row.centro_costos || 'N/A'}</td>
                             <td className="px-5 py-4 text-center text-gray-600 font-medium">{row.total_compras}</td>
                             <td className="px-5 py-4 text-right font-black text-gray-800 text-sm">
                               ${row.total_gastado.toFixed(2)}
@@ -1280,7 +1285,7 @@ export const PanelTTHH: React.FC = () => {
                               <td className="px-5 py-3 font-bold text-gray-800 font-sans">{t.empleado_nombre}</td>
                               <td className="px-5 py-3 text-gray-400">{t.empleado_cedula}</td>
                               <td className="px-5 py-3 text-gray-500 font-sans">{t.departamento}</td>
-                              <td className="px-5 py-3 text-gray-500 font-sans">{t.centro_costos}</td>
+                              <td className="px-5 py-3 text-gray-500 font-sans">{t.centro_costos?.split(' - ')[0]}</td>
                               <td className="px-5 py-3 font-semibold text-gray-800 font-sans">
                                 {t.producto_nombre}
                                 {t.producto_descripcion && t.producto_descripcion !== 'Sin detalle' && (

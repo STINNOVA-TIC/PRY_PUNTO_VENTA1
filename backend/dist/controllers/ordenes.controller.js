@@ -566,9 +566,39 @@ exports.ordenesController = {
                 throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
             }
             await client.query('BEGIN');
-            const checkRes = await client.query('SELECT * FROM orden_compra WHERE orden_compra_id = $1', [id]);
+            const checkRes = await client.query(`SELECT empleado_aprobador_id, empleado_receptor_id, 
+                orden_compra_firma_aprobador, orden_compra_fecha_firma_aprobador,
+                orden_compra_firma_recibido, orden_compra_fecha_firma_recibido,
+                orden_compra_estado 
+         FROM orden_compra WHERE orden_compra_id = $1`, [id]);
             if (checkRes.rows.length === 0) {
                 throw new error_middleware_1.AppError('Requerimiento no encontrado', 404);
+            }
+            const ocDb = checkRes.rows[0];
+            const oldAprobadorId = ocDb.empleado_aprobador_id ? Number(ocDb.empleado_aprobador_id) : null;
+            const oldReceptorId = ocDb.empleado_receptor_id ? Number(ocDb.empleado_receptor_id) : null;
+            const valNewAprobadorId = empleado_aprobador_id ? Number(empleado_aprobador_id) : null;
+            const valNewReceptorId = empleado_receptor_id ? Number(empleado_receptor_id) : null;
+            let newFirmaAprobador = ocDb.orden_compra_firma_aprobador;
+            let newFechaFirmaAprobador = ocDb.orden_compra_fecha_firma_aprobador;
+            let newFirmaRecibido = ocDb.orden_compra_firma_recibido;
+            let newFechaFirmaRecibido = ocDb.orden_compra_fecha_firma_recibido;
+            let newEstado = ocDb.orden_compra_estado;
+            // Si cambia el aprobador, se borran ambas firmas y el estado vuelve a pendiente
+            if (oldAprobadorId !== valNewAprobadorId) {
+                newFirmaAprobador = null;
+                newFechaFirmaAprobador = null;
+                newFirmaRecibido = null;
+                newFechaFirmaRecibido = null;
+                newEstado = 'pendiente';
+            }
+            // Si cambia el recibidor, se borra su firma. Si estaba recibida, vuelve a aprobada.
+            if (oldReceptorId !== valNewReceptorId) {
+                newFirmaRecibido = null;
+                newFechaFirmaRecibido = null;
+                if (newEstado === 'recibida') {
+                    newEstado = 'aprobada';
+                }
             }
             await client.query(`UPDATE orden_compra 
          SET empresa_id = $1, sucursal_id = $2, departamento_id = $3, centro_costos_id = $4, 
@@ -579,8 +609,11 @@ exports.ordenesController = {
              orden_compra_trabajador_asignado = $17, orden_compra_caracteristicas = $18, orden_compra_tipo_compra = $19,
              empleado_aprobador_id = $20, empleado_receptor_id = $21,
              orden_compra_aprobado_por = $22, orden_compra_recibido_por = $23,
+             orden_compra_firma_aprobador = $24, orden_compra_fecha_firma_aprobador = $25,
+             orden_compra_firma_recibido = $26, orden_compra_fecha_firma_recibido = $27,
+             orden_compra_estado = $28,
              orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
-         WHERE orden_compra_id = $24`, [
+         WHERE orden_compra_id = $29`, [
                 empresa_id,
                 sucursal_id,
                 departamento_id,
@@ -600,10 +633,15 @@ exports.ordenesController = {
                 trabajador_asignado || null,
                 caracteristicas || null,
                 tipo_compra || 'LOCAL',
-                empleado_aprobador_id || null,
-                empleado_receptor_id || null,
+                valNewAprobadorId,
+                valNewReceptorId,
                 aprobado_por || null,
                 recibido_por || null,
+                newFirmaAprobador,
+                newFechaFirmaAprobador,
+                newFirmaRecibido,
+                newFechaFirmaRecibido,
+                newEstado,
                 id
             ]);
             await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
