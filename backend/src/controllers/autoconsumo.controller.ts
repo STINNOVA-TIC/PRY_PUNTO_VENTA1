@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import pool from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { generarCodigoUnico } from '../utils/codigos';
 
 export const autoconsumoController = {
   // Obtener todos los autoconsumos
@@ -269,8 +270,16 @@ export const autoconsumoController = {
       // 3. Generar código de autoconsumo único
       const today = new Date();
       const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const rand = Math.floor(100 + Math.random() * 900);
-      const autoconsumoCodigo = `AUTO-${dateStr}-${rand}`;
+      const autoconsumoCodigo = await generarCodigoUnico(
+        () => `AUTO-${dateStr}-${Math.floor(100 + Math.random() * 900)}`,
+        async (codigo) => {
+          const existe = await client.query(
+            'SELECT 1 FROM autoconsumo WHERE autoconsumo_codigo = $1',
+            [codigo]
+          );
+          return (existe.rowCount ?? 0) > 0;
+        }
+      );
 
       // 4. Crear registro de autoconsumo
       const autoconsumoRes = await client.query(

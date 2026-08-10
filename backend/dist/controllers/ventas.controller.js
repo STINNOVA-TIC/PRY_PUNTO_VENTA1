@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ventasController = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const error_middleware_1 = require("../middleware/error.middleware");
+const codigos_1 = require("../utils/codigos");
 exports.ventasController = {
     // Obtener todas las ventas
     getAll: async (req, res) => {
@@ -138,8 +139,10 @@ exports.ventasController = {
                     prefix = cleanName.toUpperCase().padEnd(3, 'X');
                 }
             }
-            const randNum = Math.floor(100 + Math.random() * 900);
-            const codigoRetiro = `${prefix}-${randNum}`;
+            const codigoRetiro = await (0, codigos_1.generarCodigoUnico)(() => `${prefix}-${Math.floor(100 + Math.random() * 900)}`, async (codigo) => {
+                const existe = await client.query('SELECT 1 FROM solicitud_entrega WHERE solicitud_entrega_codigo = $1', [codigo]);
+                return (existe.rowCount ?? 0) > 0;
+            });
             const solRes = await client.query(`INSERT INTO solicitud_entrega (empleado_id, sucursal_id, solicitud_entrega_codigo, solicitud_entrega_estado, solicitud_entrega_observacion) 
          VALUES ($1, $2, $3, 'pendiente', 'Retiro en Bodega de POS Autoservicio')
          RETURNING solicitud_entrega_id`, [empleado_id, sucursalId, codigoRetiro]);

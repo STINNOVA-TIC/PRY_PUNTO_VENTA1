@@ -119,6 +119,33 @@ export const initDb = async () => {
       END $$;
     `);
 
+    // 4.6. Migración: índice de unicidad para códigos de retiro
+    await pool.query(`
+      DO $$
+      DECLARE
+        r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT solicitud_entrega_id, solicitud_entrega_codigo
+          FROM solicitud_entrega
+          WHERE solicitud_entrega_codigo IN (
+            SELECT solicitud_entrega_codigo
+            FROM solicitud_entrega
+            GROUP BY solicitud_entrega_codigo
+            HAVING COUNT(*) > 1
+          )
+          ORDER BY solicitud_entrega_id
+        LOOP
+          UPDATE solicitud_entrega
+          SET solicitud_entrega_codigo = solicitud_entrega_codigo || '-' || solicitud_entrega_id
+          WHERE solicitud_entrega_id = r.solicitud_entrega_id;
+        END LOOP;
+      END $$;
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_solicitud_entrega_codigo ON solicitud_entrega(solicitud_entrega_codigo);
+    `);
+
     // 5. Sembrar nuevo rol de empleado_autorizado
     await pool.query(`
       INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 

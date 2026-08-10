@@ -42,6 +42,40 @@ export const CarritoCompras: React.FC = () => {
   // Paginación del historial "Mis Pedidos y Códigos de Retiro"
   const [currentPagePedidos, setCurrentPagePedidos] = useState(1);
   const [itemsPerPagePedidos, setItemsPerPagePedidos] = useState(10);
+  const [filtroPeriodo, setFiltroPeriodo] = useState<'mes' | 'semana' | 'dia'>('mes');
+  const [tabHistorial, setTabHistorial] = useState<'personales' | 'autoconsumos'>('personales');
+
+  const calcularSubtotalDetalle = (det: any) =>
+    det.subtotal ?? (det.precio_unitario || 0) * (det.cantidad || 0);
+
+  const totalPedido = (auto: any) =>
+    auto.detalles?.reduce((sum: number, d: any) => sum + calcularSubtotalDetalle(d), 0) || 0;
+
+  const getPeriodFilter = (fecha: string) => {
+    const f = new Date(fecha);
+    const hoy = new Date();
+    if (filtroPeriodo === 'dia') {
+      return f.toDateString() === hoy.toDateString();
+    }
+    if (filtroPeriodo === 'semana') {
+      const hace7Dias = new Date();
+      hace7Dias.setDate(hace7Dias.getDate() - 7);
+      return f >= hace7Dias && f <= hoy;
+    }
+    return f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
+  };
+
+  const historialPersonales = React.useMemo(
+    () => historialAutoconsumo.filter((s) => s.tipo === 'pedido' && getPeriodFilter(s.fecha_solicitud)),
+    [historialAutoconsumo, filtroPeriodo]
+  );
+
+  const historialAutoconsumos = React.useMemo(
+    () => historialAutoconsumo.filter((s) => s.tipo === 'autoconsumo' && getPeriodFilter(s.fecha_solicitud)),
+    [historialAutoconsumo, filtroPeriodo]
+  );
+
+  const historialVisible = tabHistorial === 'personales' ? historialPersonales : historialAutoconsumos;
 
   const cargarHistorial = async () => {
     try {
@@ -60,7 +94,7 @@ export const CarritoCompras: React.FC = () => {
             codigo: ent.codigo_entrega || `RET-${ent.id}`,
             fecha_solicitud: ent.fecha_solicitud,
             estado: ent.estado,
-            justificacion: 'Pedido de consumo personal (Descuento de nómina)',
+            justificacion: 'Pedido de consumo personal',
             tipo: 'pedido',
             detalles: ent.detalles || []
           });
@@ -283,8 +317,13 @@ export const CarritoCompras: React.FC = () => {
   const historialPaginado = React.useMemo(() => {
     const startIndex = (currentPagePedidos - 1) * itemsPerPagePedidos;
     const endIndex = startIndex + itemsPerPagePedidos;
-    return historialAutoconsumo.slice(startIndex, endIndex);
-  }, [historialAutoconsumo, currentPagePedidos, itemsPerPagePedidos]);
+    return historialVisible.slice(startIndex, endIndex);
+  }, [historialVisible, currentPagePedidos, itemsPerPagePedidos]);
+
+  const totalGastadoPeriodo = React.useMemo(
+    () => historialVisible.reduce((sum: number, s: any) => sum + totalPedido(s), 0),
+    [historialVisible]
+  );
 
   return (
     <div className="flex flex-col font-sans h-[calc(100vh-3rem)] overflow-hidden space-y-4">
@@ -575,13 +614,62 @@ export const CarritoCompras: React.FC = () => {
               <BsFileEarmarkText className="text-gray-600 text-lg" />
               <h2 className="text-sm font-bold text-gray-800">Mis Pedidos y Códigos de Retiro</h2>
             </div>
-            <BotonRecargar onRefresh={cargarHistorial} loading={loadingHistorial} />
+            <div className="flex items-center gap-2">
+              <div className="flex bg-gray-100 p-0.5 rounded-lg items-center">
+                {(['dia', 'semana', 'mes'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setFiltroPeriodo(p); setCurrentPagePedidos(1); }}
+                    className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-md transition ${
+                      filtroPeriodo === p
+                        ? 'bg-white text-gray-800 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {p === 'dia' ? 'Hoy' : p === 'semana' ? 'Semana' : 'Mes'}
+                  </button>
+                ))}
+              </div>
+              <BotonRecargar onRefresh={cargarHistorial} loading={loadingHistorial} />
+            </div>
+          </div>
+
+          {/* Subsecciones: Personales / Autoconsumos */}
+          <div className="flex bg-gray-100 p-0.5 rounded-lg items-center w-fit mb-3">
+            <button
+              onClick={() => { setTabHistorial('personales'); setCurrentPagePedidos(1); }}
+              className={`px-3 py-1 text-[11px] font-bold uppercase rounded-md transition ${
+                tabHistorial === 'personales'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Personales
+            </button>
+            {canCreateAutoconsumo && (
+              <button
+                onClick={() => { setTabHistorial('autoconsumos'); setCurrentPagePedidos(1); }}
+                className={`px-3 py-1 text-[11px] font-bold uppercase rounded-md transition ${
+                  tabHistorial === 'autoconsumos'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Autoconsumos
+              </button>
+            )}
           </div>
 
           <div className="overflow-y-auto flex-1 space-y-3.5 pr-1">
-            {historialAutoconsumo.length === 0 ? (
+            {tabHistorial === 'personales' && historialPersonales.length === 0 && historialAutoconsumo.length === 0 ? (
               <div className="text-center py-12 text-gray-400 text-xs">
                 No tienes solicitudes registradas en tu historial.
+              </div>
+            ) : historialVisible.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-xs">
+                {tabHistorial === 'personales'
+                  ? 'No tienes pedidos personales en el período seleccionado.'
+                  : 'No tienes autoconsumos en el período seleccionado.'}
               </div>
             ) : (
               historialPaginado.map((auto) => (
@@ -654,17 +742,54 @@ export const CarritoCompras: React.FC = () => {
                       ))}
                     </div>
                   </div>
+
+                  {/* Costo del pedido */}
+                  {tabHistorial === 'personales' ? (
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Consumo de este pedido</span>
+                      <span className="font-black text-gray-800 text-sm">${totalPedido(auto).toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Costo asumido por la empresa</span>
+                      <span className="font-black text-gray-800 text-sm">${totalPedido(auto).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
 
+          {/* Resumen del período */}
+          {historialVisible.length > 0 && tabHistorial === 'personales' && (
+            <div className="pt-3 mt-3 flex-shrink-0 bg-gray-800 text-white rounded-xl px-5 py-3 flex justify-between items-center">
+              <div className="text-xs">
+                <span className="text-gray-300 font-medium block text-[9px] uppercase tracking-wider">
+                  Gastado {filtroPeriodo === 'dia' ? 'hoy' : filtroPeriodo === 'semana' ? 'en la semana' : 'en el mes'} en pedidos personales
+                </span>
+                <span className="text-gray-300">{historialVisible.length} solicitud{historialVisible.length !== 1 ? 'es' : ''} </span>
+              </div>
+              <span className="font-black text-lg">${totalGastadoPeriodo.toFixed(2)}</span>
+            </div>
+          )}
+          {historialVisible.length > 0 && tabHistorial === 'autoconsumos' && (
+            <div className="pt-3 mt-3 flex-shrink-0 bg-gray-800 text-white rounded-xl px-5 py-3 flex justify-between items-center">
+              <div className="text-xs">
+                <span className="text-gray-300 font-medium block text-[9px] uppercase tracking-wider">
+                  Autoconsumos {filtroPeriodo === 'dia' ? 'de hoy' : filtroPeriodo === 'semana' ? 'de la semana' : 'del mes'}
+                </span>
+                <span className="text-gray-300">{historialVisible.length} solicitud{historialVisible.length !== 1 ? 'es' : ''} </span>
+              </div>
+              <span className="font-black text-lg">${totalGastadoPeriodo.toFixed(2)}</span>
+            </div>
+          )}
+
           {/* Paginación del historial */}
-          {historialAutoconsumo.length > 0 && (
+          {historialVisible.length > 0 && (
             <div className="pt-3 border-t border-gray-150 mt-3 flex-shrink-0">
               <Paginacion
                 currentPage={currentPagePedidos}
-                totalItems={historialAutoconsumo.length}
+                totalItems={historialVisible.length}
                 itemsPerPage={itemsPerPagePedidos}
                 onPageChange={setCurrentPagePedidos}
                 onItemsPerPageChange={setItemsPerPagePedidos}

@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import pool from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { ICreateVentaRequest } from '../types/index';
+import { generarCodigoUnico } from '../utils/codigos';
 
 export const ventasController = {
   // Obtener todas las ventas
@@ -177,8 +178,16 @@ export const ventasController = {
         }
       }
 
-      const randNum = Math.floor(100 + Math.random() * 900);
-      const codigoRetiro = `${prefix}-${randNum}`;
+      const codigoRetiro = await generarCodigoUnico(
+        () => `${prefix}-${Math.floor(100 + Math.random() * 900)}`,
+        async (codigo) => {
+          const existe = await client.query(
+            'SELECT 1 FROM solicitud_entrega WHERE solicitud_entrega_codigo = $1',
+            [codigo]
+          );
+          return (existe.rowCount ?? 0) > 0;
+        }
+      );
 
       const solRes = await client.query(
         `INSERT INTO solicitud_entrega (empleado_id, sucursal_id, solicitud_entrega_codigo, solicitud_entrega_estado, solicitud_entrega_observacion) 
