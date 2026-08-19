@@ -69,10 +69,23 @@ exports.ordenesController = {
             if (!empleadoId) {
                 empleadoId = 1;
             }
+            // Validar si el usuario está autorizado a firmar requerimientos
+            const isUserAdmin = req.user?.rol_id === 1;
+            if (!isUserAdmin) {
+                const firmasCheck = await client.query(`SELECT 1 FROM usuario_rol ur
+           JOIN usuario u ON ur.usuario_id = u.usuario_id
+           WHERE (u.usuario_id = $1 OR u.empleado_id = $2) AND ur.rol_id = 9 AND u.usuario_estado = 'activo'`, [req.user?.id || 0, empleadoId]);
+                if (firmasCheck.rows.length === 0) {
+                    throw new error_middleware_1.AppError('No tienes autorizada la opción de firmar requerimientos. Solicita la activación de firma a un Administrador.', 403);
+                }
+            }
             // Obtener firma del Elaborador para estamparla inmediatamente
             const empFirmaRes = await client.query('SELECT empleado_firma, empleado_nombre, empleado_apellido FROM empleado WHERE empleado_id = $1', [empleadoId]);
             const firmaElaborador = empFirmaRes.rows[0]?.empleado_firma || null;
-            const fechaFirmaElaborador = firmaElaborador ? new Date() : null;
+            if (!firmaElaborador) {
+                throw new error_middleware_1.AppError('Debes registrar y subir tu firma digital antes de crear un requerimiento de compra.', 400);
+            }
+            const fechaFirmaElaborador = new Date();
             const elaboradoPorName = empFirmaRes.rows[0] ? `${empFirmaRes.rows[0].empleado_nombre} ${empFirmaRes.rows[0].empleado_apellido}` : elaborado_por;
             const usuarioId = req.user?.id && req.user.id !== 0 ? req.user.id : 1;
             // 3. Insertar la cabecera de la orden de compra

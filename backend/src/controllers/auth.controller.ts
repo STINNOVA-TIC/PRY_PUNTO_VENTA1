@@ -92,7 +92,7 @@ export const authController = {
          LIMIT 1`,
         [empleado.empleado_id]
       );
-      const permitirFirmas = firmasCheck.rows.length > 0;
+      const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
 
       // Generar Token JWT con el rol y el ID real/virtual
       const token = jwt.sign(
@@ -127,6 +127,7 @@ export const authController = {
               apellido: empleado.empleado_apellido,
               cargo: empleado.empleado_cargo,
               foto_perfil: empleado.empleado_foto,
+              firma: empleado.empleado_firma || null,
               departamento: empleado.departamento_nombre || 'General',
               centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
             }
@@ -224,7 +225,9 @@ export const authController = {
             apellido: emp.empleado_apellido,
             cargo: emp.empleado_cargo,
             foto_perfil: emp.empleado_foto,
-            departamento: emp.departamento_nombre || 'Sin Departamento'
+            firma: emp.empleado_firma || null,
+            departamento: emp.departamento_nombre || 'Sin Departamento',
+            centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
           };
         }
       }
@@ -243,7 +246,7 @@ export const authController = {
          WHERE usuario_id = $1 AND rol_id = 9`,
         [user.usuario_id]
       );
-      const permitirFirmas = firmasCheck.rows.length > 0;
+      const permitirFirmas = rol.rol_id === 1 || firmasCheck.rows.length > 0;
 
       // Generar Token JWT
       const token = jwt.sign(
@@ -329,6 +332,7 @@ export const authController = {
               apellido: emp.empleado_apellido,
               cargo: emp.empleado_cargo,
               foto_perfil: emp.empleado_foto,
+              firma: emp.empleado_firma || null,
               departamento: emp.departamento_nombre || 'Sin Departamento',
               centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
             };
@@ -338,7 +342,7 @@ export const authController = {
 
       // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
       let permitirAutoconsumo = false;
-      let permitirFirmas = false;
+      let permitirFirmas = req.user.rol_id === 1;
       const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0 
         ? (await pool.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id 
         : null);
@@ -360,7 +364,7 @@ export const authController = {
            LIMIT 1`,
           [targetEmpId]
         );
-        permitirFirmas = firmasCheck.rows.length > 0;
+        permitirFirmas = req.user.rol_id === 1 || firmasCheck.rows.length > 0;
       }
 
       res.json({
@@ -458,7 +462,7 @@ export const authController = {
             LIMIT 1`,
            [empleado.empleado_id]
          );
-         const permitirFirmas = firmasCheck.rows.length > 0;
+         const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
 
          res.json({
            success: true,
@@ -482,6 +486,7 @@ export const authController = {
                  apellido: empleado.empleado_apellido,
                  cargo: empleado.empleado_cargo,
                  foto_perfil: empleado.empleado_foto,
+                 firma: empleado.empleado_firma || null,
                  departamento: empleado.departamento_nombre || 'General',
                  centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
                }
@@ -496,6 +501,32 @@ export const authController = {
         throw new AppError('Usuario inactivo', 401);
       }
       const user = userRes.rows[0];
+
+      let empleadoData = null;
+      if (user.empleado_id) {
+        const empRes = await pool.query(
+          `SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre, cc.centro_costos_codigo 
+           FROM empleado e 
+           LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
+           LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
+           WHERE e.empleado_id = $1`,
+          [user.empleado_id]
+        );
+        const emp = empRes.rows[0];
+        if (emp) {
+          empleadoData = {
+            id: emp.empleado_id,
+            codigo_empleado: emp.empleado_cedula,
+            nombre: emp.empleado_nombre,
+            apellido: emp.empleado_apellido,
+            cargo: emp.empleado_cargo,
+            foto_perfil: emp.empleado_foto,
+            firma: emp.empleado_firma || null,
+            departamento: emp.departamento_nombre || 'Sin Departamento',
+            centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
+          };
+        }
+      }
 
       const staticRole = rolesData.find(r => r.id === decoded.rol_id);
       const rolNombre = staticRole?.nombre || 'empleado';
@@ -515,7 +546,7 @@ export const authController = {
          WHERE usuario_id = $1 AND rol_id = 9`,
         [user.usuario_id]
       );
-      const permitirFirmas = firmasCheck.rows.length > 0;
+      const permitirFirmas = decoded.rol_id === 1 || firmasCheck.rows.length > 0;
 
       res.json({
         success: true,
@@ -531,7 +562,8 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
-            permitir_firmas: permitirFirmas
+            permitir_firmas: permitirFirmas,
+            empleado: empleadoData
           }
         }
       });

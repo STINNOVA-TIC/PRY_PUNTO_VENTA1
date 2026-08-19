@@ -290,19 +290,54 @@ export const autoconsumoController = {
       );
       const autoconsumoId = autoconsumoRes.rows[0].autoconsumo_id;
 
-      // 5. Crear detalles
+      // 5. Crear detalles, descontar stock (reserva) y registrar movimiento
+      const stockUpdates = [];
       for (const d of calculatedDetails) {
         await client.query(
           `INSERT INTO autoconsumo_detalle (autoconsumo_id, producto_id, autoconsumo_detalle_cantidad, autoconsumo_detalle_precio_unitario, autoconsumo_detalle_subtotal)
            VALUES ($1, $2, $3, $4, $5)`,
           [autoconsumoId, d.producto_id, d.cantidad, d.precio_unitario, d.subtotal]
         );
+
+        // Descontar inmediatamente para reservar el stock
+        await client.query(
+          'UPDATE producto SET producto_stock = producto_stock - $1 WHERE producto_id = $2',
+          [d.cantidad, d.producto_id]
+        );
+
+        const freshProdRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1', [d.producto_id]);
+        const stockNuevo = freshProdRes.rows[0]?.producto_stock || 0;
+
+        await client.query(
+          `INSERT INTO movimiento_inventario (
+            producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
+            movimiento_inventario_cantidad, movimiento_inventario_stock_anterior,
+            movimiento_inventario_stock_nuevo, movimiento_inventario_observacion,
+            autoconsumo_id
+          ) VALUES ($1, $2, $3, 'salida', $4, $5, $6, $7, $8)`,
+          [
+            d.producto_id,
+            sucursalId,
+            req.user?.id || 1,
+            d.cantidad,
+            stockNuevo + d.cantidad,
+            stockNuevo,
+            `Reserva Autoconsumo: ${autoconsumoCodigo}`,
+            autoconsumoId
+          ]
+        );
+
+        stockUpdates.push({
+          producto_id: d.producto_id,
+          cantidad: d.cantidad
+        });
       }
 
       await client.query('COMMIT');
 
       if (req.io) {
         req.io.emit('autoconsumo-pendiente', { id: autoconsumoId, codigo: autoconsumoCodigo });
+        req.io.emit('stock-actualizado', { productos: stockUpdates });
       }
 
       res.status(201).json({
@@ -311,7 +346,7 @@ export const autoconsumoController = {
           id: autoconsumoId,
           codigo: autoconsumoCodigo
         },
-        message: 'Solicitud de autoconsumo registrada exitosamente'
+        message: 'Solicitud de autoconsumo registrada exitosamente y stock reservado'
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -361,13 +396,17 @@ export const autoconsumoController = {
     }
   },
 
-  // Cancelar o rechazar solicitud de autoconsumo
+  // Cancelar o rechazar solicitud de autoconsumo y restaurar stock reservado
   cancelar: async (req: AuthRequest, res: Response): Promise<void> => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
       const { observacion, esRechazo } = req.body; // esRechazo = true si viene de TTHH rechazando
+      const usuarioId = req.user?.id && req.user.id !== 0 ? req.user.id : null;
 
-      const autoRes = await pool.query('SELECT * FROM autoconsumo WHERE autoconsumo_id = $1', [id]);
+      await client.query('BEGIN');
+
+      const autoRes = await client.query('SELECT * FROM autoconsumo WHERE autoconsumo_id = $1 FOR UPDATE', [id]);
       const autoconsumo = autoRes.rows[0];
 
       if (!autoconsumo) {
@@ -378,9 +417,51 @@ export const autoconsumoController = {
         throw new AppError('No se puede cancelar una solicitud que ya ha sido entregada', 400);
       }
 
+      if (autoconsumo.autoconsumo_estado === 'rechazado' || autoconsumo.autoconsumo_estado === 'cancelado') {
+        throw new AppError('La solicitud ya se encuentra cancelada o rechazada', 400);
+      }
+
+      // Devolver el stock reservado a cada producto
+      const detailsRes = await client.query('SELECT * FROM autoconsumo_detalle WHERE autoconsumo_id = $1', [id]);
+      const stockUpdates = [];
+
+      for (const d of detailsRes.rows) {
+        await client.query(
+          'UPDATE producto SET producto_stock = producto_stock + $1 WHERE producto_id = $2',
+          [d.autoconsumo_detalle_cantidad, d.producto_id]
+        );
+
+        const freshProdRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1', [d.producto_id]);
+        const stockNuevo = freshProdRes.rows[0]?.producto_stock || 0;
+
+        await client.query(
+          `INSERT INTO movimiento_inventario (
+            producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
+            movimiento_inventario_cantidad, movimiento_inventario_stock_anterior,
+            movimiento_inventario_stock_nuevo, movimiento_inventario_observacion,
+            autoconsumo_id
+          ) VALUES ($1, $2, $3, 'entrada', $4, $5, $6, $7, $8)`,
+          [
+            d.producto_id,
+            autoconsumo.sucursal_id,
+            usuarioId || 1,
+            d.autoconsumo_detalle_cantidad,
+            stockNuevo - d.autoconsumo_detalle_cantidad,
+            stockNuevo,
+            `${esRechazo ? 'Rechazo' : 'Cancelación'} Autoconsumo (Stock devuelto): ${autoconsumo.autoconsumo_codigo}`,
+            autoconsumo.autoconsumo_id
+          ]
+        );
+
+        stockUpdates.push({
+          producto_id: d.producto_id,
+          cantidad: d.autoconsumo_detalle_cantidad
+        });
+      }
+
       const nuevoEstado = esRechazo ? 'rechazado' : 'cancelado';
 
-      await pool.query(
+      await client.query(
         `UPDATE autoconsumo 
          SET autoconsumo_estado = $1,
              autoconsumo_observacion = COALESCE($2, $3)
@@ -388,14 +469,20 @@ export const autoconsumoController = {
         [nuevoEstado, observacion, esRechazo ? 'Rechazado por Talento Humano' : 'Cancelado por el solicitante', id]
       );
 
+      await client.query('COMMIT');
+
       if (req.io) {
         req.io.emit('autoconsumo-actualizado', { id, estado: nuevoEstado });
+        req.io.emit('stock-actualizado', { productos: stockUpdates });
       }
 
-      res.json({ success: true, message: `Solicitud de autoconsumo ${nuevoEstado} con éxito` });
+      res.json({ success: true, message: `Solicitud de autoconsumo ${nuevoEstado} con éxito y stock devuelto al inventario` });
     } catch (error) {
+      await client.query('ROLLBACK');
       if (error instanceof AppError) throw error;
       throw new AppError('Error al cancelar autoconsumo', 500);
+    } finally {
+      client.release();
     }
   },
 
@@ -421,55 +508,9 @@ export const autoconsumoController = {
         throw new AppError('La solicitud debe estar aprobada para poder ser entregada', 400);
       }
 
-      // 2. Obtener detalles y validar stock actual
-      const detailsRes = await client.query('SELECT * FROM autoconsumo_detalle WHERE autoconsumo_id = $1', [id]);
-      
-      for (const d of detailsRes.rows) {
-        const prodRes = await client.query('SELECT producto_stock, producto_nombre FROM producto WHERE producto_id = $1 FOR UPDATE', [d.producto_id]);
-        const prod = prodRes.rows[0];
-        if (prod.producto_stock < d.autoconsumo_detalle_cantidad) {
-          throw new AppError(`Stock insuficiente de: ${prod.producto_nombre}. Stock actual: ${prod.producto_stock}, solicitado: ${d.autoconsumo_detalle_cantidad}`, 400);
-        }
-      }
+      // Nota: El stock ya fue reservado y descontado al crear la solicitud.
 
-      // 3. Modificar stock y crear movimiento de inventario para cada producto
-      const stockUpdates = [];
-      for (const d of detailsRes.rows) {
-        // Descontar
-        await client.query(
-          'UPDATE producto SET producto_stock = producto_stock - $1 WHERE producto_id = $2',
-          [d.autoconsumo_detalle_cantidad, d.producto_id]
-        );
-
-        // Obtener stock actual post-descuento
-        const freshProdRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1', [d.producto_id]);
-        const stockNuevo = freshProdRes.rows[0]?.producto_stock || 0;
-
-        // Registrar movimiento
-        await client.query(
-          `INSERT INTO movimiento_inventario (
-            producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
-            movimiento_inventario_cantidad, movimiento_inventario_stock_anterior,
-            movimiento_inventario_stock_nuevo, movimiento_inventario_observacion
-          ) VALUES ($1, $2, $3, 'salida', $4, $5, $6, $7)`,
-          [
-            d.producto_id,
-            autoconsumo.sucursal_id,
-            despachadorId || 1, // Si es virtual, asociar a admin por defecto
-            d.autoconsumo_detalle_cantidad,
-            stockNuevo + d.autoconsumo_detalle_cantidad,
-            stockNuevo,
-            `Autoconsumo despachado: ${autoconsumo.autoconsumo_codigo}`
-          ]
-        );
-
-        stockUpdates.push({
-          producto_id: d.producto_id,
-          cantidad: d.autoconsumo_detalle_cantidad
-        });
-      }
-
-      // 4. Actualizar estado de autoconsumo
+      // Actualizar estado de autoconsumo a entregado
       const foto = foto_entrega || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80';
       await client.query(
         `UPDATE autoconsumo 
@@ -486,7 +527,6 @@ export const autoconsumoController = {
 
       if (req.io) {
         req.io.emit('autoconsumo-actualizado', { id, estado: 'entregado' });
-        req.io.emit('stock-actualizado', { productos: stockUpdates });
       }
 
       res.json({ success: true, message: 'Productos entregados y registrados exitosamente' });

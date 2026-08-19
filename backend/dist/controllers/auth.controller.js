@@ -67,7 +67,7 @@ exports.authController = {
          JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
          WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
          LIMIT 1`, [empleado.empleado_id]);
-            const permitirFirmas = firmasCheck.rows.length > 0;
+            const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
             // Generar Token JWT con el rol y el ID real/virtual
             const token = jsonwebtoken_1.default.sign({
                 id: userId,
@@ -96,6 +96,7 @@ exports.authController = {
                             apellido: empleado.empleado_apellido,
                             cargo: empleado.empleado_cargo,
                             foto_perfil: empleado.empleado_foto,
+                            firma: empleado.empleado_firma || null,
                             departamento: empleado.departamento_nombre || 'General',
                             centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
                         }
@@ -171,7 +172,9 @@ exports.authController = {
                         apellido: emp.empleado_apellido,
                         cargo: emp.empleado_cargo,
                         foto_perfil: emp.empleado_foto,
-                        departamento: emp.departamento_nombre || 'Sin Departamento'
+                        firma: emp.empleado_firma || null,
+                        departamento: emp.departamento_nombre || 'Sin Departamento',
+                        centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
                     };
                 }
             }
@@ -182,7 +185,7 @@ exports.authController = {
             // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
             const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
          WHERE usuario_id = $1 AND rol_id = 9`, [user.usuario_id]);
-            const permitirFirmas = firmasCheck.rows.length > 0;
+            const permitirFirmas = rol.rol_id === 1 || firmasCheck.rows.length > 0;
             // Generar Token JWT
             const token = jsonwebtoken_1.default.sign({
                 id: user.usuario_id,
@@ -259,6 +262,7 @@ exports.authController = {
                             apellido: emp.empleado_apellido,
                             cargo: emp.empleado_cargo,
                             foto_perfil: emp.empleado_foto,
+                            firma: emp.empleado_firma || null,
                             departamento: emp.departamento_nombre || 'Sin Departamento',
                             centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
                         };
@@ -267,7 +271,7 @@ exports.authController = {
             }
             // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
             let permitirAutoconsumo = false;
-            let permitirFirmas = false;
+            let permitirFirmas = req.user.rol_id === 1;
             const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0
                 ? (await db_1.default.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id
                 : null);
@@ -281,7 +285,7 @@ exports.authController = {
            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
            WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
            LIMIT 1`, [targetEmpId]);
-                permitirFirmas = firmasCheck.rows.length > 0;
+                permitirFirmas = req.user.rol_id === 1 || firmasCheck.rows.length > 0;
             }
             res.json({
                 success: true,
@@ -358,7 +362,7 @@ exports.authController = {
             JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
             WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
             LIMIT 1`, [empleado.empleado_id]);
-                const permitirFirmas = firmasCheck.rows.length > 0;
+                const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
                 res.json({
                     success: true,
                     data: {
@@ -381,6 +385,7 @@ exports.authController = {
                                 apellido: empleado.empleado_apellido,
                                 cargo: empleado.empleado_cargo,
                                 foto_perfil: empleado.empleado_foto,
+                                firma: empleado.empleado_firma || null,
                                 departamento: empleado.departamento_nombre || 'General',
                                 centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
                             }
@@ -394,6 +399,28 @@ exports.authController = {
                 throw new error_middleware_1.AppError('Usuario inactivo', 401);
             }
             const user = userRes.rows[0];
+            let empleadoData = null;
+            if (user.empleado_id) {
+                const empRes = await db_1.default.query(`SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre, cc.centro_costos_codigo 
+           FROM empleado e 
+           LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
+           LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
+           WHERE e.empleado_id = $1`, [user.empleado_id]);
+                const emp = empRes.rows[0];
+                if (emp) {
+                    empleadoData = {
+                        id: emp.empleado_id,
+                        codigo_empleado: emp.empleado_cedula,
+                        nombre: emp.empleado_nombre,
+                        apellido: emp.empleado_apellido,
+                        cargo: emp.empleado_cargo,
+                        foto_perfil: emp.empleado_foto,
+                        firma: emp.empleado_firma || null,
+                        departamento: emp.departamento_nombre || 'Sin Departamento',
+                        centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
+                    };
+                }
+            }
             const staticRole = roles_data_1.rolesData.find(r => r.id === decoded.rol_id);
             const rolNombre = staticRole?.nombre || 'empleado';
             const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
@@ -404,7 +431,7 @@ exports.authController = {
             // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
             const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
          WHERE usuario_id = $1 AND rol_id = 9`, [user.usuario_id]);
-            const permitirFirmas = firmasCheck.rows.length > 0;
+            const permitirFirmas = decoded.rol_id === 1 || firmasCheck.rows.length > 0;
             res.json({
                 success: true,
                 data: {
@@ -419,7 +446,8 @@ exports.authController = {
                             permisos
                         },
                         permitir_autoconsumo: permitirAutoconsumo,
-                        permitir_firmas: permitirFirmas
+                        permitir_firmas: permitirFirmas,
+                        empleado: empleadoData
                     }
                 }
             });

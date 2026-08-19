@@ -8,7 +8,16 @@ import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { BotonRecargar } from '../common/BotonRecargar';
 import { useModal } from '../../context/ModalContext';
 import { ModalFlujoRequerimiento } from './ModalFlujoRequerimiento';
-import { BsTrash, BsDiagram3, BsFileEarmarkPdf, BsPencil } from 'react-icons/bs';
+import { 
+  BsTrash, 
+  BsDiagram3, 
+  BsFileEarmarkPdf, 
+  BsPencil, 
+  BsShieldLock, 
+  BsCloudUpload, 
+  BsExclamationTriangle, 
+  BsX 
+} from 'react-icons/bs';
 import { Paginacion } from '../common/Paginacion';
 
 export const PanelRequerimientos: React.FC = () => {
@@ -16,6 +25,7 @@ export const PanelRequerimientos: React.FC = () => {
   const { showConfirm } = useModal();
   const loggedEmpleadoId = user?.empleado?.id;
   const isEmployeeRole = user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar';
+  const canSign = user?.rol?.id === 1 || user?.rol?.nombre === 'admin' || !!user?.permitir_firmas || user?.rol?.nombre === 'empleado_autorizado_firmar';
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -100,6 +110,14 @@ export const PanelRequerimientos: React.FC = () => {
   const [currentFirma, setCurrentFirma] = useState(user?.empleado?.firma || '');
   const [subiendoFirma, setSubiendoFirma] = useState(false);
 
+  // Modales de validación de firma
+  const [showNoPermisoModal, setShowNoPermisoModal] = useState(false);
+  const [showSubirFirmaModal, setShowSubirFirmaModal] = useState(false);
+  const [modalFirmaFile, setModalFirmaFile] = useState<File | null>(null);
+  const [modalFirmaPreview, setModalFirmaPreview] = useState<string | null>(null);
+
+  const hasSignature = !!currentFirma || !!user?.empleado?.firma;
+
   // Estado para edición de requerimiento (solo admin)
   const [editingOrdenId, setEditingOrdenId] = useState<number | null>(null);
 
@@ -109,8 +127,48 @@ export const PanelRequerimientos: React.FC = () => {
     }
   }, [user]);
 
+  const handleModalFirmaUpload = async () => {
+    if (!modalFirmaFile) return;
+    const targetEmpId = loggedEmpleadoId || user?.empleado?.id || (user?.rol.id === 1 ? 1 : null);
+    if (!targetEmpId) {
+      setError('No se encontró un perfil de empleado para asociar la firma.');
+      return;
+    }
+
+    try {
+      setSubiendoFirma(true);
+      setError('');
+      
+      // 1. Subir la imagen de la firma
+      const res = await adminAPI.uploadPhoto(modalFirmaFile, 'firma');
+      
+      // 2. Asociar firma al empleado
+      await empleadosAPI.updateSignature(targetEmpId, res.url);
+      
+      // 3. Actualizar estado local
+      setCurrentFirma(res.url);
+      
+      // 4. Actualizar context si existe
+      if (user && user.empleado) {
+        user.empleado.firma = res.url;
+      }
+      
+      setSuccess('Tu firma digitalizada ha sido registrada y guardada exitosamente.');
+      setShowSubirFirmaModal(false);
+      setModalFirmaFile(null);
+      setModalFirmaPreview(null);
+      setModuloActivo('requerimiento');
+    } catch (err: any) {
+      console.error('Error al subir firma desde modal:', err);
+      setError(err.response?.data?.message || err.message || 'Error al subir la firma');
+    } finally {
+      setSubiendoFirma(false);
+    }
+  };
+
   const handleFirmaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && loggedEmpleadoId) {
+    const targetEmpId = loggedEmpleadoId || user?.empleado?.id || (user?.rol.id === 1 ? 1 : null);
+    if (e.target.files && e.target.files[0] && targetEmpId) {
       const file = e.target.files[0];
       try {
         setSubiendoFirma(true);
@@ -121,7 +179,7 @@ export const PanelRequerimientos: React.FC = () => {
         const res = await adminAPI.uploadPhoto(file, 'firma');
         
         // 2. Asociar firma al empleado
-        await empleadosAPI.updateSignature(loggedEmpleadoId, res.url);
+        await empleadosAPI.updateSignature(targetEmpId, res.url);
         
         // 3. Actualizar estado local
         setCurrentFirma(res.url);
@@ -183,12 +241,12 @@ export const PanelRequerimientos: React.FC = () => {
     }
   }, [user, departamentos, centrosCosto]);
 
-  // Forzar moduloActivo a 'historial' para empleados
+  // Control de acceso inicial al submodulo
   useEffect(() => {
-    if (isEmployeeRole) {
+    if (!canSign && moduloActivo === 'requerimiento') {
       setModuloActivo('historial');
     }
-  }, [isEmployeeRole]);
+  }, [canSign, moduloActivo]);
 
   // Pre-seleccionar Dominique Veloz y Mishell Paucar por defecto al cargar colaboradores
   useEffect(() => {
@@ -452,6 +510,16 @@ export const PanelRequerimientos: React.FC = () => {
     setError('');
     setSuccess('');
 
+    if (!canSign) {
+      setShowNoPermisoModal(true);
+      return;
+    }
+
+    if (!hasSignature) {
+      setShowSubirFirmaModal(true);
+      return;
+    }
+
     if (detallesLocales.length === 0) {
       setError('Debes agregar al menos un artículo o servicio al requerimiento.');
       return;
@@ -714,36 +782,46 @@ export const PanelRequerimientos: React.FC = () => {
       )}
 
       {/* Selector de Subsecciones (Tabs) */}
-      {!isEmployeeRole && (
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setModuloActivo('requerimiento')}
-            className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
-              moduloActivo === 'requerimiento'
-                ? 'border-gray-800 text-gray-800'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            Requerimiento de Bienes y/o Servicios
-          </button>
-          <button
-            onClick={() => setModuloActivo('historial')}
-            className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
-              moduloActivo === 'historial'
-                ? 'border-gray-800 text-gray-800'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            Historial de Órdenes de Reabastecimiento y Requerimientos
-          </button>
-        </div>
-      )}
+      <div className="flex border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (!canSign) {
+              setShowNoPermisoModal(true);
+              return;
+            }
+            if (!hasSignature) {
+              setShowSubirFirmaModal(true);
+              return;
+            }
+            setModuloActivo('requerimiento');
+          }}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'requerimiento'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Requerimiento de Bienes y/o Servicios
+        </button>
+        <button
+          type="button"
+          onClick={() => setModuloActivo('historial')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'historial'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Historial de Órdenes de Reabastecimiento y Requerimientos
+        </button>
+      </div>
 
       {/* SUBMODULO 1: REQUERIMIENTO */}
       {moduloActivo === 'requerimiento' && (
       <>
       {/* FORMULARIO DE REQUERIMIENTO */}
-      {!isEmployeeRole && (
+      {canSign && (
       <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
         
         {/* SECCIÓN A: METADATOS Y CABECERA */}
@@ -1751,6 +1829,166 @@ export const PanelRequerimientos: React.FC = () => {
           orden={selectedOrdenForFlow}
           onClose={() => setSelectedOrdenForFlow(null)}
         />
+      )}
+
+      {/* MODAL 1: SIN AUTORIZACIÓN DE FIRMA */}
+      {showNoPermisoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-gray-100 space-y-5 animate-scale-up">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-600">
+              <BsShieldLock className="text-3xl" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-bold text-gray-900">
+                Autorización de Firma Requerida
+              </h3>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Tu usuario no cuenta con el permiso para <strong className="text-gray-700">firmar y emitir requerimientos de compra</strong>.
+              </p>
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-left text-xs text-amber-900 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5 text-amber-800">
+                  <BsExclamationTriangle className="text-amber-600 shrink-0 text-sm" /> ¿Por qué es necesario?
+                </p>
+                <p className="text-[11px] text-amber-700">
+                  Todo requerimiento debe llevar la firma digital de quien lo elabora. Si se genera sin firma, el flujo de aprobación queda incompleto y bodega no podrá ingresar los productos cuando lleguen.
+                </p>
+              </div>
+              <p className="text-[11px] text-gray-400 pt-1">
+                Solicita a un <strong>Administrador o a Talento Humano</strong> que active la opción <em className="text-gray-600">"Autorizar Firma de Requerimientos"</em> en tu ficha de empleado.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoPermisoModal(false);
+                  setModuloActivo('historial');
+                }}
+                className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95"
+              >
+                Entendido, ir al Historial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: SUBIR FIRMA OBLIGATORIA */}
+      {showSubirFirmaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-gray-100 space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                  <BsPencil className="text-lg" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Registrar Firma Digital
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Requerida antes de crear tu requerimiento de compra
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSubirFirmaModal(false);
+                  setModalFirmaFile(null);
+                  setModalFirmaPreview(null);
+                  setModuloActivo('historial');
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition"
+              >
+                <BsX className="text-2xl" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Tienes los permisos habilitados, pero aún no has registrado tu firma. Para que el requerimiento se emita firmado y los productos puedan ser recibidos en bodega más adelante, sube tu firma física digitalizada ahora:
+              </p>
+
+              {/* Upload Dropzone / File Picker */}
+              <div 
+                onClick={() => document.getElementById('modal-firma-input')?.click()}
+                className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 ${
+                  modalFirmaPreview 
+                    ? 'border-indigo-400 bg-indigo-50/20' 
+                    : 'border-gray-300 hover:border-indigo-400 bg-gray-50/50 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="file"
+                  id="modal-firma-input"
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const file = e.target.files[0];
+                      setModalFirmaFile(file);
+                      setModalFirmaPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+
+                {modalFirmaPreview ? (
+                  <div className="space-y-2">
+                    <div className="w-48 h-24 mx-auto bg-white border border-gray-200 rounded-xl p-2 flex items-center justify-center overflow-hidden shadow-inner">
+                      <img 
+                        src={modalFirmaPreview} 
+                        alt="Previsualización de Firma" 
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <p className="text-[11px] font-semibold text-indigo-600">
+                      Hacer clic para seleccionar otra imagen
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 mb-1">
+                      <BsCloudUpload className="text-2xl" />
+                    </div>
+                    <div className="text-xs font-semibold text-gray-700">
+                      Haz clic aquí para seleccionar tu firma
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Recomendado: Imagen PNG con fondo transparente o fondo blanco nítido
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Acciones */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSubirFirmaModal(false);
+                  setModalFirmaFile(null);
+                  setModalFirmaPreview(null);
+                  setModuloActivo('historial');
+                }}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!modalFirmaFile || subiendoFirma}
+                onClick={handleModalFirmaUpload}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 flex items-center gap-2"
+              >
+                {subiendoFirma ? 'Guardando Firma...' : 'Guardar y Continuar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
