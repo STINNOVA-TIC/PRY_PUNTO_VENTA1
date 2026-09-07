@@ -557,7 +557,9 @@ export const PanelInventario: React.FC = () => {
     doc.text(esGuardia ? 'Reporte de Stock' : 'Reporte de Stock e Inventario Valorado', 14, 15);
     doc.setFontSize(10);
     doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 21);
-    doc.text(`Filtros: Busqueda: "${searchTerm || 'Todas'}" | Categoria: ${filterCategory === 'ALL' ? 'Todas' : categorias.find(c => c.id === filterCategory)?.nombre || 'Todas'}`, 14, 26);
+    const estadoTexto = filterStatus === 'active' ? 'Activos' : filterStatus === 'inactive' ? 'Inactivos' : 'Todos';
+    const categoriaTexto = filterCategory === 'ALL' ? 'Todas' : categorias.find(c => c.id === filterCategory)?.nombre || 'Todas';
+    doc.text(`Filtros: Busqueda: "${searchTerm || 'Todas'}" | Categoria: ${categoriaTexto} | Estado: ${estadoTexto}`, 14, 26);
 
     const headers = esGuardia
       ? [['Código', 'Producto', 'Descripción', 'Stock']]
