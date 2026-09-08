@@ -21,11 +21,11 @@ import {
 import { Paginacion } from '../common/Paginacion';
 
 export const PanelRequerimientos: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { showConfirm } = useModal();
   const loggedEmpleadoId = user?.empleado?.id;
-  const isEmployeeRole = user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar';
-  const canSign = user?.rol?.id === 1 || user?.rol?.nombre === 'admin' || !!user?.permitir_firmas || user?.rol?.nombre === 'empleado_autorizado_firmar';
+  const isEmployeeRole = user?.rol?.nombre === 'empleado';
+  const canSign = user?.rol?.id === 1 || user?.rol?.nombre === 'admin' || !!user?.permitir_firmas || hasPermission('requerimientos.firmar');
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);

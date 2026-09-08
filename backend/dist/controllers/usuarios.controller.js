@@ -14,28 +14,36 @@ exports.usuariosController = {
             const query = `
         SELECT u.usuario_id, u.usuario_nombre, u.usuario_email, u.usuario_estado, 
                u.empleado_id, e.empleado_nombre, e.empleado_apellido,
-               r.rol_id, r.rol_nombre
+               COALESCE(
+                 json_agg(
+                   json_build_object('id', r.rol_id, 'nombre', r.rol_nombre)
+                 ) FILTER (WHERE r.rol_id IS NOT NULL), '[]'
+               ) as roles
         FROM usuario u
         LEFT JOIN empleado e ON u.empleado_id = e.empleado_id
         LEFT JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
         LEFT JOIN rol r ON ur.rol_id = r.rol_id
+        GROUP BY u.usuario_id, u.usuario_nombre, u.usuario_email, u.usuario_estado, 
+                 u.empleado_id, e.empleado_nombre, e.empleado_apellido
         ORDER BY u.usuario_nombre ASC
       `;
             const resUsers = await db_1.default.query(query);
-            const data = resUsers.rows.map(row => ({
-                id: row.usuario_id,
-                nombre: row.usuario_nombre,
-                email: row.usuario_email,
-                activo: row.usuario_estado === 'activo',
-                empleado: row.empleado_id ? {
-                    id: row.empleado_id,
-                    nombre: `${row.empleado_nombre} ${row.empleado_apellido}`
-                } : null,
-                rol: row.rol_id ? {
-                    id: row.rol_id,
-                    nombre: row.rol_nombre
-                } : null
-            }));
+            const data = resUsers.rows.map(row => {
+                const rolesList = row.roles || [];
+                const principalRol = rolesList.length > 0 ? rolesList[0] : null;
+                return {
+                    id: row.usuario_id,
+                    nombre: row.usuario_nombre,
+                    email: row.usuario_email,
+                    activo: row.usuario_estado === 'activo',
+                    empleado: row.empleado_id ? {
+                        id: row.empleado_id,
+                        nombre: `${row.empleado_nombre} ${row.empleado_apellido}`
+                    } : null,
+                    rol: principalRol,
+                    roles: rolesList
+                };
+            });
             res.json({
                 success: true,
                 data
@@ -200,5 +208,128 @@ exports.usuariosController = {
                 throw error;
             throw new error_middleware_1.AppError('Error al eliminar operador', 500);
         }
+    },
+    // Obtener permisos completos (base de roles + personalizados) de un usuario
+    getUserPermissions: async (req, res) => {
+        try {
+            const id = parseInt(req.params.id);
+            // 1. Obtener todos los permisos del sistema organizados por módulo
+            const allPermsRes = await db_1.default.query(`
+        SELECT p.permiso_id, p.permiso_clave, p.permiso_nombre, p.permiso_descripcion,
+               m.modulo_id, m.modulo_nombre
+        FROM permiso p
+        JOIN modulo m ON p.modulo_id = m.modulo_id
+        WHERE p.permiso_estado = 'activo'
+        ORDER BY m.modulo_id ASC, p.permiso_nombre ASC
+      `);
+            // 2. Obtener permisos que el usuario hereda de sus roles
+            const rolePermsRes = await db_1.default.query(`
+        SELECT DISTINCT p.permiso_id, p.permiso_clave
+        FROM usuario_rol ur
+        JOIN rol_permiso rp ON ur.rol_id = rp.rol_id
+        JOIN permiso p ON rp.permiso_id = p.permiso_id
+        WHERE ur.usuario_id = $1 AND p.permiso_estado = 'activo'
+      `, [id]);
+            const rolePermIds = new Set(rolePermsRes.rows.map(r => r.permiso_id));
+            // 3. Obtener personalizaciones directas en usuario_permiso
+            const customPermsRes = await db_1.default.query(`
+        SELECT permiso_id, tipo
+        FROM usuario_permiso
+        WHERE usuario_id = $1
+      `, [id]);
+            const customConcedidos = new Set();
+            const customDenegados = new Set();
+            for (const row of customPermsRes.rows) {
+                if (row.tipo === 'conceder')
+                    customConcedidos.add(row.permiso_id);
+                if (row.tipo === 'denegar')
+                    customDenegados.add(row.permiso_id);
+            }
+            // 4. Mapear cada permiso con su estado final
+            const permisosConEstado = allPermsRes.rows.map(p => {
+                const porRol = rolePermsIdsContains(rolePermIds, p.permiso_id);
+                const estaConcedido = customConcedidos.has(p.permiso_id);
+                const estaDenegado = customDenegados.has(p.permiso_id);
+                let activo = false;
+                if (estaDenegado) {
+                    activo = false;
+                }
+                else if (estaConcedido || porRol) {
+                    activo = true;
+                }
+                return {
+                    id: p.permiso_id,
+                    clave: p.permiso_clave,
+                    nombre: p.permiso_nombre,
+                    descripcion: p.permiso_descripcion,
+                    modulo_id: p.modulo_id,
+                    modulo_nombre: p.modulo_nombre,
+                    heredado_rol: porRol,
+                    personalizado: estaConcedido ? 'conceder' : estaDenegado ? 'denegar' : null,
+                    activo
+                };
+            });
+            res.json({
+                success: true,
+                data: permisosConEstado
+            });
+            return;
+        }
+        catch (error) {
+            throw new error_middleware_1.AppError('Error al consultar permisos del operador', 500);
+        }
+    },
+    // Guardar personalizaciones de permisos para un usuario
+    saveUserPermissions: async (req, res) => {
+        const client = await db_1.default.connect();
+        try {
+            const id = parseInt(req.params.id);
+            const { cambios } = req.body; // Array de { permiso_id: number, activo: boolean }
+            if (!Array.isArray(cambios)) {
+                throw new error_middleware_1.AppError('Formato de datos inválido para permisos', 400);
+            }
+            // Permisos que vienen por rol
+            const rolePermsRes = await client.query(`
+        SELECT DISTINCT p.permiso_id
+        FROM usuario_rol ur
+        JOIN rol_permiso rp ON ur.rol_id = rp.rol_id
+        JOIN permiso p ON rp.permiso_id = p.permiso_id
+        WHERE ur.usuario_id = $1 AND p.permiso_estado = 'activo'
+      `, [id]);
+            const rolePermIds = new Set(rolePermsRes.rows.map(r => r.permiso_id));
+            await client.query('BEGIN');
+            // Limpiar excepciones previas
+            await client.query('DELETE FROM usuario_permiso WHERE usuario_id = $1', [id]);
+            // Insertar solo las excepciones respecto a su rol
+            for (const item of cambios) {
+                const heredaPorRol = rolePermIds.has(item.permiso_id);
+                if (item.activo && !heredaPorRol) {
+                    // No lo tenía en el rol, pero se lo concedemos de forma personalizada
+                    await client.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo) VALUES ($1, $2, 'conceder')`, [id, item.permiso_id]);
+                }
+                else if (!item.activo && heredaPorRol) {
+                    // Lo tenía en el rol, pero se lo denegamos específicamente
+                    await client.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo) VALUES ($1, $2, 'denegar')`, [id, item.permiso_id]);
+                }
+            }
+            await client.query('COMMIT');
+            res.json({
+                success: true,
+                message: 'Permisos del usuario actualizados correctamente'
+            });
+            return;
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            throw new error_middleware_1.AppError('Error al guardar permisos personalizados', 500);
+        }
+        finally {
+            client.release();
+        }
     }
 };
+function rolePermsIdsContains(set, id) {
+    return set.has(id);
+}

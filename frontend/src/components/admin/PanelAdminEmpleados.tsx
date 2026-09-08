@@ -7,10 +7,12 @@ import { BotonRecargar } from '../common/BotonRecargar';
 import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
 import { useModal } from '../../context/ModalContext';
+import { useAuth } from '../../context/AuthContext';
 
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 
 export const PanelAdminEmpleados: React.FC = () => {
+  const { hasPermission } = useAuth();
   const { showConfirm } = useModal();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [departamentos, setDepartamentos] = useState<{ id: number; nombre: string }[]>([]);
@@ -271,19 +273,23 @@ export const PanelAdminEmpleados: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <BotonRecargar onRefresh={cargarDatos} loading={loading} />
-          <button
-            type="button"
-            onClick={() => setIsImportExportOpen(true)}
-            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            Importar / Exportar
-          </button>
-          <button
-            onClick={handleCreateNewClick}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            Registrar Colaborador
-          </button>
+          {hasPermission('empleados.crear') && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsImportExportOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-750 rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                Importar / Exportar
+              </button>
+              <button
+                onClick={handleCreateNewClick}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                Registrar Colaborador
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -453,14 +459,18 @@ export const PanelAdminEmpleados: React.FC = () => {
                           </td>
                           <td className="px-5 py-4 text-right">
                             <div className="flex gap-2 justify-end">
-                              <BotonAccion
-                                tipo="editar"
-                                onClick={() => handleEditClick(emp)}
-                              />
-                              <BotonAccion
-                                tipo={emp.activo ? 'desactivar' : 'activar'}
-                                onClick={() => handleToggleActivo(emp)}
-                              />
+                              {hasPermission('empleados.editar') && (
+                                <BotonAccion
+                                  tipo="editar"
+                                  onClick={() => handleEditClick(emp)}
+                                />
+                              )}
+                              {(hasPermission('empleados.desactivar') || hasPermission('empleados.activar') || hasPermission('empleados.editar')) && (
+                                <BotonAccion
+                                  tipo={emp.activo ? 'desactivar' : 'activar'}
+                                  onClick={() => handleToggleActivo(emp)}
+                                />
+                              )}
                             </div>
                           </td>
                         </tr>

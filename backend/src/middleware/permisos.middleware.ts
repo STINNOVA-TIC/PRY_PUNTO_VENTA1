@@ -1,12 +1,11 @@
 // backend/src/middleware/permisos.middleware.ts
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
-import { rolesData } from '../models/roles.data';
 import { Permiso } from '../types/permisos';
 import pool from '../config/db';
 
-// Helper para obtener la unión de todos los permisos de los roles del usuario
-async function getUsuarioPermisos(userId: number, defaultRolId: number): Promise<{ permissions: Set<string>; isAdmin: boolean; roles: string[] }> {
+// Helper para obtener los permisos efectivos del usuario
+export async function getUsuarioPermisos(userId: number, defaultRolId: number): Promise<{ permissions: Set<string>; isAdmin: boolean; roles: string[] }> {
   const rolesList: number[] = [];
   
   if (userId && userId !== 0) {
@@ -21,20 +20,30 @@ async function getUsuarioPermisos(userId: number, defaultRolId: number): Promise
     rolesList.push(defaultRolId);
   }
 
-  const matchedRoles = rolesData.filter(r => rolesList.includes(r.id));
+  // 1. Obtener nombres de roles
+  const rolesRes = await pool.query(
+    'SELECT rol_id, rol_nombre FROM rol WHERE rol_id = ANY($1)',
+    [rolesList]
+  );
+  const rolesNames: string[] = rolesRes.rows.map(r => r.rol_nombre);
+  const isAdmin = rolesNames.includes('admin') || rolesList.includes(1);
+
+  // 2. Obtener permisos híbridos reales (DB + personalizados)
   const allPermisos = new Set<string>();
-  let isAdmin = false;
-  const rolesNames: string[] = [];
 
-  matchedRoles.forEach(r => {
-    rolesNames.push(r.nombre);
-    if (r.nombre === 'admin') {
-      isAdmin = true;
+  if (userId && userId !== 0) {
+    const { getPermisosForUsuario } = await import('../controllers/auth.controller');
+    const userPerms = await getPermisosForUsuario(userId, defaultRolId || 3);
+    userPerms.forEach(p => allPermisos.add(p));
+  } else {
+    const { getPermisosForRol } = await import('../controllers/auth.controller');
+    for (const rId of rolesList) {
+      const perms = await getPermisosForRol(rId);
+      perms.forEach(p => allPermisos.add(p));
     }
-    r.permisos.forEach(p => allPermisos.add(p));
-  });
+  }
 
-  return { permissions: allPermisos, isAdmin, roles: rolesNames };
+  return { permissions: allPermisos, isAdmin, roles: rolesNames.length > 0 ? rolesNames : ['empleado'] };
 }
 
 // Verificar si el usuario tiene un permiso específico

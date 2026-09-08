@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authController = void 0;
+exports.authController = exports.getPermisosForUsuario = exports.getPermisosForRol = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const db_1 = __importDefault(require("../config/db"));
@@ -11,6 +11,68 @@ const error_middleware_1 = require("../middleware/error.middleware");
 const permisos_1 = require("../types/permisos");
 const roles_data_1 = require("../models/roles.data");
 const validators_1 = require("../utils/validators");
+/**
+ * Obtener permisos activos de la base de datos para un rol dado.
+ * Si la base de datos no tiene permisos o falla, recurre a rolesData como fallback seguro.
+ */
+const getPermisosForRol = async (rolId) => {
+    try {
+        const res = await db_1.default.query(`SELECT p.permiso_clave 
+       FROM rol_permiso rp
+       JOIN permiso p ON rp.permiso_id = p.permiso_id
+       WHERE rp.rol_id = $1 AND p.permiso_estado = 'activo'
+       ORDER BY p.permiso_clave ASC`, [rolId]);
+        if (res.rows.length > 0) {
+            return res.rows.map(r => r.permiso_clave);
+        }
+    }
+    catch (error) {
+        console.error(`Error al consultar permisos de la BD para rol ${rolId}:`, error);
+    }
+    // Fallback seguro a los datos estáticos existentes
+    const staticRole = roles_data_1.rolesData.find(r => r.id === rolId);
+    return (staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO);
+};
+exports.getPermisosForRol = getPermisosForRol;
+/**
+ * Obtener permisos finales calculados para un usuario:
+ * (Permisos de todos sus roles asignados + permisos concedidos directamente) - permisos denegados directamente
+ */
+const getPermisosForUsuario = async (usuarioId, rolIdFallback) => {
+    try {
+        // 1. Obtener todos los roles asociados a este usuario
+        const rolesRes = await db_1.default.query(`SELECT rol_id FROM usuario_rol WHERE usuario_id = $1`, [usuarioId]);
+        const userRoles = rolesRes.rows.map(r => r.rol_id);
+        if (!userRoles.includes(rolIdFallback)) {
+            userRoles.push(rolIdFallback);
+        }
+        // 2. Obtener permisos base de los roles del usuario
+        const basePermisosSet = new Set();
+        for (const rId of userRoles) {
+            const perms = await (0, exports.getPermisosForRol)(rId);
+            perms.forEach(p => basePermisosSet.add(p));
+        }
+        // 3. Consultar personalizaciones individuales en usuario_permiso
+        const customRes = await db_1.default.query(`SELECT p.permiso_clave, up.tipo
+       FROM usuario_permiso up
+       JOIN permiso p ON up.permiso_id = p.permiso_id
+       WHERE up.usuario_id = $1 AND p.permiso_estado = 'activo'`, [usuarioId]);
+        for (const row of customRes.rows) {
+            if (row.tipo === 'conceder') {
+                basePermisosSet.add(row.permiso_clave);
+            }
+            else if (row.tipo === 'denegar') {
+                basePermisosSet.delete(row.permiso_clave);
+            }
+        }
+        return Array.from(basePermisosSet).sort();
+    }
+    catch (error) {
+        console.error(`Error calculando permisos híbridos para usuario ${usuarioId}:`, error);
+        return await (0, exports.getPermisosForRol)(rolIdFallback);
+    }
+};
+exports.getPermisosForUsuario = getPermisosForUsuario;
 exports.authController = {
     /**
      * Iniciar sesión de empleado por Cédula (Sin Contraseña)
@@ -46,7 +108,7 @@ exports.authController = {
                 userId = userRolesRes.rows[0].usuario_id;
                 const rolesList = userRolesRes.rows.map(r => r.rol_id);
                 // Restricción de seguridad: Limitar Cédula únicamente a roles de colaborador (3, 8, 9)
-                const colaboradorRolesList = rolesList.filter(id => [3, 8, 9].includes(id));
+                const colaboradorRolesList = rolesList.filter(id => id === 3);
                 const matchedRoles = roles_data_1.rolesData.filter(r => colaboradorRolesList.includes(r.id));
                 matchedRoles.sort((a, b) => b.nivel - a.nivel); // De mayor a menor nivel
                 if (matchedRoles.length > 0) {
@@ -55,19 +117,11 @@ exports.authController = {
             }
             const staticRole = roles_data_1.rolesData.find(r => r.id === rolId);
             const rolNombre = staticRole?.nombre || 'empleado';
-            const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
-            // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
-            const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-         WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
-         LIMIT 1`, [empleado.empleado_id]);
-            const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
-            // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
-            const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-         JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-         WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
-         LIMIT 1`, [empleado.empleado_id]);
-            const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
+            const permisos = userId > 0 ? await (0, exports.getPermisosForUsuario)(userId, rolId) : await (0, exports.getPermisosForRol)(rolId);
+            // Verificar si el colaborador tiene autorizado el autoconsumo
+            const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
+            // Verificar si el colaborador tiene autorizado firmar requerimientos
+            const permitirFirmas = rolId === 1 || permisos.includes('requerimientos.firmar');
             // Generar Token JWT con el rol y el ID real/virtual
             const token = jsonwebtoken_1.default.sign({
                 id: userId,
@@ -152,10 +206,10 @@ exports.authController = {
             if (!tieneRolOperador) {
                 throw new error_middleware_1.AppError('Acceso denegado. Este portal es de uso exclusivo para operadores y administradores.', 403);
             }
-            // Mapear permisos según rol dinámicamente desde static rolesData
+            // Mapear permisos según rol y personalización híbrida del usuario
             const staticRole = roles_data_1.rolesData.find(r => r.id === rol.rol_id);
             const rolNombre = staticRole?.nombre || 'empleado';
-            const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
+            const permisos = await (0, exports.getPermisosForUsuario)(user.usuario_id, rol.rol_id);
             // Obtener datos del empleado asociado si existe
             let empleado = null;
             if (user.empleado_id) {
@@ -178,14 +232,9 @@ exports.authController = {
                     };
                 }
             }
-            // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
-            const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
-         WHERE usuario_id = $1 AND rol_id = 8`, [user.usuario_id]);
-            const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
-            // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
-            const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
-         WHERE usuario_id = $1 AND rol_id = 9`, [user.usuario_id]);
-            const permitirFirmas = rol.rol_id === 1 || firmasCheck.rows.length > 0;
+            // Verificar permisos de autoconsumo y firmas
+            const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
+            const permitirFirmas = rol.rol_id === 1 || permisos.includes('requerimientos.firmar');
             // Generar Token JWT
             const token = jsonwebtoken_1.default.sign({
                 id: user.usuario_id,
@@ -229,7 +278,7 @@ exports.authController = {
             }
             const staticRole = roles_data_1.rolesData.find(r => r.id === req.user.rol_id);
             const rolNombre = staticRole?.nombre || 'empleado';
-            const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
+            const permisos = req.user.id > 0 ? await (0, exports.getPermisosForUsuario)(req.user.id, req.user.rol_id) : await (0, exports.getPermisosForRol)(req.user.rol_id);
             let empleado = null;
             if (req.empleado) {
                 empleado = {
@@ -269,24 +318,8 @@ exports.authController = {
                     }
                 }
             }
-            // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
-            let permitirAutoconsumo = false;
-            let permitirFirmas = req.user.rol_id === 1;
-            const targetEmpId = req.empleado?.empleado_id || (req.user?.id && req.user.id !== 0
-                ? (await db_1.default.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id])).rows[0]?.empleado_id
-                : null);
-            if (targetEmpId) {
-                const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-           JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-           WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
-           LIMIT 1`, [targetEmpId]);
-                permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
-                const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-           JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-           WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
-           LIMIT 1`, [targetEmpId]);
-                permitirFirmas = req.user.rol_id === 1 || firmasCheck.rows.length > 0;
-            }
+            const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
+            const permitirFirmas = req.user.rol_id === 1 || permisos.includes('requerimientos.firmar');
             res.json({
                 success: true,
                 data: {
@@ -350,19 +383,11 @@ exports.authController = {
                 }
                 const staticRole = roles_data_1.rolesData.find(r => r.id === rolId);
                 const rolNombre = staticRole?.nombre || 'empleado';
-                const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
-                // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
-                const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-            WHERE u.empleado_id = $1 AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
-            LIMIT 1`, [empleado.empleado_id]);
-                const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
-                // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
-                const firmasCheck = await db_1.default.query(`SELECT 1 FROM usuario u
-            JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
-            WHERE u.empleado_id = $1 AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
-            LIMIT 1`, [empleado.empleado_id]);
-                const permitirFirmas = rolId === 1 || firmasCheck.rows.length > 0;
+                const permisos = userId > 0 ? await (0, exports.getPermisosForUsuario)(userId, rolId) : await (0, exports.getPermisosForRol)(rolId);
+                // Verificar si el colaborador tiene autorizado el autoconsumo
+                const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
+                // Verificar si el colaborador tiene autorizado firmar requerimientos
+                const permitirFirmas = rolId === 1 || permisos.includes('requerimientos.firmar');
                 res.json({
                     success: true,
                     data: {
@@ -423,7 +448,7 @@ exports.authController = {
             }
             const staticRole = roles_data_1.rolesData.find(r => r.id === decoded.rol_id);
             const rolNombre = staticRole?.nombre || 'empleado';
-            const permisos = staticRole?.permisos || permisos_1.GruposPermisos.EMPLEADO;
+            const permisos = await (0, exports.getPermisosForUsuario)(user.usuario_id, decoded.rol_id);
             // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
             const autoconsumoCheck = await db_1.default.query(`SELECT 1 FROM usuario_rol 
          WHERE usuario_id = $1 AND rol_id = 8`, [user.usuario_id]);

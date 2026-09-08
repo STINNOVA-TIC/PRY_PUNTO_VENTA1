@@ -78,7 +78,10 @@ export type Permiso =
   | 'autoconsumo.crear'
   | 'autoconsumo.aprobar'
   | 'autoconsumo.entregar'
-  | 'autoconsumo.eliminar';
+  | 'autoconsumo.eliminar'
+
+  // ============ REQUERIMIENTOS ============
+  | 'requerimientos.firmar';
 
 // Grupos de permisos para facilitar la asignación
 export const GruposPermisos = {
@@ -94,7 +97,7 @@ export const GruposPermisos = {
     'productos.activar', 'productos.desactivar',
     'inventario.ver', 'inventario.ver_movimientos', 'inventario.ajustar_stock',
     'inventario.ingresar_mercancia', 'inventario.ver_costos',
-    'ventas.realizar', 'ventas.ver', 'ventas.anular', 'ventas.cancelar',
+    'ventas.realizar', 'ventas.ver', 'ventas.ver_propias', 'ventas.anular', 'ventas.cancelar',
     'entregas.ver', 'entregas.ver_pendientes', 'entregas.confirmar',
     'entregas.verificar_empleado', 'entregas.reportar_incidente',
     'reportes.ver', 'reportes.ver_financieros', 'reportes.ver_consumo_empleados',
@@ -102,7 +105,8 @@ export const GruposPermisos = {
     'nomina.ver', 'nomina.ver_todos', 'nomina.aplicar_descuento',
     'nomina.configurar_descuentos',
     'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
-    'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar'
+    'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar',
+    'requerimientos.firmar'
   ] as Permiso[],
 
   // GUARDIA: Solo entregas y verificación

@@ -159,7 +159,7 @@ function App() {
             <Route path="/admin/empleados" element={
               <ProtectedRoute>
                 <Layout>
-                  <PermissionGuard permiso="empleados.crear">
+                  <PermissionGuard permisos={['empleados.ver', 'empleados.crear']}>
                     <PanelAdminEmpleados />
                   </PermissionGuard>
                 </Layout>
@@ -168,7 +168,7 @@ function App() {
             <Route path="/admin/usuarios" element={
               <ProtectedRoute>
                 <Layout>
-                  <PermissionGuard permiso="empleados.crear">
+                  <PermissionGuard permisos={['usuarios.ver', 'usuarios.crear']}>
                     <PanelAdminUsuarios />
                   </PermissionGuard>
                 </Layout>

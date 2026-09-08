@@ -19,7 +19,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export const PanelInventario: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const rol = user?.rol.nombre;
   const { showConfirm, showAlert } = useModal();
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -663,12 +663,14 @@ export const PanelInventario: React.FC = () => {
               >
                 Importar / Exportar
               </button>
-              <button
-                onClick={handleCreateProductClick}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-              >
-                Crear Nuevo Producto
-              </button>
+              {hasPermission('productos.crear') && (
+                <button
+                  onClick={handleCreateProductClick}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                >
+                  Crear Nuevo Producto
+                </button>
+              )}
               <Link
                 to="/requerimientos"
                 className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center"
@@ -928,22 +930,28 @@ export const PanelInventario: React.FC = () => {
                             <>
                               {rol !== 'guardia' ? (
                                 <>
-                                  <BotonAccion
-                                    tipo="editar_detalle"
-                                    onClick={() => handleEditProductClick(p)}
-                                  />
-                                  <BotonAccion
-                                    tipo={p.activo ? 'desactivar' : 'activar'}
-                                    onClick={() => handleToggleProductStatus(p.id, p.activo)}
-                                  />
-                                  <BotonAccion
-                                    tipo="ajustar_stock"
-                                    onClick={() => {
-                                      setEditingStockId(p.id);
-                                      setNewStockVal(p.stock_actual.toString());
-                                    }}
-                                  />
-                                  {rol === 'admin' && (
+                                  {hasPermission('productos.editar') && (
+                                    <BotonAccion
+                                      tipo="editar_detalle"
+                                      onClick={() => handleEditProductClick(p)}
+                                    />
+                                  )}
+                                  {(p.activo ? hasPermission('productos.desactivar') : hasPermission('productos.activar')) && (
+                                    <BotonAccion
+                                      tipo={p.activo ? 'desactivar' : 'activar'}
+                                      onClick={() => handleToggleProductStatus(p.id, p.activo)}
+                                    />
+                                  )}
+                                  {hasPermission('inventario.ajustar_stock') && (
+                                    <BotonAccion
+                                      tipo="ajustar_stock"
+                                      onClick={() => {
+                                        setEditingStockId(p.id);
+                                        setNewStockVal(p.stock_actual.toString());
+                                      }}
+                                    />
+                                  )}
+                                  {rol === 'admin' && hasPermission('productos.eliminar') && (
                                     <BotonAccion
                                       tipo="eliminar"
                                       onClick={() => handleDeleteProduct(p.id)}

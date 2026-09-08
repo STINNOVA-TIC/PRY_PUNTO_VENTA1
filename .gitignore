@@ -43,3 +43,6 @@ Desktop.ini
 # Snapshots / test artefacts
 __snapshots__/
 backend/img/*
+scratch/
+*/scratch/
+

@@ -57,4 +57,7 @@ export type Permiso =
   | 'autoconsumo.crear'
   | 'autoconsumo.aprobar'
   | 'autoconsumo.entregar'
-  | 'autoconsumo.eliminar';
+  | 'autoconsumo.eliminar'
+
+  // ============ REQUERIMIENTOS ============
+  | 'requerimientos.firmar';

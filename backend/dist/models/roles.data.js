@@ -69,24 +69,5 @@ exports.rolesData = [
         descripcion: 'Talento Humano: Gestión de devoluciones, nómina y consumo de empleados',
         permisos: permisos_1.GruposPermisos.TTHH,
         nivel: 50
-    },
-    {
-        id: 8,
-        nombre: 'empleado_autorizado',
-        descripcion: 'Empleado autorizado para realizar autoconsumos para la empresa',
-        permisos: [
-            ...permisos_1.GruposPermisos.EMPLEADO,
-            'autoconsumo.crear'
-        ],
-        nivel: 25
-    },
-    {
-        id: 9,
-        nombre: 'empleado_autorizado_firmar',
-        descripcion: 'Colaborador autorizado para firmar requerimientos',
-        permisos: [
-            ...permisos_1.GruposPermisos.EMPLEADO
-        ],
-        nivel: 26
     }
 ];

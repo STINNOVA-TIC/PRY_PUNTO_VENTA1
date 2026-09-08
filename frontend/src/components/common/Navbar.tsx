@@ -6,7 +6,7 @@ import { BsList, BsX, BsBoxSeam, BsClipboardCheck, BsBoxes, BsFileEarmarkText, B
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const { user, logout, isShopSession, setIsShopSession } = useAuth();
+  const { user, logout, isShopSession, isSignatureSession, setIsShopSession, hasPermission } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -31,6 +31,12 @@ export const Navbar: React.FC = () => {
             </Link>
             
             <div className="hidden md:flex items-center space-x-1">
+              {isSignatureSession ? (
+                <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition flex items-center gap-1.5">
+                  <BsFileEarmarkText className="h-4 w-4" />
+                  Requerimientos
+                </Link>
+              ) : (<>
               {/* Guardia / Admin */}
               {(rol === 'guardia' || rol === 'admin') && (
                 <Link to="/entregas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
@@ -60,7 +66,7 @@ export const Navbar: React.FC = () => {
                         <BsFileEarmarkText className="h-4 w-4" />
                         Requerimientos
                       </Link>
-                      {rol === 'inventario' && (
+                      {rol === 'inventario' && !hasPermission('roles.ver') && !hasPermission('roles.crear') && (
                         <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
                           <BsGrid1X2Fill className="h-4 w-4" />
                           Catálogos
@@ -79,23 +85,26 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
 
-              {/* Solo Admin */}
-              {rol === 'admin' && (
-                <>
-                  <Link to="/admin/empleados" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                    <BsPeople className="h-4 w-4" />
-                    Colaboradores
-                  </Link>
-                  <Link to="/admin/usuarios" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                    <BsPersonGear className="h-4 w-4" />
-                    Operadores
-                  </Link>
-                  <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                    <BsGrid1X2Fill className="h-4 w-4" />
-                    Tablas Maestras
-                  </Link>
-                </>
+              {/* Módulos de Administración / Configuración */}
+              {(rol === 'admin' || hasPermission('empleados.ver') || hasPermission('empleados.crear')) && (
+                <Link to="/admin/empleados" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsPeople className="h-4 w-4" />
+                  Colaboradores
+                </Link>
               )}
+              {(rol === 'admin' || hasPermission('usuarios.ver') || hasPermission('usuarios.crear')) && (
+                <Link to="/admin/usuarios" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsPersonGear className="h-4 w-4" />
+                  Operadores
+                </Link>
+              )}
+              {(rol === 'admin' || hasPermission('roles.ver') || hasPermission('roles.crear') || hasPermission('configuracion.ver')) && (
+                <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
+                  <BsGrid1X2Fill className="h-4 w-4" />
+                  Tablas Maestras
+                </Link>
+              )}
+              </>)}
             </div>
           </div>
 
@@ -144,6 +153,12 @@ export const Navbar: React.FC = () => {
       {/* Menú móvil desplegable */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 py-3 px-4 bg-gray-50 space-y-1.5 transition duration-150 animate-fade-in shadow-inner">
+          {isSignatureSession ? (
+            <Link to="/requerimientos" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2">
+              <BsFileEarmarkText className="h-4 w-4 text-gray-400" />
+              Requerimientos
+            </Link>
+          ) : (<>
           {/* Guardia / Admin */}
           {(rol === 'guardia' || rol === 'admin') && (
             <Link
@@ -189,7 +204,7 @@ export const Navbar: React.FC = () => {
                     <BsFileEarmarkText className="h-4 w-4 text-gray-400" />
                     Requerimientos
                   </Link>
-                  {rol === 'inventario' && (
+                  {rol === 'inventario' && !hasPermission('roles.ver') && !hasPermission('roles.crear') && (
                     <Link
                       to="/admin/tablas"
                       onClick={() => setMobileMenuOpen(false)}
@@ -216,35 +231,38 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
 
-          {/* Solo Admin */}
-          {rol === 'admin' && (
-            <>
-              <Link
-                to="/admin/empleados"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
-              >
-                <BsPeople className="h-4 w-4 text-gray-400" />
-                Colaboradores
-              </Link>
-              <Link
-                to="/admin/usuarios"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
-              >
-                <BsPersonGear className="h-4 w-4 text-gray-400" />
-                Operadores
-              </Link>
-              <Link
-                to="/admin/tablas"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
-              >
-                <BsGrid1X2Fill className="h-4 w-4 text-gray-400" />
-                Tablas Maestras
-              </Link>
-            </>
+          {/* Módulos de Administración / Configuración en móviles */}
+          {(rol === 'admin' || hasPermission('empleados.ver') || hasPermission('empleados.crear')) && (
+            <Link
+              to="/admin/empleados"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <BsPeople className="h-4 w-4 text-gray-400" />
+              Colaboradores
+            </Link>
           )}
+          {(rol === 'admin' || hasPermission('usuarios.ver') || hasPermission('usuarios.crear')) && (
+            <Link
+              to="/admin/usuarios"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <BsPersonGear className="h-4 w-4 text-gray-400" />
+              Operadores
+            </Link>
+          )}
+          {(rol === 'admin' || hasPermission('roles.ver') || hasPermission('roles.crear') || hasPermission('configuracion.ver')) && (
+            <Link
+              to="/admin/tablas"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <BsGrid1X2Fill className="h-4 w-4 text-gray-400" />
+              Tablas Maestras
+            </Link>
+          )}
+          </>)}
         </div>
       )}
     </nav>

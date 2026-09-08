@@ -8,6 +8,7 @@ interface AuthContextType {
   user: Usuario | null;
   loading: boolean;
   isShopSession: boolean;
+  isSignatureSession: boolean;
   setIsShopSession: (isShop: boolean) => void;
   login: (email: string, password: string) => Promise<void>;
   loginByCedula: (cedula: string, isForSignatures?: boolean) => Promise<void>;
@@ -25,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
   const [isShopSession, setIsShopSession] = useState<boolean>(false);
+  const employeeRoles = ['empleado', 'empleado_autorizado', 'empleado_autorizado_firmar'];
+  const isSignatureSession = !isShopSession && !!user && employeeRoles.includes(user.rol.nombre);
   const lastActivity = useRef<number>(Date.now());
 
   const hasPermission = (permiso: Permiso): boolean => {
@@ -99,10 +102,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedIsShop = localStorage.getItem('isShopSession');
       
       if (token && storedUser) {
-        const userData = JSON.parse(storedUser);
-        // Pasar el token en la petición para validar en backend
-        await authAPI.verifyToken(token);
-        setUser(userData);
+        // Pasar el token en la petición para validar en backend y obtener datos y permisos actualizados
+        const verifyRes = await authAPI.verifyToken(token);
+        if (verifyRes.data?.user) {
+          const freshUser = verifyRes.data.user;
+          localStorage.setItem('user', JSON.stringify(freshUser));
+          setUser(freshUser);
+        } else {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+        }
         setIsShopSession(storedIsShop === 'true');
         lastActivity.current = Date.now();
       } else {
@@ -165,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       loading,
       isShopSession,
+      isSignatureSession,
       setIsShopSession,
       login,
       loginByCedula,

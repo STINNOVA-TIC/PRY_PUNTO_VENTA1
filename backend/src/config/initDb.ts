@@ -146,24 +146,204 @@ export const initDb = async () => {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_solicitud_entrega_codigo ON solicitud_entrega(solicitud_entrega_codigo);
     `);
 
-    // 5. Sembrar nuevo rol de empleado_autorizado
+    // 5. Migración: Crear tabla usuario_permiso si no existe
     await pool.query(`
-      INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 
-      VALUES (8, 'empleado_autorizado', 'Empleado autorizado para realizar autoconsumo', 'activo')
-      ON CONFLICT (rol_nombre) DO NOTHING;
+      CREATE TABLE IF NOT EXISTS usuario_permiso (
+        usuario_permiso_id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+        permiso_id INTEGER NOT NULL REFERENCES permiso(permiso_id) ON DELETE CASCADE,
+        tipo VARCHAR(10) DEFAULT 'conceder' CHECK (tipo IN ('conceder', 'denegar')),
+        fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (usuario_id, permiso_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_usuario_permiso_user ON usuario_permiso(usuario_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_permiso_clave ON permiso(permiso_clave);
     `);
 
-    // 5.1 Sembrar nuevo rol de empleado_autorizado_firmar
+    // 5.1 Migración: Convertir roles auxiliares en permisos y eliminarlos
     await pool.query(`
-      INSERT INTO rol (rol_id, rol_nombre, rol_descripcion, rol_estado) 
-      VALUES (9, 'empleado_autorizado_firmar', 'Empleado autorizado para firmar requerimientos', 'activo')
-      ON CONFLICT (rol_nombre) DO NOTHING;
-    `);
+      -- Si existían roles 8 o 9, migrar a permisos de usuario
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM rol WHERE rol_nombre = 'empleado_autorizado') THEN
+          INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+          SELECT ur.usuario_id, p.permiso_id, 'conceder'
+          FROM usuario_rol ur
+          JOIN rol r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'empleado_autorizado'
+          JOIN permiso p ON p.permiso_clave = 'autoconsumo.crear'
+          ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder';
+        END IF;
 
-    // Ajustar secuencia de rol
-    await pool.query(`
+        IF EXISTS (SELECT 1 FROM rol WHERE rol_nombre = 'empleado_autorizado_firmar') THEN
+          INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+          SELECT ur.usuario_id, p.permiso_id, 'conceder'
+          FROM usuario_rol ur
+          JOIN rol r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'empleado_autorizado_firmar'
+          JOIN permiso p ON p.permiso_clave = 'requerimientos.firmar'
+          ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder';
+        END IF;
+
+        DELETE FROM usuario_rol WHERE rol_id IN (SELECT rol_id FROM rol WHERE rol_nombre IN ('empleado_autorizado', 'empleado_autorizado_firmar'));
+        DELETE FROM rol_permiso WHERE rol_id IN (SELECT rol_id FROM rol WHERE rol_nombre IN ('empleado_autorizado', 'empleado_autorizado_firmar'));
+        DELETE FROM rol WHERE rol_nombre IN ('empleado_autorizado', 'empleado_autorizado_firmar');
+      END $$;
+
       SELECT setval('rol_rol_id_seq', COALESCE((SELECT MAX(rol_id)+1 FROM rol), 1), false);
     `);
+
+    // 6. Migración Segura: Sembrar Módulos del Sistema (idempotente)
+    await pool.query(`
+      INSERT INTO modulo (modulo_id, modulo_nombre, modulo_descripcion, modulo_icono, modulo_estado) VALUES
+      (1, 'Usuarios', 'Gestión de cuentas y accesos del sistema', 'Users', 'activo'),
+      (2, 'Roles', 'Gestión de roles y niveles jerárquicos', 'Shield', 'activo'),
+      (3, 'Empleados', 'Ficha y datos del personal', 'UserCheck', 'activo'),
+      (4, 'Productos', 'Catálogo de productos, categorías y proveedores', 'Package', 'activo'),
+      (5, 'Inventario', 'Movimientos, ajustes y stock de almacén', 'Boxes', 'activo'),
+      (6, 'Ventas', 'Consumo y ventas internas', 'ShoppingCart', 'activo'),
+      (7, 'Entregas', 'Despacho y verificación en bodega', 'Truck', 'activo'),
+      (8, 'Reportes', 'Reportes de gestión, financieros y consumo', 'BarChart3', 'activo'),
+      (9, 'Nómina', 'Descuentos y cierres salariales', 'DollarSign', 'activo'),
+      (10, 'Configuración', 'Parámetros del sistema y auditoría', 'Settings', 'activo'),
+      (11, 'Autoconsumo', 'Solicitudes de bienes internos para áreas de la empresa', 'ClipboardCheck', 'activo')
+      ON CONFLICT (modulo_nombre) DO NOTHING;
+      SELECT setval('modulo_modulo_id_seq', COALESCE((SELECT MAX(modulo_id)+1 FROM modulo), 1), false);
+    `);
+
+    // 6.1 Sembrar Permisos del Sistema (idempotente)
+    await pool.query(`
+      INSERT INTO permiso (modulo_id, permiso_nombre, permiso_descripcion, permiso_clave, permiso_estado) VALUES
+      (1, 'Ver Usuarios', 'Permite listar y ver información de usuarios del sistema', 'usuarios.ver', 'activo'),
+      (1, 'Crear Usuarios', 'Permite registrar nuevos usuarios operativos', 'usuarios.crear', 'activo'),
+      (1, 'Editar Usuarios', 'Permite modificar usuarios existentes', 'usuarios.editar', 'activo'),
+      (1, 'Eliminar Usuarios', 'Permite eliminar registros de usuarios', 'usuarios.eliminar', 'activo'),
+      (1, 'Activar Usuarios', 'Permite reactivar usuarios inactivos', 'usuarios.activar', 'activo'),
+      (1, 'Desactivar Usuarios', 'Permite suspender o desactivar usuarios', 'usuarios.desactivar', 'activo'),
+      (2, 'Ver Roles', 'Permite consultar roles y permisos', 'roles.ver', 'activo'),
+      (2, 'Crear Roles', 'Permite crear nuevos roles', 'roles.crear', 'activo'),
+      (2, 'Editar Roles', 'Permite modificar roles existentes', 'roles.editar', 'activo'),
+      (2, 'Eliminar Roles', 'Permite eliminar roles', 'roles.eliminar', 'activo'),
+      (3, 'Ver Empleados', 'Permite ver el directorio de empleados', 'empleados.ver', 'activo'),
+      (3, 'Ver Datos Sensibles Empleados', 'Permite visualizar salarios y datos confidenciales', 'empleados.ver_datos_sensibles', 'activo'),
+      (3, 'Crear Empleados', 'Permite registrar nuevos empleados', 'empleados.crear', 'activo'),
+      (3, 'Editar Empleados', 'Permite actualizar datos de empleados', 'empleados.editar', 'activo'),
+      (3, 'Eliminar Empleados', 'Permite eliminar empleados', 'empleados.eliminar', 'activo'),
+      (3, 'Activar Empleados', 'Permite activar estado de empleado', 'empleados.activar', 'activo'),
+      (3, 'Desactivar Empleados', 'Permite desactivar empleados', 'empleados.desactivar', 'activo'),
+      (3, 'Ver Historial de Compras Empleados', 'Permite revisar historial de compras de los empleados', 'empleados.ver_historial_compras', 'activo'),
+      (4, 'Ver Productos', 'Permite consultar catálogo de productos', 'productos.ver', 'activo'),
+      (4, 'Crear Productos', 'Permite ingresar nuevos productos al catálogo', 'productos.crear', 'activo'),
+      (4, 'Editar Productos', 'Permite modificar precios y datos de productos', 'productos.editar', 'activo'),
+      (4, 'Eliminar Productos', 'Permite eliminar productos del catálogo', 'productos.eliminar', 'activo'),
+      (4, 'Activar Productos', 'Permite activar productos', 'productos.activar', 'activo'),
+      (4, 'Desactivar Productos', 'Permite desactivar productos', 'productos.desactivar', 'activo'),
+      (5, 'Ver Inventario', 'Permite consultar niveles de inventario', 'inventario.ver', 'activo'),
+      (5, 'Ver Movimientos Inventario', 'Permite auditar entradas y salidas de bodega', 'inventario.ver_movimientos', 'activo'),
+      (5, 'Ajustar Stock', 'Permite realizar ajustes manuales de existencias', 'inventario.ajustar_stock', 'activo'),
+      (5, 'Ingresar Mercancía', 'Permite registrar ingresos de productos a stock', 'inventario.ingresar_mercancia', 'activo'),
+      (5, 'Ver Costos Inventario', 'Permite ver los precios de compra y costos de almacén', 'inventario.ver_costos', 'activo'),
+      (6, 'Realizar Ventas', 'Permite emitir solicitudes de compra interna', 'ventas.realizar', 'activo'),
+      (6, 'Ver Ventas', 'Permite ver todas las ventas y pedidos de la empresa', 'ventas.ver', 'activo'),
+      (6, 'Ver Ventas Propias', 'Permite al empleado ver únicamente sus compras', 'ventas.ver_propias', 'activo'),
+      (6, 'Anular Ventas', 'Permite anular ventas o pedidos procesados', 'ventas.anular', 'activo'),
+      (6, 'Cancelar Ventas', 'Permite cancelar solicitudes de compra pendientes', 'ventas.cancelar', 'activo'),
+      (7, 'Ver Entregas', 'Permite visualizar el módulo de entregas', 'entregas.ver', 'activo'),
+      (7, 'Ver Entregas Pendientes', 'Permite listar despachos pendientes de retiro', 'entregas.ver_pendientes', 'activo'),
+      (7, 'Confirmar Entrega', 'Permite despachar pedidos y tomar foto de evidencia', 'entregas.confirmar', 'activo'),
+      (7, 'Verificar Empleado Entrega', 'Permite validar identidad del colaborador mediante código', 'entregas.verificar_empleado', 'activo'),
+      (7, 'Reportar Incidente Entrega', 'Permite marcar no entregado o incidencia en bodega', 'entregas.reportar_incidente', 'activo'),
+      (8, 'Ver Reportes', 'Permite acceder a la sección de reportes', 'reportes.ver', 'activo'),
+      (8, 'Ver Reportes Financieros', 'Permite ver métricas de ventas y costos', 'reportes.ver_financieros', 'activo'),
+      (8, 'Ver Consumo de Empleados', 'Permite generar reportes de consumo por colaborador', 'reportes.ver_consumo_empleados', 'activo'),
+      (8, 'Ver Reporte de Inventario', 'Permite auditar existencias y rotación', 'reportes.ver_inventario', 'activo'),
+      (8, 'Exportar Reportes', 'Permite descargar archivos PDF/Excel', 'reportes.exportar', 'activo'),
+      (9, 'Ver Nómina', 'Permite consultar el módulo de nómina', 'nomina.ver', 'activo'),
+      (9, 'Ver Nómina Propia', 'Permite al empleado consultar sus descuentos aplicados', 'nomina.ver_propia', 'activo'),
+      (9, 'Ver Todos Nómina', 'Permite a TTHH revisar nómina de todos los colaboradores', 'nomina.ver_todos', 'activo'),
+      (9, 'Aplicar Descuento Nómina', 'Permite aplicar deducciones de nómina generadas', 'nomina.aplicar_descuento', 'activo'),
+      (9, 'Configurar Descuentos Nómina', 'Permite establecer parámetros de descuentos', 'nomina.configurar_descuentos', 'activo'),
+      (10, 'Ver Configuración', 'Permite consultar parámetros de sistema', 'configuracion.ver', 'activo'),
+      (10, 'Editar Configuración', 'Permite modificar parámetros maestros', 'configuracion.editar', 'activo'),
+      (10, 'Ver Logs Auditoría', 'Permite ver bitácoras y registros de seguridad', 'configuracion.ver_logs', 'activo'),
+      (11, 'Ver Autoconsumos', 'Permite ver requerimientos y solicitudes de autoconsumo', 'autoconsumo.ver', 'activo'),
+      (11, 'Crear Autoconsumo', 'Permite solicitar insumos y bienes para áreas internas', 'autoconsumo.crear', 'activo'),
+      (11, 'Aprobar Autoconsumo', 'Permite autorizar solicitudes de consumo interno', 'autoconsumo.aprobar', 'activo'),
+      (11, 'Entregar Autoconsumo', 'Permite a bodega registrar entrega de insumos autorizados', 'autoconsumo.entregar', 'activo'),
+      (11, 'Eliminar Autoconsumo', 'Permite cancelar o borrar requerimientos de consumo', 'autoconsumo.eliminar', 'activo'),
+      (11, 'Firmar Requerimientos', 'Permite firmar órdenes de compra y requerimientos', 'requerimientos.firmar', 'activo'),
+      (4, 'Ver Proveedores', 'Permite consultar catálogo de proveedores', 'proveedores.ver', 'activo'),
+      (4, 'Crear Proveedores', 'Permite registrar nuevos proveedores', 'proveedores.crear', 'activo'),
+      (4, 'Editar Proveedores', 'Permite modificar proveedores', 'proveedores.editar', 'activo'),
+      (4, 'Ver Categorías', 'Permite consultar categorías de productos', 'categorias.ver', 'activo'),
+      (4, 'Crear Categorías', 'Permite crear categorías de productos', 'categorias.crear', 'activo'),
+      (4, 'Editar Categorías', 'Permite editar categorías de productos', 'categorias.editar', 'activo')
+      ON CONFLICT (permiso_nombre) DO NOTHING;
+      SELECT setval('permiso_permiso_id_seq', COALESCE((SELECT MAX(permiso_id)+1 FROM permiso), 1), false);
+    `);
+
+    // 6.2 Asociar Permisos a Roles en rol_permiso (idempotente)
+    await pool.query(`
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 1, permiso_id FROM permiso WHERE permiso_estado = 'activo'
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 2, permiso_id FROM permiso WHERE permiso_clave IN (
+        'empleados.ver', 'empleados.ver_historial_compras', 'entregas.ver', 'entregas.ver_pendientes',
+        'entregas.confirmar', 'entregas.verificar_empleado', 'entregas.reportar_incidente',
+        'reportes.ver', 'reportes.ver_consumo_empleados', 'inventario.ver', 'productos.ver',
+        'autoconsumo.ver', 'autoconsumo.entregar'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 3, permiso_id FROM permiso WHERE permiso_clave IN (
+        'ventas.realizar', 'ventas.ver_propias', 'empleados.ver', 'productos.ver', 'entregas.ver',
+        'inventario.ver', 'reportes.ver_consumo_empleados', 'nomina.ver_propia', 'autoconsumo.ver'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 4, permiso_id FROM permiso WHERE permiso_clave IN (
+        'productos.ver', 'productos.crear', 'productos.editar', 'productos.activar', 'productos.desactivar',
+        'inventario.ver', 'inventario.ver_movimientos', 'inventario.ajustar_stock', 'inventario.ingresar_mercancia', 'inventario.ver_costos',
+        'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
+        'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
+        'categorias.ver', 'categorias.crear', 'categorias.editar',
+        'autoconsumo.ver', 'empleados.ver'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 5, permiso_id FROM permiso WHERE permiso_clave IN (
+        'usuarios.ver',
+        'empleados.ver', 'empleados.ver_datos_sensibles', 'empleados.crear', 'empleados.editar', 'empleados.activar', 'empleados.desactivar', 'empleados.ver_historial_compras',
+        'productos.ver', 'productos.crear', 'productos.editar', 'productos.activar', 'productos.desactivar',
+        'inventario.ver', 'inventario.ver_movimientos', 'inventario.ajustar_stock', 'inventario.ingresar_mercancia', 'inventario.ver_costos',
+        'ventas.realizar', 'ventas.ver', 'ventas.anular', 'ventas.cancelar',
+        'entregas.ver', 'entregas.ver_pendientes', 'entregas.confirmar', 'entregas.verificar_empleado', 'entregas.reportar_incidente',
+        'reportes.ver', 'reportes.ver_financieros', 'reportes.ver_consumo_empleados', 'reportes.ver_inventario', 'reportes.exportar',
+        'nomina.ver', 'nomina.ver_todos', 'nomina.aplicar_descuento',
+        'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 6, permiso_id FROM permiso WHERE permiso_clave IN (
+        'reportes.ver', 'reportes.ver_financieros', 'reportes.exportar', 'nomina.ver', 'nomina.ver_todos',
+        'ventas.ver', 'empleados.ver', 'empleados.ver_datos_sensibles'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT 7, permiso_id FROM permiso WHERE permiso_clave IN (
+        'reportes.ver', 'reportes.ver_consumo_empleados', 'nomina.ver', 'nomina.ver_todos',
+        'nomina.aplicar_descuento', 'nomina.configurar_descuentos', 'empleados.ver', 'empleados.ver_datos_sensibles',
+        'autoconsumo.ver', 'autoconsumo.aprobar'
+      )
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+    `);
+
+
 
     console.log('✅ Verificación y migración de base de datos completada exitosamente.');
   } catch (error: any) {

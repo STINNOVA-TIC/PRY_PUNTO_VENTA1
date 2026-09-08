@@ -13,13 +13,15 @@ export const empleadosController = {
         SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre,
                EXISTS (
                  SELECT 1 FROM usuario u 
-                 JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
-                 WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+                 JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
+                 JOIN permiso p ON up.permiso_id = p.permiso_id
+                 WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'autoconsumo.crear' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
                ) as permitir_autoconsumo,
                EXISTS (
                  SELECT 1 FROM usuario u 
-                 JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
-                 WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+                 JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
+                 JOIN permiso p ON up.permiso_id = p.permiso_id
+                 WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'requerimientos.firmar' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
                ) as permitir_firmas
         FROM empleado e
         LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
@@ -79,13 +81,15 @@ export const empleadosController = {
         `SELECT e.*, d.departamento_nombre,
                 EXISTS (
                   SELECT 1 FROM usuario u 
-                  JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
-                  WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 8 AND u.usuario_estado = 'activo'
+                  JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
+                  JOIN permiso p ON up.permiso_id = p.permiso_id
+                  WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'autoconsumo.crear' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
                 ) as permitir_autoconsumo,
                 EXISTS (
                   SELECT 1 FROM usuario u 
-                  JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id 
-                  WHERE u.empleado_id = e.empleado_id AND ur.rol_id = 9 AND u.usuario_estado = 'activo'
+                  JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
+                  JOIN permiso p ON up.permiso_id = p.permiso_id
+                  WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'requerimientos.firmar' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
                 ) as permitir_firmas
          FROM empleado e 
          LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
@@ -229,15 +233,25 @@ export const empleadosController = {
         );
         const userId = userRes.rows[0].usuario_id;
         
+        // Asegurar que tenga rol base de empleado (rol_id = 3)
+        await pool.query(
+          `INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 3) ON CONFLICT DO NOTHING`,
+          [userId]
+        );
+
         if (permitir_autoconsumo) {
           await pool.query(
-            `INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)`,
+            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'autoconsumo.crear'
+             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
             [userId]
           );
         }
         if (permitir_firmas) {
           await pool.query(
-            `INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 9)`,
+            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'requerimientos.firmar'
+             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
             [userId]
           );
         }
@@ -302,49 +316,66 @@ export const empleadosController = {
 
       const empleado = updateRes.rows[0];
 
-      if (permitir_autoconsumo || permitir_firmas) {
-        // Buscar si existe el usuario para este empleado
-        const userCheck = await pool.query('SELECT usuario_id FROM usuario WHERE empleado_id = $1', [id]);
-        let userId;
-        
-        if (userCheck.rows.length === 0) {
-          // Crear usuario nuevo
-          const userRes = await pool.query(
-            `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-             VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`,
-            [
-              `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
-              empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
-              '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',
-              id
-            ]
-          );
-          userId = userRes.rows[0].usuario_id;
-        } else {
-          userId = userCheck.rows[0].usuario_id;
-          // Reactivar usuario si estuviera inactivo
-          await pool.query("UPDATE usuario SET usuario_estado = 'activo' WHERE usuario_id = $1", [userId]);
-        }
-
-        // Manejar rol 8 (autoconsumo)
-        await pool.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 8', [userId]);
-        if (permitir_autoconsumo) {
-          await pool.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 8)', [userId]);
-        }
-
-        // Manejar rol 9 (firmas)
-        await pool.query('DELETE FROM usuario_rol WHERE usuario_id = $1 AND rol_id = 9', [userId]);
-        if (permitir_firmas) {
-          await pool.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 9)', [userId]);
-        }
-      } else {
-        // Si se quitan ambos checks, borrar asociación a los dos roles
-        await pool.query(
-          `DELETE FROM usuario_rol 
-           WHERE usuario_id IN (SELECT usuario_id FROM usuario WHERE empleado_id = $1) 
-           AND rol_id IN (8, 9)`,
-          [id]
+      // Buscar si existe el usuario para este empleado
+      const userCheck = await pool.query('SELECT usuario_id FROM usuario WHERE empleado_id = $1', [id]);
+      let userId: number | null = null;
+      
+      if (userCheck.rows.length > 0) {
+        userId = userCheck.rows[0].usuario_id;
+      } else if (permitir_autoconsumo || permitir_firmas) {
+        // Crear usuario nuevo para el colaborador
+        const userRes = await pool.query(
+          `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
+           VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`,
+          [
+            `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
+            empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
+            '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',
+            id
+          ]
         );
+        userId = userRes.rows[0].usuario_id;
+        // Asignar rol empleado base
+        await pool.query('INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 3) ON CONFLICT DO NOTHING', [userId]);
+      }
+
+      if (userId) {
+        // Reactivar usuario si estuviera inactivo
+        await pool.query("UPDATE usuario SET usuario_estado = 'activo' WHERE usuario_id = $1", [userId]);
+
+        // Permiso de Autoconsumo (autoconsumo.crear)
+        if (permitir_autoconsumo) {
+          await pool.query(
+            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'autoconsumo.crear'
+             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
+            [userId]
+          );
+        } else {
+          await pool.query(
+            `DELETE FROM usuario_permiso 
+             WHERE usuario_id = $1 
+               AND permiso_id IN (SELECT permiso_id FROM permiso WHERE permiso_clave = 'autoconsumo.crear')`,
+            [userId]
+          );
+        }
+
+        // Permiso de Firma (requerimientos.firmar)
+        if (permitir_firmas) {
+          await pool.query(
+            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'requerimientos.firmar'
+             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
+            [userId]
+          );
+        } else {
+          await pool.query(
+            `DELETE FROM usuario_permiso 
+             WHERE usuario_id = $1 
+               AND permiso_id IN (SELECT permiso_id FROM permiso WHERE permiso_clave = 'requerimientos.firmar')`,
+            [userId]
+          );
+        }
       }
 
       res.json({

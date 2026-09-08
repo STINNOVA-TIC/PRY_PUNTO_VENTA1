@@ -1,12 +1,45 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireSelfOrPermission = exports.requireAllPermissions = exports.requireAnyPermission = exports.requirePermission = void 0;
-const roles_data_1 = require("../models/roles.data");
+exports.getUsuarioPermisos = getUsuarioPermisos;
 const db_1 = __importDefault(require("../config/db"));
-// Helper para obtener la unión de todos los permisos de los roles del usuario
+// Helper para obtener los permisos efectivos del usuario
 async function getUsuarioPermisos(userId, defaultRolId) {
     const rolesList = [];
     if (userId && userId !== 0) {
@@ -16,18 +49,25 @@ async function getUsuarioPermisos(userId, defaultRolId) {
     if (rolesList.length === 0 && defaultRolId) {
         rolesList.push(defaultRolId);
     }
-    const matchedRoles = roles_data_1.rolesData.filter(r => rolesList.includes(r.id));
+    // 1. Obtener nombres de roles
+    const rolesRes = await db_1.default.query('SELECT rol_id, rol_nombre FROM rol WHERE rol_id = ANY($1)', [rolesList]);
+    const rolesNames = rolesRes.rows.map(r => r.rol_nombre);
+    const isAdmin = rolesNames.includes('admin') || rolesList.includes(1);
+    // 2. Obtener permisos híbridos reales (DB + personalizados)
     const allPermisos = new Set();
-    let isAdmin = false;
-    const rolesNames = [];
-    matchedRoles.forEach(r => {
-        rolesNames.push(r.nombre);
-        if (r.nombre === 'admin') {
-            isAdmin = true;
+    if (userId && userId !== 0) {
+        const { getPermisosForUsuario } = await Promise.resolve().then(() => __importStar(require('../controllers/auth.controller')));
+        const userPerms = await getPermisosForUsuario(userId, defaultRolId || 3);
+        userPerms.forEach(p => allPermisos.add(p));
+    }
+    else {
+        const { getPermisosForRol } = await Promise.resolve().then(() => __importStar(require('../controllers/auth.controller')));
+        for (const rId of rolesList) {
+            const perms = await getPermisosForRol(rId);
+            perms.forEach(p => allPermisos.add(p));
         }
-        r.permisos.forEach(p => allPermisos.add(p));
-    });
-    return { permissions: allPermisos, isAdmin, roles: rolesNames };
+    }
+    return { permissions: allPermisos, isAdmin, roles: rolesNames.length > 0 ? rolesNames : ['empleado'] };
 }
 // Verificar si el usuario tiene un permiso específico
 const requirePermission = (permiso) => {

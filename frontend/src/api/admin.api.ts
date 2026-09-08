@@ -35,5 +35,71 @@ export const adminAPI = {
       }
     });
     return response.data;
+  },
+
+  getRolePermissions: async (rolId: number): Promise<{ data: any[] }> => {
+    const response = await api.get(`/admin/crud/roles/${rolId}/permisos`);
+    return response.data;
+  },
+
+  saveRolePermissions: async (rolId: number, permisoIds: number[]) => {
+    const response = await api.post(`/admin/crud/roles/${rolId}/permisos`, { permiso_ids: permisoIds });
+    return response.data;
+  },
+
+  getDatabaseStats: async (): Promise<{ data: any }> => {
+    const response = await api.get('/admin/crud/database/stats');
+    return response.data;
+  },
+
+  downloadDatabaseBackup: async (): Promise<void> => {
+    const response = await api.get('/admin/crud/database/backup', {
+      responseType: 'blob'
+    });
+
+    const blob = new Blob([response.data], { type: 'application/sql' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.download = `backup_pointofsale_${timestamp}.sql`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  listDatabaseBackups: async (): Promise<{ data: Array<{ filename: string; size: string; size_bytes: number; created_at: string; tipo: string }> }> => {
+    const response = await api.get('/admin/crud/database/backups');
+    return response.data;
+  },
+
+  createDatabaseBackup: async (): Promise<{ success: boolean; message: string; data: any }> => {
+    const response = await api.post('/admin/crud/database/backups');
+    return response.data;
+  },
+
+  downloadBackupFile: async (filename: string): Promise<void> => {
+    const response = await api.get(`/admin/crud/database/backups/${encodeURIComponent(filename)}`, {
+      responseType: 'blob'
+    });
+
+    const blob = new Blob([response.data]);
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  deleteDatabaseBackup: async (filename: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/admin/crud/database/backups/${encodeURIComponent(filename)}`);
+    return response.data;
   }
 };

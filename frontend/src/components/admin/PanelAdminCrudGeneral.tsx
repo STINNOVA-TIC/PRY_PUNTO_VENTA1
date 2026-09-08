@@ -8,6 +8,7 @@ import { BotonAccion } from '../common/BotonAccion';
 import { Paginacion } from '../common/Paginacion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 import { useModal } from '../../context/ModalContext';
+import { BsShieldCheck, BsKey, BsCheck2Circle, BsXCircle, BsDatabaseDown, BsDatabaseFillGear, BsServer, BsTrash3, BsDownload, BsPlusCircle, BsClockHistory, BsArrowClockwise } from 'react-icons/bs';
 
 interface FieldConfig {
   key: string;
@@ -132,15 +133,29 @@ const SCHEMAS: TableSchema[] = [
       { key: 'permiso_descripcion', label: 'Descripción', type: 'text' },
       { key: 'permiso_clave', label: 'Clave Permiso (Ej. empleados.crear)', type: 'text', required: true }
     ]
+  },
+  {
+    table: 'rol_permiso',
+    label: 'Asignación Roles y Permisos',
+    fields: [
+      { key: 'rol_id', label: 'Rol', type: 'select', refTable: 'rol', refIdKey: 'rol_id', refLabelKey: 'rol_nombre', required: true },
+      { key: 'permiso_id', label: 'Permiso', type: 'select', refTable: 'permiso', refIdKey: 'permiso_id', refLabelKey: 'permiso_nombre', required: true }
+    ]
   }
 ];
 
 export const PanelAdminCrudGeneral: React.FC = () => {
   const { showConfirm } = useModal();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   
   const allowedSchemas = SCHEMAS.filter(s => {
     if (user?.rol.nombre === 'admin') return true;
+    
+    // Si tiene permiso para gestionar roles y permisos
+    if (['rol', 'modulo', 'permiso', 'rol_permiso'].includes(s.table) && (hasPermission('roles.ver') || hasPermission('roles.crear'))) {
+      return true;
+    }
+
     if (user?.rol.nombre === 'inventario') {
       return ['producto', 'proveedor', 'categoria'].includes(s.table);
     }
@@ -196,11 +211,152 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     });
   }, [rows, activeSchema, refCache, searchQuery, filterEstado]);
 
+  // Funciones de validación de permisos para las tablas maestras
+  const canCreateInTable = (table: string) => {
+    if (user?.rol?.nombre === 'admin') return true;
+    if (table === 'rol') return hasPermission('roles.crear');
+    if (['modulo', 'permiso', 'rol_permiso'].includes(table)) return hasPermission('roles.crear');
+    if (table === 'producto') return hasPermission('productos.crear');
+    if (table === 'proveedor') return hasPermission('proveedores.crear' as any);
+    if (table === 'categoria') return hasPermission('categorias.crear' as any);
+    return false;
+  };
+
+  const canEditInTable = (table: string) => {
+    if (user?.rol?.nombre === 'admin') return true;
+    if (table === 'rol') return hasPermission('roles.editar');
+    if (['modulo', 'permiso', 'rol_permiso'].includes(table)) return hasPermission('roles.editar') || hasPermission('roles.crear');
+    if (table === 'producto') return hasPermission('productos.editar');
+    if (table === 'proveedor') return hasPermission('proveedores.editar' as any);
+    if (table === 'categoria') return hasPermission('categorias.editar' as any);
+    return false;
+  };
+
+  const canToggleActiveInTable = (table: string, isActivo: boolean) => {
+    if (user?.rol?.nombre === 'admin') return true;
+    if (table === 'rol') return hasPermission('roles.eliminar');
+    if (['modulo', 'permiso', 'rol_permiso'].includes(table)) return hasPermission('roles.eliminar');
+    if (table === 'producto') return isActivo ? hasPermission('productos.desactivar') : hasPermission('productos.activar');
+    if (table === 'proveedor') return hasPermission('proveedores.editar' as any);
+    if (table === 'categoria') return hasPermission('categorias.editar' as any);
+    return false;
+  };
+
+  const canManageRolePermissions = () => {
+    if (user?.rol?.nombre === 'admin') return true;
+    return hasPermission('roles.editar') || hasPermission('roles.crear');
+  };
+
   // Formulario
   const [isModalAbierto, setIsModalAbierto] = useState(false);
   const [editingRow, setEditingRow] = useState<any>(null);
 
+  // Modal Matriz de Permisos para Roles
+  const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<any>(null);
+  const [rolePermissions, setRolePermissions] = useState<any[]>([]);
+  const [loadingRolePerms, setLoadingRolePerms] = useState(false);
+  const [savingRolePerms, setSavingRolePerms] = useState(false);
+  const [rolePermFilterModulo, setRolePermFilterModulo] = useState<string>('TODOS');
+  const [rolePermSearch, setRolePermSearch] = useState<string>('');
+
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+
+  // Modal de Copia de Seguridad de la Base de Datos
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [dbStats, setDbStats] = useState<any>(null);
+  const [loadingDbStats, setLoadingDbStats] = useState(false);
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [backupList, setBackupList] = useState<any[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
+
+  const cargarBackups = async () => {
+    setLoadingBackups(true);
+    try {
+      const res = await adminAPI.listDatabaseBackups();
+      setBackupList(res.data || []);
+    } catch (err) {
+      console.error('Error al obtener lista de backups:', err);
+    } finally {
+      setLoadingBackups(false);
+    }
+  };
+
+  const handleOpenBackupModal = async () => {
+    setIsBackupModalOpen(true);
+    setLoadingDbStats(true);
+    try {
+      const [statsRes] = await Promise.all([
+        adminAPI.getDatabaseStats(),
+        cargarBackups()
+      ]);
+      setDbStats(statsRes.data);
+    } catch (err) {
+      console.error('Error al inicializar modal de backups:', err);
+    } finally {
+      setLoadingDbStats(false);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      setDownloadingBackup(true);
+      await adminAPI.downloadDatabaseBackup();
+      setMensaje('Copia de seguridad descargada exitosamente.');
+    } catch (err) {
+      console.error('Error al descargar backup:', err);
+      setError('Error al generar la copia de seguridad.');
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const handleCreateServerBackup = async () => {
+    try {
+      setCreatingBackup(true);
+      const res = await adminAPI.createDatabaseBackup();
+      if (res.success) {
+        setMensaje('Nueva copia de seguridad almacenada en el servidor.');
+        await cargarBackups();
+      }
+    } catch (err: any) {
+      console.error('Error al crear copia en servidor:', err);
+      setError(err.response?.data?.message || 'Error al generar la copia en el servidor.');
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const handleDownloadSingleBackup = async (filename: string) => {
+    try {
+      await adminAPI.downloadBackupFile(filename);
+      setMensaje(`Descarga de ${filename} iniciada.`);
+    } catch (err) {
+      console.error('Error al descargar archivo:', err);
+      setError('Error al descargar el archivo de respaldo.');
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    const confirmed = await showConfirm({
+      title: '¿Eliminar copia de seguridad?',
+      message: `Esta acción borrará permanentemente el archivo "${filename}" del servidor. ¿Deseas continuar?`,
+      type: 'danger',
+      confirmLabel: 'Eliminar'
+    });
+
+    if (confirmed) {
+      try {
+        await adminAPI.deleteDatabaseBackup(filename);
+        setMensaje('Archivo de respaldo eliminado correctamente.');
+        await cargarBackups();
+      } catch (err: any) {
+        console.error('Error al eliminar backup:', err);
+        setError(err.response?.data?.message || 'Error al eliminar la copia de seguridad.');
+      }
+    }
+  };
 
   const lastRequestTokenRef = useRef<number>(0);
 
@@ -434,6 +590,48 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     }
   };
 
+  const handleOpenRolePermissions = async (role: any) => {
+    setSelectedRole(role);
+    setIsRolePermModalOpen(true);
+    setLoadingRolePerms(true);
+    setRolePermFilterModulo('TODOS');
+    setRolePermSearch('');
+
+    try {
+      const res = await adminAPI.getRolePermissions(role.rol_id);
+      setRolePermissions(res.data);
+    } catch (err) {
+      console.error('Error al cargar permisos del rol:', err);
+      setError('No se pudieron obtener los permisos del rol');
+    } finally {
+      setLoadingRolePerms(false);
+    }
+  };
+
+  const toggleRolePermiso = (permId: number) => {
+    setRolePermissions(prev => prev.map(p => {
+      if (p.id === permId) {
+        return { ...p, asignado: !p.asignado };
+      }
+      return p;
+    }));
+  };
+
+  const handleSaveRolePermissions = async () => {
+    if (!selectedRole) return;
+    try {
+      setSavingRolePerms(true);
+      const assignedIds = rolePermissions.filter(p => p.asignado).map(p => p.id);
+      await adminAPI.saveRolePermissions(selectedRole.rol_id, assignedIds);
+      setMensaje(`Permisos del rol "${selectedRole.rol_nombre}" actualizados correctamente.`);
+      setIsRolePermModalOpen(false);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al guardar permisos del rol');
+    } finally {
+      setSavingRolePerms(false);
+    }
+  };
+
   const rowsPaginados = rowsFiltrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
@@ -459,6 +657,17 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <BotonRecargar onRefresh={cargarDatos} loading={loading} />
+            {user?.rol?.nombre === 'admin' && (
+              <button
+                type="button"
+                onClick={handleOpenBackupModal}
+                className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5"
+                title="Descargar script SQL o respaldo de la base de datos"
+              >
+                <BsDatabaseDown className="h-4 w-4 text-blue-600" />
+                <span>Copia de Seguridad</span>
+              </button>
+            )}
             {activeSchema.table === 'centro_costos' && (
               <button
                 type="button"
@@ -468,12 +677,14 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                 Importar / Exportar
               </button>
             )}
-            <button
-              onClick={handleCreateNewClick}
-              className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-            >
-              Registrar nuevo
-            </button>
+            {canCreateInTable(activeSchema.table) && (
+              <button
+                onClick={handleCreateNewClick}
+                className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+              >
+                Registrar nuevo
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -579,15 +790,29 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <BotonAccion
-                            tipo="editar"
-                            onClick={() => handleEditClick(row)}
-                          />
-                          <BotonAccion
-                            tipo={isActivo ? 'desactivar' : 'activar'}
-                            onClick={() => handleToggleActive(row)}
-                          />
+                        <div className="flex gap-2 justify-end items-center">
+                          {activeSchema.table === 'rol' && (
+                            <button
+                              onClick={() => handleOpenRolePermissions(row)}
+                              title={canManageRolePermissions() ? "Configurar permisos de este rol" : "Ver permisos de este rol"}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition"
+                            >
+                              <BsKey className="h-3.5 w-3.5" />
+                              Permisos
+                            </button>
+                          )}
+                          {canEditInTable(activeSchema.table) && (
+                            <BotonAccion
+                              tipo="editar"
+                              onClick={() => handleEditClick(row)}
+                            />
+                          )}
+                          {canToggleActiveInTable(activeSchema.table, isActivo) && (
+                            <BotonAccion
+                              tipo={isActivo ? 'desactivar' : 'activar'}
+                              onClick={() => handleToggleActive(row)}
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -627,6 +852,353 @@ export const PanelAdminCrudGeneral: React.FC = () => {
         onGuardar={handleGuardarMaestro}
         botonGuardarLabel="Guardar Datos"
       />
+
+      {/* MODAL MATRIZ DE PERMISOS POR ROL */}
+      {isRolePermModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+            {/* Cabecera */}
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                  <BsShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">
+                    Matriz de Permisos del Rol: {selectedRole?.rol_nombre?.toUpperCase()}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {selectedRole?.rol_descripcion || 'Configura la plantilla de accesos base para este rol.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRolePermModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filtros dentro del modal */}
+            <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap gap-2 items-center justify-between bg-white">
+              <div className="flex gap-1 overflow-x-auto py-1">
+                <button
+                  onClick={() => setRolePermFilterModulo('TODOS')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                    rolePermFilterModulo === 'TODOS'
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Todos los Módulos
+                </button>
+                {Array.from(new Set(rolePermissions.map((p: any) => p.modulo_nombre))).map((mod: any) => (
+                  <button
+                    key={mod}
+                    onClick={() => setRolePermFilterModulo(mod)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                      rolePermFilterModulo === mod
+                        ? 'bg-gray-800 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {mod}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Filtrar permiso..."
+                value={rolePermSearch}
+                onChange={e => setRolePermSearch(e.target.value)}
+                className="px-3 py-1 text-xs border border-gray-200 rounded-lg w-44 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Lista de permisos interactiva */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-2">
+              {loadingRolePerms ? (
+                <div className="py-12 text-center text-xs text-gray-400 font-medium">
+                  Cargando permisos del rol...
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {rolePermissions
+                    .filter((p: any) => {
+                      if (rolePermFilterModulo !== 'TODOS' && p.modulo_nombre !== rolePermFilterModulo) return false;
+                      if (rolePermSearch) {
+                        const q = rolePermSearch.toLowerCase();
+                        return p.nombre.toLowerCase().includes(q) || p.clave.toLowerCase().includes(q);
+                      }
+                      return true;
+                    })
+                    .map((perm: any) => (
+                      <div
+                        key={perm.id}
+                        onClick={() => canManageRolePermissions() && toggleRolePermiso(perm.id)}
+                        className={`p-3 rounded-xl border transition flex items-start justify-between gap-2 select-none ${
+                          canManageRolePermissions() ? 'cursor-pointer' : 'cursor-default'
+                        } ${
+                          perm.asignado
+                            ? 'bg-emerald-50/40 border-emerald-200' + (canManageRolePermissions() ? ' hover:bg-emerald-50/70' : '')
+                            : 'bg-gray-50/60 border-gray-200 opacity-65' + (canManageRolePermissions() ? ' hover:opacity-90' : '')
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-xs text-gray-800">{perm.nombre}</span>
+                            <span className="text-[9px] font-mono text-gray-400 bg-white px-1.5 py-0.5 rounded border">
+                              {perm.modulo_nombre}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 line-clamp-1">{perm.descripcion || perm.clave}</p>
+                        </div>
+                        <div className="pt-0.5">
+                          {perm.asignado ? (
+                            <BsCheck2Circle className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <BsXCircle className="h-4 w-4 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Pie del modal */}
+            <div className="px-6 py-3.5 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <div className="text-xs text-gray-500">
+                Permisos asignados: <strong className="text-gray-800">{rolePermissions.filter((p: any) => p.asignado).length}</strong> de {rolePermissions.length}
+                {!canManageRolePermissions() && (
+                  <span className="ml-2 text-amber-600 font-medium">(Solo lectura)</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRolePermModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-semibold transition"
+                >
+                  {canManageRolePermissions() ? 'Cancelar' : 'Cerrar'}
+                </button>
+                {canManageRolePermissions() && (
+                  <button
+                    type="button"
+                    onClick={handleSaveRolePermissions}
+                    disabled={savingRolePerms}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  >
+                    {savingRolePerms ? 'Guardando...' : 'Guardar Permisos'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL COPIA DE SEGURIDAD Y GESTIÓN DE HISTORIAL DE BACKUPS */}
+      {isBackupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 animate-scale-up flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                  <BsDatabaseFillGear className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800">Centro de Copias de Seguridad</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Historial y respaldos automáticos / manuales de PostgreSQL</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBackupModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {loadingDbStats && !dbStats ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
+                  <p className="text-xs text-gray-500">Consultando estado de la base de datos...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Resumen de la Base de Datos */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-2.5 bg-gray-50 border border-gray-200/80 rounded-xl space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Base de Datos</span>
+                      <p className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                        <BsServer className="text-blue-600 h-3 w-3" />
+                        {dbStats?.database_name || 'pointofsale'}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-gray-50 border border-gray-200/80 rounded-xl space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Peso Total</span>
+                      <p className="text-xs font-bold text-emerald-700 font-mono">
+                        {dbStats?.total_size || 'N/A'}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-gray-50 border border-gray-200/80 rounded-xl space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Tablas Maestras</span>
+                      <p className="text-xs font-bold text-gray-800">
+                        {dbStats?.total_tables ?? 0} tablas
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-gray-50 border border-gray-200/80 rounded-xl space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Registros</span>
+                      <p className="text-[11px] font-semibold text-gray-700 truncate" title={`${dbStats?.total_usuarios ?? 0} usuarios · ${dbStats?.total_empleados ?? 0} colab. · ${dbStats?.total_productos ?? 0} prod.`}>
+                        {dbStats?.total_usuarios ?? 0}u / {dbStats?.total_empleados ?? 0}c / {dbStats?.total_productos ?? 0}p
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Acciones principales de Respaldo */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 bg-blue-50/60 border border-blue-200/60 rounded-xl">
+                    <div className="text-xs text-blue-950">
+                      <p className="font-semibold text-[12px]">Crear nuevo punto de restauración</p>
+                      <p className="text-[11px] text-blue-800/80">Guarda una captura completa e íntegra en el almacenamiento persistente del servidor.</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleCreateServerBackup}
+                        disabled={creatingBackup}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95"
+                      >
+                        <BsPlusCircle className="h-3.5 w-3.5" />
+                        <span>{creatingBackup ? 'Creando en Servidor...' : 'Crear en Servidor'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadBackup}
+                        disabled={downloadingBackup}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95"
+                        title="Descargar directamente al navegador como archivo .sql"
+                      >
+                        <BsDatabaseDown className="h-3.5 w-3.5" />
+                        <span>{downloadingBackup ? 'Descargando...' : 'Descargar Directo'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Historial de Copias en Servidor */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <BsClockHistory className="h-3.5 w-3.5 text-gray-500" />
+                        <span>Historial de Copias en Servidor ({backupList.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={cargarBackups}
+                        disabled={loadingBackups}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 hover:underline disabled:opacity-50"
+                      >
+                        <BsArrowClockwise className={`h-3 w-3 ${loadingBackups ? 'animate-spin' : ''}`} />
+                        <span>Refrescar</span>
+                      </button>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-60 overflow-y-auto">
+                      {loadingBackups && backupList.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-500">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto mb-1.5"></div>
+                          Cargando historial...
+                        </div>
+                      ) : backupList.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-400">
+                          No hay copias de seguridad almacenadas en el servidor aún.
+                        </div>
+                      ) : (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-semibold text-[11px]">
+                            <tr>
+                              <th className="px-3 py-2">Archivo / Origen</th>
+                              <th className="px-3 py-2">Fecha</th>
+                              <th className="px-3 py-2">Tamaño</th>
+                              <th className="px-3 py-2 text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {backupList.map((item) => (
+                              <tr key={item.filename} className="hover:bg-gray-50/60 transition">
+                                <td className="px-3 py-2">
+                                  <div className="font-semibold text-gray-800 font-mono text-[11px] truncate max-w-[200px]" title={item.filename}>
+                                    {item.filename}
+                                  </div>
+                                  <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                    item.tipo.includes('Automática')
+                                      ? 'bg-purple-100 text-purple-700'
+                                      : item.tipo.includes('Imágenes')
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {item.tipo}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap text-[11px]">
+                                  {new Date(item.created_at).toLocaleString('es-EC', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </td>
+                                <td className="px-3 py-2 text-emerald-700 font-mono text-[11px] whitespace-nowrap">
+                                  {item.size}
+                                </td>
+                                <td className="px-3 py-2 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadSingleBackup(item.filename)}
+                                      className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
+                                      title="Descargar este archivo"
+                                    >
+                                      <BsDownload className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteBackup(item.filename)}
+                                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
+                                      title="Eliminar este respaldo del servidor"
+                                    >
+                                      <BsTrash3 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsBackupModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-semibold transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

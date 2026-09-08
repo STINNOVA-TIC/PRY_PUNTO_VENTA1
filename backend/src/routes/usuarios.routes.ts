@@ -2,17 +2,23 @@
 import { Router } from 'express';
 import { usuariosController } from '../controllers/usuarios.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requirePermission } from '../middleware/permisos.middleware';
+import { requirePermission, requireAnyPermission } from '../middleware/permisos.middleware';
 
 const router = Router();
 
 router.use(authenticate);
 
-// Solo el rol de Administrador puede administrar operadores del sistema
-router.get('/', requirePermission('empleados.crear'), usuariosController.getAll);
-router.get('/roles', requirePermission('empleados.crear'), usuariosController.getRoles);
-router.post('/', requirePermission('empleados.crear'), usuariosController.create);
-router.put('/:id', requirePermission('empleados.crear'), usuariosController.update);
-router.delete('/:id', requirePermission('empleados.crear'), usuariosController.delete);
+// Ver operadores y roles disponibles para asignar
+router.get('/', requireAnyPermission('usuarios.ver', 'usuarios.crear'), usuariosController.getAll);
+router.get('/roles', requireAnyPermission('usuarios.ver', 'usuarios.crear'), usuariosController.getRoles);
+
+// Crear, editar y eliminar operadores
+router.post('/', requirePermission('usuarios.crear'), usuariosController.create);
+router.put('/:id', requirePermission('usuarios.editar'), usuariosController.update);
+router.delete('/:id', requirePermission('usuarios.eliminar'), usuariosController.delete);
+
+// Permisos individuales por usuario
+router.get('/:id/permisos', requireAnyPermission('roles.ver', 'roles.crear', 'usuarios.editar'), usuariosController.getUserPermissions);
+router.post('/:id/permisos', requireAnyPermission('roles.crear', 'usuarios.editar'), usuariosController.saveUserPermissions);
 
 export default router;
