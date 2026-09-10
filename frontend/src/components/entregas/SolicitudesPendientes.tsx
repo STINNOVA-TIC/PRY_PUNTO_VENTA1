@@ -321,63 +321,63 @@ export const SolicitudesPendientes: React.FC = () => {
       </div>
 
       {/* Tabs para alternar entre Pendientes, Historial, Autoconsumos y Autoconsumos Entregados */}
-      <div className="flex bg-gray-100 p-1 rounded-xl gap-1 max-w-2xl w-full shadow-xs">
+      <div className="flex flex-wrap sm:flex-nowrap bg-gray-100 p-1.5 rounded-xl gap-1.5 w-full shadow-xs">
         <button
           onClick={() => setActiveTab('pendientes')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
+          className={`flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1.5 ${
             activeTab === 'pendientes'
-              ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
-              : 'text-gray-500 hover:text-gray-800'
+              ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
           }`}
         >
-          <BsDownload className="shrink-0" /> Por Entregar
+          <BsDownload className="shrink-0 text-sm" /> <span>Por Entregar</span>
           {pendientesPorEntregar > 0 && (
-            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+            <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
               {pendientesPorEntregar}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('entregadas')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
+          className={`flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1.5 ${
             activeTab === 'entregadas'
-              ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
-              : 'text-gray-500 hover:text-gray-800'
+              ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
           }`}
         >
-          <BsCheckCircle className="shrink-0" /> Entregadas
+          <BsCheckCircle className="shrink-0 text-sm" /> <span>Entregadas</span>
           {entregadasPendientesDevolver > 0 && (
-            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+            <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
               {entregadasPendientesDevolver}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('autoconsumos')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
+          className={`flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1.5 ${
             activeTab === 'autoconsumos'
-              ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
-              : 'text-gray-500 hover:text-gray-800'
+              ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
           }`}
         >
-          <BsBuilding className="shrink-0" /> Autoconsumos
+          <BsBuilding className="shrink-0 text-sm" /> <span>Autoconsumos</span>
           {autoconsumosPorEntregar > 0 && (
-            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+            <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
               {autoconsumosPorEntregar}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('autoconsumos_entregados')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1 ${
+          className={`flex-1 min-w-[180px] py-2.5 px-3 text-xs font-bold rounded-lg transition-all text-center relative flex items-center justify-center gap-1.5 ${
             activeTab === 'autoconsumos_entregados'
-              ? 'bg-white text-gray-800 shadow-xs border border-gray-200'
-              : 'text-gray-500 hover:text-gray-800'
+              ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
           }`}
         >
-          <BsBoxSeam className="shrink-0" /> Autoconsumos Entregados
+          <BsBoxSeam className="shrink-0 text-sm" /> <span>Autoconsumos Entregados</span>
           {autoconsumosPendientesDevolver > 0 && (
-            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+            <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
               {autoconsumosPendientesDevolver}
             </span>
           )}

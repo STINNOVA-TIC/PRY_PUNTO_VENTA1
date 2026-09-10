@@ -114,27 +114,28 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
   const isDevPendiente = auto.devolucion?.estado === 'pendiente';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition duration-150 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-        <div className="flex gap-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition duration-150 flex flex-col justify-between space-y-4">
+      <div className="space-y-3">
+        {/* Cabecera: Foto, Códigos, Estados y Datos del Empleado a ancho completo */}
+        <div className="flex items-center gap-3.5">
           <img
             src={`https://ui-avatars.com/api/?name=${auto.empleado?.nombre}&size=128`}
             alt="Empleado"
-            className="w-12 h-12 rounded-full border border-gray-200 object-cover flex-shrink-0"
+            className="w-12 h-12 rounded-full border border-gray-200 object-cover flex-shrink-0 shadow-xs"
           />
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-gray-400">{auto.codigo}</span>
-              <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${getEstadoBadgeClass(auto.estado)}`}>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-xs font-semibold text-gray-500">{auto.codigo}</span>
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${getEstadoBadgeClass(auto.estado)}`}>
                 {auto.estado}
               </span>
               {auto.devolucion && (
                 <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
                   isDevAprobada
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                     : isDevPendiente
-                      ? 'bg-amber-50 text-amber-600 border-amber-100'
-                      : 'bg-rose-50 text-rose-600 border-rose-100'
+                      ? 'bg-amber-50 text-amber-600 border-amber-200'
+                      : 'bg-rose-50 text-rose-600 border-rose-200'
                 }`}>
                   Devolución: {auto.devolucion.estado}
                 </span>
@@ -145,96 +146,98 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                 </span>
               )}
             </div>
-            <h3 className="text-base font-bold text-gray-800">{auto.empleado?.nombre}</h3>
-            <p className="text-xs text-gray-400">
-              Cédula: {auto.empleado?.cedula} • Dpto: {auto.departamento?.nombre}
+            <h3 className="text-sm sm:text-base font-bold text-gray-800 leading-snug break-words">{auto.empleado?.nombre}</h3>
+            <p className="text-xs text-gray-400 truncate">
+              Cédula: <span className="text-gray-600 font-medium">{auto.empleado?.cedula}</span> • Dpto: <span className="text-gray-600 font-medium">{auto.departamento?.nombre}</span>
             </p>
           </div>
         </div>
 
-        <div className="w-full sm:w-auto pt-2 sm:pt-0">
-          {esGuardia && (
-            <div className="flex flex-col sm:flex-row gap-2 w-full">
-              {auto.estado === 'aprobado' && (
-                <button
-                  onClick={() => onDespachar?.(auto)}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-bold shadow-sm transition active:scale-95 text-center"
-                >
-                  Confirmar Despacho
-                </button>
-              )}
-
-              {auto.estado === 'entregado' && (
-                <>
-                  {isDevAprobada ? (
-                    <button
-                      onClick={() => onEjecutarDevolucion?.(auto.id, auto.devolucion!.id)}
-                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-bold transition text-center shadow-xs active:scale-95"
-                    >
-                      Ejecutar Devolución
-                    </button>
-                  ) : isDevPendiente ? (
-                    <button
-                      disabled
-                      className="w-full sm:w-auto bg-gray-100 text-gray-400 border border-gray-200 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed text-center"
-                    >
-                      Devolución Pendiente
-                    </button>
-                  ) : totalDisponible > 0 ? (
-                    <button
-                      onClick={handleOpenDevModal}
-                      className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
-                    >
-                      <BsArrowClockwise /> Solicitar Devolución
-                    </button>
-                  ) : null}
-                </>
-              )}
-
-              {auto.estado === 'entregado' && (
-                <button
-                  onClick={() => navigate(`/entregas/autoconsumos/${auto.id}/despacho`)}
-                  className="w-full sm:w-auto text-center text-xs font-semibold bg-gray-50 border border-gray-250 text-gray-600 hover:bg-gray-100 px-4 py-2.5 sm:py-1.5 rounded-lg transition"
-                >
-                  Ver Detalles
-                </button>
-              )}
-            </div>
-          )}
+        {/* Productos y Fecha */}
+        <div className="pt-2 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+          <div>
+            <span className="font-semibold text-gray-700">Productos:</span> {productosList}
+          </div>
+          <div className="text-gray-400 text-[11px]">
+            Solicitado: {formatFecha(auto.fecha_solicitud)}
+          </div>
         </div>
+
+        {auto.justificacion && (
+          <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-600 font-mono break-words">
+            Justificación: {auto.justificacion}
+          </div>
+        )}
+
+        {auto.centro_costos && (
+          <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-600">
+            Centro de Costos: <span className="font-semibold">{auto.centro_costos.codigo}</span> - {auto.centro_costos.nombre}
+          </div>
+        )}
+
+        {auto.foto_entrega && (
+          <div className="pt-2">
+            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Evidencia despacho</span>
+            <img
+              src={auto.foto_entrega}
+              alt="Despacho"
+              className="w-full h-24 object-cover rounded-lg border border-gray-200"
+            />
+          </div>
+        )}
       </div>
 
-      <div className="pt-3 border-t border-gray-50 flex flex-col sm:flex-row sm:justify-between text-xs text-gray-500 gap-2">
-        <div>
-          <span className="font-semibold text-gray-600">Productos:</span> {productosList}
-        </div>
-        <div className="text-gray-400">
-          Solicitado: {formatFecha(auto.fecha_solicitud)}
-        </div>
+      {/* Botonera inferior: Ancho completo y adaptable para móvil y desktop */}
+      <div className="pt-3 border-t border-gray-100">
+        {esGuardia && (
+          <div className="flex flex-wrap gap-2 w-full">
+            {auto.estado === 'aprobado' && (
+              <button
+                onClick={() => onDespachar?.(auto)}
+                className="flex-1 min-w-[130px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-xs transition active:scale-95 text-center"
+              >
+                Confirmar Despacho
+              </button>
+            )}
+
+            {auto.estado === 'entregado' && (
+              <>
+                {isDevAprobada ? (
+                  <button
+                    onClick={() => onEjecutarDevolucion?.(auto.id, auto.devolucion!.id)}
+                    className="flex-1 min-w-[130px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition text-center shadow-xs active:scale-95"
+                  >
+                    Ejecutar Devolución
+                  </button>
+                ) : isDevPendiente ? (
+                  <button
+                    disabled
+                    className="flex-1 min-w-[130px] bg-gray-100 text-gray-400 border border-gray-200 px-3 py-2 rounded-lg text-xs font-semibold cursor-not-allowed text-center"
+                  >
+                    Devolución Pendiente
+                  </button>
+                ) : totalDisponible > 0 ? (
+                  <button
+                    onClick={handleOpenDevModal}
+                    className="flex-1 min-w-[130px] bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
+                  >
+                    <BsArrowClockwise className="text-sm" /> Solicitar Devolución
+                  </button>
+                ) : null}
+              </>
+            )}
+
+            {auto.estado === 'entregado' && (
+              <button
+                onClick={() => navigate(`/entregas/autoconsumos/${auto.id}/despacho`)}
+                className="flex-1 min-w-[100px] text-center text-xs font-semibold bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg transition"
+              >
+                Ver Detalles
+              </button>
+            )}
+          </div>
+        )}
       </div>
-
-      {auto.justificacion && (
-        <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-600 font-mono">
-          Justificación: {auto.justificacion}
-        </div>
-      )}
-
-      {auto.centro_costos && (
-        <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-600">
-          Centro de Costos: {auto.centro_costos.codigo} - {auto.centro_costos.nombre}
-        </div>
-      )}
-
-      {auto.foto_entrega && (
-        <div className="pt-2">
-          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Evidencia despacho</span>
-          <img
-            src={auto.foto_entrega}
-            alt="Despacho"
-            className="w-full h-24 object-cover rounded-lg border border-gray-200"
-          />
-        </div>
-      )}
 
       {/* MODAL SOLICITAR DEVOLUCIÓN */}
       {showDevModal && (

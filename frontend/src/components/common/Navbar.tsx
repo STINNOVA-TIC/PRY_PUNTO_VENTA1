@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
 import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight } from 'react-icons/bs';
@@ -8,6 +8,7 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const { user, logout, isShopSession, isSignatureSession, setIsShopSession, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -16,8 +17,42 @@ export const Navbar: React.FC = () => {
 
   const rol = user?.rol.nombre;
 
+  // Determinar si una ruta está activa
+  const isRouteActive = (basePath: string) => {
+    if (basePath === '/') return location.pathname === '/';
+    return location.pathname.startsWith(basePath);
+  };
+
+  // Renderizador de enlaces de navegación con señal interactiva / nube indicadora
+  const renderNavLink = (to: string, label: string, icon: React.ReactNode) => {
+    const active = isRouteActive(to);
+
+    return (
+      <Link
+        to={to}
+        key={to}
+        className={`relative px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 ${
+          active
+            ? 'bg-gray-900 text-white shadow-sm ring-1 ring-gray-900'
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+        }`}
+      >
+        <span className="text-sm shrink-0">{icon}</span>
+        <span>{label}</span>
+
+        {/* Nube / Señal indicadora del módulo activo */}
+        {active && (
+          <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-10">
+            {/* Triángulo tipo flecha / bocadillo de diálogo apuntando hacia abajo al contenido */}
+            <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-900 drop-shadow-xs animate-bounce" />
+          </span>
+        )}
+      </Link>
+    );
+  };
+
   return (
-    <nav className="bg-white border-b border-gray-200 text-gray-800 font-sans shadow-sm sticky top-0 z-50">
+    <nav className="bg-white border-b border-gray-200 text-gray-800 font-sans shadow-xs sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           
@@ -30,42 +65,27 @@ export const Navbar: React.FC = () => {
               />
             </Link>
             
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden md:flex items-center space-x-1.5">
               {isSignatureSession ? (
-                <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition flex items-center gap-1.5">
-                  <BsFileEarmarkText className="h-4 w-4" />
-                  Requerimientos
-                </Link>
+                renderNavLink('/requerimientos', 'Requerimientos', <BsFileEarmarkText />)
               ) : (<>
               {/* Guardia / Admin */}
               {(rol === 'guardia' || rol === 'admin') && (
-                <Link to="/entregas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsBoxSeam className="h-4 w-4" />
-                  Entregas
-                </Link>
+                renderNavLink('/entregas', 'Entregas', <BsBoxSeam />)
               )}
               
               {(rol === 'admin' || hasPermission('compras.ver')) && (
-                <Link to="/compras" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition flex items-center gap-1.5">
-                  <BsCartCheck className="h-4 w-4" />
-                  Compras
-                </Link>
+                renderNavLink('/compras', 'Compras', <BsCartCheck />)
               )}
               
               {/* Inventario / Admin / Guardia */}
               {(rol === 'inventario' || rol === 'admin' || rol === 'guardia') && (
                 <>
-                  <Link to="/inventario" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                    <BsBoxes className="h-4 w-4" />
-                    Inventario
-                  </Link>
+                  {renderNavLink('/inventario', 'Inventario', <BsBoxes />)}
                   {(rol === 'inventario' || rol === 'admin') && (
                     <>
                       {rol === 'inventario' && !hasPermission('roles.ver') && !hasPermission('roles.crear') && (
-                        <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                          <BsGrid1X2Fill className="h-4 w-4" />
-                          Catálogos
-                        </Link>
+                        renderNavLink('/admin/tablas', 'Catálogos', <BsGrid1X2Fill />)
                       )}
                     </>
                   )}
@@ -74,30 +94,18 @@ export const Navbar: React.FC = () => {
 
               {/* TTHH / Admin */}
               {(rol === 'tthh' || rol === 'admin') && (
-                <Link to="/tthh" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsBarChart className="h-4 w-4" />
-                  Reportes
-                </Link>
+                renderNavLink('/tthh', 'Reportes', <BsBarChart />)
               )}
 
               {/* Módulos de Administración / Configuración */}
               {(rol === 'admin' || hasPermission('empleados.ver') || hasPermission('empleados.crear')) && (
-                <Link to="/admin/empleados" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsPeople className="h-4 w-4" />
-                  Colaboradores
-                </Link>
+                renderNavLink('/admin/empleados', 'Colaboradores', <BsPeople />)
               )}
               {(rol === 'admin' || hasPermission('usuarios.ver') || hasPermission('usuarios.crear')) && (
-                <Link to="/admin/usuarios" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsPersonGear className="h-4 w-4" />
-                  Operadores
-                </Link>
+                renderNavLink('/admin/usuarios', 'Operadores', <BsPersonGear />)
               )}
               {(rol === 'admin' || hasPermission('roles.ver') || hasPermission('roles.crear') || hasPermission('configuracion.ver')) && (
-                <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsGrid1X2Fill className="h-4 w-4" />
-                  Tablas Maestras
-                </Link>
+                renderNavLink('/admin/tablas', 'Tablas Maestras', <BsGrid1X2Fill />)
               )}
               </>)}
             </div>
