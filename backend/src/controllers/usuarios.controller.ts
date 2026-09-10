@@ -77,14 +77,27 @@ export const usuariosController = {
     try {
       const { nombre, email, password, rol_id, empleado_id, activo } = req.body;
 
-      if (!nombre || !email || !password || !rol_id) {
-        throw new AppError('Los campos nombre, email, contraseña y rol son requeridos', 400);
+      if (!nombre || !email || !password || !rol_id || !empleado_id) {
+        throw new AppError('Los campos nombre, email, contraseña, rol y colaborador son requeridos', 400);
       }
 
       // Validar duplicados
       const dupRes = await client.query('SELECT usuario_id FROM usuario WHERE usuario_email = $1', [email.trim().toLowerCase()]);
       if (dupRes.rows.length > 0) {
         throw new AppError('Ya existe un usuario con este correo electrónico', 400);
+      }
+
+      const empleadoRes = await client.query(
+        `SELECT e.empleado_id,
+                EXISTS (SELECT 1 FROM usuario u WHERE u.empleado_id = e.empleado_id) AS ya_vinculado
+         FROM empleado e WHERE e.empleado_id = $1 AND e.empleado_estado = 'activo'`,
+        [empleado_id]
+      );
+      if (empleadoRes.rows.length === 0) {
+        throw new AppError('El colaborador seleccionado no existe o está inactivo', 400);
+      }
+      if (empleadoRes.rows[0].ya_vinculado) {
+        throw new AppError('El colaborador seleccionado ya está vinculado a otro usuario', 400);
       }
 
       await client.query('BEGIN');
@@ -96,7 +109,7 @@ export const usuariosController = {
         `INSERT INTO usuario (empleado_id, usuario_nombre, usuario_email, usuario_password, usuario_estado)
          VALUES ($1, $2, $3, $4, $5) RETURNING usuario_id`,
         [
-          empleado_id || null, 
+          empleado_id,
           nombre.trim(), 
           email.trim().toLowerCase(), 
           hashedPassword, 
@@ -135,14 +148,30 @@ export const usuariosController = {
       const id = parseInt(req.params.id);
       const { nombre, email, password, rol_id, empleado_id, activo } = req.body;
 
-      if (!nombre || !email || !rol_id) {
-        throw new AppError('Los campos nombre, email y rol son requeridos', 400);
+      if (!nombre || !email || !rol_id || !empleado_id) {
+        throw new AppError('Los campos nombre, email, rol y colaborador son requeridos', 400);
       }
 
       // Validar correo duplicado
       const dupRes = await client.query('SELECT usuario_id FROM usuario WHERE usuario_email = $1 AND usuario_id <> $2', [email.trim().toLowerCase(), id]);
       if (dupRes.rows.length > 0) {
         throw new AppError('Ya existe otro usuario con este correo electrónico', 400);
+      }
+
+      const empleadoRes = await client.query(
+        `SELECT e.empleado_id,
+                EXISTS (
+                  SELECT 1 FROM usuario u
+                  WHERE u.empleado_id = e.empleado_id AND u.usuario_id <> $2
+                ) AS ya_vinculado
+         FROM empleado e WHERE e.empleado_id = $1 AND e.empleado_estado = 'activo'`,
+        [empleado_id, id]
+      );
+      if (empleadoRes.rows.length === 0) {
+        throw new AppError('El colaborador seleccionado no existe o está inactivo', 400);
+      }
+      if (empleadoRes.rows[0].ya_vinculado) {
+        throw new AppError('El colaborador seleccionado ya está vinculado a otro usuario', 400);
       }
 
       await client.query('BEGIN');
@@ -159,7 +188,7 @@ export const usuariosController = {
           WHERE usuario_id = $6
           RETURNING *
         `;
-        queryParams = [empleado_id || null, nombre.trim(), email.trim().toLowerCase(), hashedPassword, activo ? 'activo' : 'inactivo', id];
+        queryParams = [empleado_id, nombre.trim(), email.trim().toLowerCase(), hashedPassword, activo ? 'activo' : 'inactivo', id];
       } else {
         updateQuery = `
           UPDATE usuario 
@@ -167,7 +196,7 @@ export const usuariosController = {
           WHERE usuario_id = $5
           RETURNING *
         `;
-        queryParams = [empleado_id || null, nombre.trim(), email.trim().toLowerCase(), activo ? 'activo' : 'inactivo', id];
+        queryParams = [empleado_id, nombre.trim(), email.trim().toLowerCase(), activo ? 'activo' : 'inactivo', id];
       }
 
       const userRes = await client.query(updateQuery, queryParams);

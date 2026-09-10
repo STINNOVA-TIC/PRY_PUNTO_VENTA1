@@ -25,7 +25,9 @@ exports.GruposPermisos = {
         'nomina.configurar_descuentos',
         'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
         'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar',
-        'requerimientos.firmar'
+        'requerimientos.firmar',
+        'compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar',
+        'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar'
     ],
     // GUARDIA: Solo entregas y verificación
     GUARDIA: [
@@ -40,7 +42,8 @@ exports.GruposPermisos = {
         'reportes.ver_consumo_empleados',
         'inventario.ver', // Para ubicar productos en stock
         'productos.ver', // Para ver detalles del producto a entregar
-        'autoconsumo.ver', 'autoconsumo.entregar'
+        'autoconsumo.ver', 'autoconsumo.entregar',
+        'compras.ver', 'compras.requerimientos.crear'
     ],
     // EMPLEADO: Compras y ver propio consumo
     EMPLEADO: [
@@ -63,7 +66,8 @@ exports.GruposPermisos = {
         'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
         'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
         'categorias.ver', 'categorias.crear', 'categorias.editar',
-        'autoconsumo.ver', 'empleados.ver'
+        'autoconsumo.ver', 'empleados.ver',
+        'compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.recibir'
     ],
     // TTHH: Gestión de nómina, devoluciones y gastos de empleados
     TTHH: [
@@ -75,6 +79,7 @@ exports.GruposPermisos = {
         'nomina.configurar_descuentos',
         'empleados.ver',
         'empleados.ver_datos_sensibles',
-        'autoconsumo.ver', 'autoconsumo.aprobar'
+        'autoconsumo.ver', 'autoconsumo.aprobar',
+        'compras.ver', 'compras.requerimientos.crear'
     ]
 };

@@ -2,12 +2,19 @@
 import { Router } from 'express';
 import { empleadosController } from '../controllers/empleados.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requirePermission, requireSelfOrPermission } from '../middleware/permisos.middleware';
+import { requireAnyPermission, requirePermission, requireSelfOrPermission } from '../middleware/permisos.middleware';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+
+// Catálogo limitado para seleccionar aprobadores y receptores en Compras.
+router.get(
+  '/catalogo-compras',
+  requireAnyPermission('compras.ver', 'requerimientos.firmar'),
+  empleadosController.getCatalogoCompras
+);
 
 // GET /api/empleados - Ver todos los empleados
 router.get(

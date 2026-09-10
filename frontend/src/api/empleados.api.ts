@@ -7,6 +7,11 @@ export const empleadosAPI = {
     return response.data;
   },
 
+  getCatalogoCompras: async (): Promise<{ data: Empleado[] }> => {
+    const response = await api.get('/empleados/catalogo-compras');
+    return response.data;
+  },
+
   getById: async (id: number): Promise<{ data: Empleado }> => {
     const response = await api.get(`/empleados/${id}`);
     return response.data;

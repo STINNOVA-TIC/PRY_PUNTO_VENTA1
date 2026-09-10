@@ -176,6 +176,9 @@ CREATE TABLE usuario (
     usuario_fecha_desactivacion TIMESTAMP NULL
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuario_empleado_unico
+    ON usuario(empleado_id) WHERE empleado_id IS NOT NULL;
+
 
 -- =============================================
 -- 3. TABLAS INTERMEDIAS (N:N)
@@ -573,7 +576,8 @@ INSERT INTO modulo (modulo_id, modulo_nombre, modulo_descripcion, modulo_icono, 
 (8, 'Reportes', 'Reportes de gestión, financieros y consumo', 'BarChart3', 'activo'),
 (9, 'Nómina', 'Descuentos y cierres salariales', 'DollarSign', 'activo'),
 (10, 'Configuración', 'Parámetros del sistema y auditoría', 'Settings', 'activo'),
-(11, 'Autoconsumo', 'Solicitudes de bienes internos para áreas de la empresa', 'ClipboardCheck', 'activo')
+(11, 'Autoconsumo', 'Solicitudes de bienes internos para áreas de la empresa', 'ClipboardCheck', 'activo'),
+(12, 'Compras', 'Requerimientos, aprobaciones y recepción de compras corporativas', 'CartCheck', 'activo')
 ON CONFLICT (modulo_nombre) DO NOTHING;
 
 SELECT setval('modulo_modulo_id_seq', COALESCE((SELECT MAX(modulo_id)+1 FROM modulo), 1), false);
@@ -666,7 +670,15 @@ INSERT INTO permiso (modulo_id, permiso_nombre, permiso_descripcion, permiso_cla
 (4, 'Editar Proveedores', 'Permite modificar proveedores', 'proveedores.editar', 'activo'),
 (4, 'Ver Categorías', 'Permite consultar categorías de productos', 'categorias.ver', 'activo'),
 (4, 'Crear Categorías', 'Permite crear categorías de productos', 'categorias.crear', 'activo'),
-(4, 'Editar Categorías', 'Permite editar categorías de productos', 'categorias.editar', 'activo')
+(4, 'Editar Categorías', 'Permite editar categorías de productos', 'categorias.editar', 'activo'),
+
+-- COMPRAS
+(12, 'Ver Compras', 'Permite acceder al área corporativa de Compras', 'compras.ver', 'activo'),
+(12, 'Crear Requerimientos de Compra', 'Permite crear requerimientos para el área solicitante', 'compras.requerimientos.crear', 'activo'),
+(12, 'Editar Requerimientos de Compra', 'Permite editar requerimientos corporativos', 'compras.requerimientos.editar', 'activo'),
+(12, 'Aprobar Requerimientos de Compra', 'Permite aprobar y firmar requerimientos corporativos', 'compras.requerimientos.aprobar', 'activo'),
+(12, 'Recibir Compras', 'Permite registrar la recepción de bienes comprados', 'compras.requerimientos.recibir', 'activo'),
+(12, 'Eliminar Requerimientos de Compra', 'Permite eliminar requerimientos corporativos', 'compras.requerimientos.eliminar', 'activo')
 ON CONFLICT (permiso_nombre) DO NOTHING;
 
 SELECT setval('permiso_permiso_id_seq', COALESCE((SELECT MAX(permiso_id)+1 FROM permiso), 1), false);
@@ -683,7 +695,7 @@ SELECT 2, permiso_id FROM permiso WHERE permiso_clave IN (
     'empleados.ver', 'empleados.ver_historial_compras', 'entregas.ver', 'entregas.ver_pendientes',
     'entregas.confirmar', 'entregas.verificar_empleado', 'entregas.reportar_incidente',
     'reportes.ver', 'reportes.ver_consumo_empleados', 'inventario.ver', 'productos.ver',
-    'autoconsumo.ver', 'autoconsumo.entregar'
+    'autoconsumo.ver', 'autoconsumo.entregar', 'compras.ver', 'compras.requerimientos.crear'
 )
 ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
@@ -703,7 +715,8 @@ SELECT 4, permiso_id FROM permiso WHERE permiso_clave IN (
     'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
     'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
     'categorias.ver', 'categorias.crear', 'categorias.editar',
-    'autoconsumo.ver', 'empleados.ver'
+    'autoconsumo.ver', 'empleados.ver', 'compras.ver', 'compras.requerimientos.crear',
+    'compras.requerimientos.editar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar'
 )
 ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
@@ -718,7 +731,8 @@ SELECT 5, permiso_id FROM permiso WHERE permiso_clave IN (
     'entregas.ver', 'entregas.ver_pendientes', 'entregas.confirmar', 'entregas.verificar_empleado', 'entregas.reportar_incidente',
     'reportes.ver', 'reportes.ver_financieros', 'reportes.ver_consumo_empleados', 'reportes.ver_inventario', 'reportes.exportar',
     'nomina.ver', 'nomina.ver_todos', 'nomina.aplicar_descuento',
-    'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar'
+    'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar',
+    'compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar'
 )
 ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
@@ -726,7 +740,8 @@ ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 INSERT INTO rol_permiso (rol_id, permiso_id)
 SELECT 6, permiso_id FROM permiso WHERE permiso_clave IN (
     'reportes.ver', 'reportes.ver_financieros', 'reportes.exportar', 'nomina.ver', 'nomina.ver_todos',
-    'ventas.ver', 'empleados.ver', 'empleados.ver_datos_sensibles'
+    'ventas.ver', 'empleados.ver', 'empleados.ver_datos_sensibles',
+    'compras.ver', 'compras.requerimientos.crear'
 )
 ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
@@ -735,7 +750,7 @@ INSERT INTO rol_permiso (rol_id, permiso_id)
 SELECT 7, permiso_id FROM permiso WHERE permiso_clave IN (
     'reportes.ver', 'reportes.ver_consumo_empleados', 'nomina.ver', 'nomina.ver_todos',
     'nomina.aplicar_descuento', 'nomina.configurar_descuentos', 'empleados.ver', 'empleados.ver_datos_sensibles',
-    'autoconsumo.ver', 'autoconsumo.aprobar'
+    'autoconsumo.ver', 'autoconsumo.aprobar', 'compras.ver', 'compras.requerimientos.crear'
 )
 ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 

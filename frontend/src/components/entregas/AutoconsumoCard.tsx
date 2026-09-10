@@ -52,9 +52,23 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
 
   const productosList = auto.detalles
     ? auto.detalles
-        .map((d) => `${d.producto_codigo} - ${d.producto_nombre} (x${d.cantidad})`)
+        .map((d) => {
+          const dev = d.cantidad_devuelta || 0;
+          if (dev > 0) {
+            return `${d.producto_codigo} - ${d.producto_nombre} (${d.cantidad} despachadas, ${dev} devueltas)`;
+          }
+          return `${d.producto_codigo} - ${d.producto_nombre} (x${d.cantidad})`;
+        })
         .join(', ')
     : 'Productos';
+
+  // Calcular total disponible restante para devolución
+  const totalDisponible = (auto.detalles || []).reduce((acc, d) => {
+    const disp = d.cantidad_disponible !== undefined ? d.cantidad_disponible : d.cantidad;
+    return acc + disp;
+  }, 0);
+  const tieneProductosDevueltos = (auto.detalles || []).some(d => (d.cantidad_devuelta || 0) > 0);
+  const esDevolucionCompleta = tieneProductosDevueltos && totalDisponible === 0;
 
   const [showDevModal, setShowDevModal] = useState(false);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
@@ -64,7 +78,8 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
     const initialQuantities: Record<number, number> = {};
     if (auto.detalles) {
       auto.detalles.forEach((d) => {
-        initialQuantities[d.producto_id] = d.cantidad;
+        const maxDev = d.cantidad_disponible !== undefined ? d.cantidad_disponible : d.cantidad;
+        initialQuantities[d.producto_id] = maxDev; // Default a todo lo disponible restante
       });
     }
     setCantidadesDevolucion(initialQuantities);
@@ -124,6 +139,11 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                   Devolución: {auto.devolucion.estado}
                 </span>
               )}
+              {esDevolucionCompleta && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                  Devuelto Total
+                </span>
+              )}
             </div>
             <h3 className="text-base font-bold text-gray-800">{auto.empleado?.nombre}</h3>
             <p className="text-xs text-gray-400">
@@ -149,7 +169,7 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                   {isDevAprobada ? (
                     <button
                       onClick={() => onEjecutarDevolucion?.(auto.id, auto.devolucion!.id)}
-                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-bold transition text-center"
+                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-bold transition text-center shadow-xs active:scale-95"
                     >
                       Ejecutar Devolución
                     </button>
@@ -160,14 +180,14 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                     >
                       Devolución Pendiente
                     </button>
-                  ) : (
+                  ) : totalDisponible > 0 ? (
                     <button
                       onClick={handleOpenDevModal}
                       className="w-full sm:w-auto bg-white hover:bg-gray-55 border border-gray-300 text-gray-600 px-4 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
                     >
                       <BsArrowClockwise /> Solicitar Devolución
                     </button>
-                  )}
+                  ) : null}
                 </>
               )}
 
@@ -249,7 +269,8 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                       onClick={() => {
                         const allMax: Record<number, number> = {};
                         (auto.detalles || []).forEach((d) => {
-                          allMax[d.producto_id] = d.cantidad;
+                          const maxDev = d.cantidad_disponible !== undefined ? d.cantidad_disponible : d.cantidad;
+                          allMax[d.producto_id] = maxDev;
                         });
                         setCantidadesDevolucion(allMax);
                       }}
@@ -274,12 +295,16 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                 </div>
 
                 {(auto.detalles || []).map((d) => {
+                  const maxDisponible = d.cantidad_disponible !== undefined ? d.cantidad_disponible : d.cantidad;
+                  const devueltasPrevias = d.cantidad_devuelta || 0;
                   const currentVal = cantidadesDevolucion[d.producto_id] || 0;
                   return (
                     <div key={d.producto_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white border border-gray-150 rounded-xl shadow-xs">
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-800 text-xs truncate">{d.producto_nombre}</p>
-                        <p className="text-[10px] text-gray-450 font-medium mt-0.5">Original: {d.cantidad} ud(s)</p>
+                        <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                          Despachadas: {d.cantidad} {devueltasPrevias > 0 && <span className="text-amber-600 font-semibold">(Ya devueltas: {devueltasPrevias})</span>} • <span className="text-emerald-700 font-bold">Disponibles: {maxDisponible}</span>
+                        </p>
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
@@ -303,11 +328,11 @@ export const AutoconsumoCard: React.FC<AutoconsumoCardProps> = ({
                           </span>
                           <button
                             type="button"
-                            disabled={currentVal >= d.cantidad}
+                            disabled={currentVal >= maxDisponible}
                             onClick={() => {
                               setCantidadesDevolucion({
                                 ...cantidadesDevolucion,
-                                [d.producto_id]: Math.min(d.cantidad, currentVal + 1)
+                                [d.producto_id]: Math.min(maxDisponible, currentVal + 1)
                               });
                             }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center bg-white hover:bg-gray-100 disabled:opacity-40 text-gray-700 text-sm font-bold border border-gray-150 shadow-xs transition active:scale-90"

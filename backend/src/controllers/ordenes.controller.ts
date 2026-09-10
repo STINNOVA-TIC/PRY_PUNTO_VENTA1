@@ -107,17 +107,30 @@ export const ordenesController = {
         empleadoId = 1;
       }
 
-      // Validar si el usuario está autorizado a firmar requerimientos
+      // Validar si el usuario puede crear el requerimiento corporativo o firmarlo desde la bandeja rápida.
       const isUserAdmin = req.user?.rol_id === 1;
       if (!isUserAdmin) {
         const firmasCheck = await client.query(
-          `SELECT 1 FROM usuario_rol ur
-           JOIN usuario u ON ur.usuario_id = u.usuario_id
-           WHERE (u.usuario_id = $1 OR u.empleado_id = $2) AND ur.rol_id = 9 AND u.usuario_estado = 'activo'`,
+          `SELECT 1
+           FROM usuario u
+           WHERE (u.usuario_id = $1 OR u.empleado_id = $2)
+             AND u.usuario_estado = 'activo'
+             AND EXISTS (
+               SELECT 1
+               FROM permiso p
+               LEFT JOIN usuario_permiso up
+                 ON up.permiso_id = p.permiso_id AND up.usuario_id = u.usuario_id
+               LEFT JOIN usuario_rol ur ON ur.usuario_id = u.usuario_id
+               LEFT JOIN rol_permiso rp
+                 ON rp.rol_id = ur.rol_id AND rp.permiso_id = p.permiso_id
+               WHERE p.permiso_clave IN ('requerimientos.firmar', 'compras.requerimientos.crear')
+                 AND p.permiso_estado = 'activo'
+                 AND (up.tipo = 'conceder' OR (rp.rol_permiso_id IS NOT NULL AND COALESCE(up.tipo, '') <> 'denegar'))
+             )`,
           [req.user?.id || 0, empleadoId]
         );
         if (firmasCheck.rows.length === 0) {
-          throw new AppError('No tienes autorizada la opción de firmar requerimientos. Solicita la activación de firma a un Administrador.', 403);
+          throw new AppError('No tienes autorización para crear requerimientos de compra.', 403);
         }
       }
 

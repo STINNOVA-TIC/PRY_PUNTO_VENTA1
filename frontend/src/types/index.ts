@@ -155,7 +155,10 @@ export interface AutoconsumoDetalle {
   producto_id: number;
   producto_nombre: string;
   producto_codigo: string;
+  producto_descripcion?: string;
   cantidad: number;
+  cantidad_devuelta?: number;
+  cantidad_disponible?: number;
   precio_unitario: number;
   subtotal: number;
 }

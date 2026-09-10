@@ -89,6 +89,14 @@ export const getPermisosForUsuario = async (usuarioId: number, rolIdFallback: nu
   }
 };
 
+const getNombreRol = async (rolId: number): Promise<string> => {
+  const rolRes = await pool.query(
+    `SELECT rol_nombre FROM rol WHERE rol_id = $1 AND rol_estado = 'activo'`,
+    [rolId]
+  );
+  return rolRes.rows[0]?.rol_nombre || rolesData.find(r => r.id === rolId)?.nombre || 'empleado';
+};
+
 export const authController = {
   /**
    * Iniciar sesión de empleado por Cédula (Sin Contraseña)
@@ -147,7 +155,24 @@ export const authController = {
 
       const staticRole = rolesData.find(r => r.id === rolId);
       const rolNombre = staticRole?.nombre || 'empleado';
-      const permisos = userId > 0 ? await getPermisosForUsuario(userId, rolId) : await getPermisosForRol(rolId);
+      const permisosBase = await getPermisosForRol(3);
+      const permisosSet = new Set(permisosBase);
+      if (userId > 0) {
+        const quickPermsRes = await pool.query(
+          `SELECT p.permiso_clave, up.tipo
+           FROM usuario_permiso up
+           JOIN permiso p ON p.permiso_id = up.permiso_id
+           WHERE up.usuario_id = $1
+             AND p.permiso_estado = 'activo'
+             AND p.permiso_clave IN ('autoconsumo.crear', 'requerimientos.firmar')`,
+          [userId]
+        );
+        quickPermsRes.rows.forEach(({ permiso_clave, tipo }) => {
+          if (tipo === 'conceder') permisosSet.add(permiso_clave);
+          if (tipo === 'denegar') permisosSet.delete(permiso_clave);
+        });
+      }
+      const permisos = Array.from(permisosSet).sort();
 
       // Verificar si el colaborador tiene autorizado el autoconsumo
       const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
@@ -252,19 +277,17 @@ export const authController = {
         throw new AppError('Rol de usuario no encontrado', 500);
       }
 
-      // Restricción de Seguridad: Colaboradores no pueden ingresar por este portal (usuario y contraseña)
+      // El portal corporativo admite roles creados desde Tablas Maestras.
+      // Solo el rol base de empleado queda reservado para el acceso simplificado por cédula.
       const rolesNombres = rolRes.rows.map(r => r.rol_nombre);
-      const tieneRolOperador = rolesNombres.some(nombre => 
-        ['admin', 'guardia', 'inventario', 'contador', 'gerente', 'tthh'].includes(nombre)
-      );
+      const tieneRolCorporativo = rolesNombres.some(nombre => nombre !== 'empleado');
 
-      if (!tieneRolOperador) {
-        throw new AppError('Acceso denegado. Este portal es de uso exclusivo para operadores y administradores.', 403);
+      if (!tieneRolCorporativo) {
+        throw new AppError('Acceso denegado. Este usuario solo puede ingresar mediante el acceso por cédula.', 403);
       }
 
       // Mapear permisos según rol y personalización híbrida del usuario
-      const staticRole = rolesData.find(r => r.id === rol.rol_id);
-      const rolNombre = staticRole?.nombre || 'empleado';
+      const rolNombre = rol.rol_nombre;
       const permisos = await getPermisosForUsuario(user.usuario_id, rol.rol_id);
 
       // Obtener datos del empleado asociado si existe
@@ -343,8 +366,7 @@ export const authController = {
         throw new AppError('Usuario no autenticado', 401);
       }
 
-      const staticRole = rolesData.find(r => r.id === req.user!.rol_id);
-      const rolNombre = staticRole?.nombre || 'empleado';
+      const rolNombre = req.empleado ? 'empleado' : await getNombreRol(req.user!.rol_id);
       const permisos = req.user!.id > 0 ? await getPermisosForUsuario(req.user!.id, req.user!.rol_id) : await getPermisosForRol(req.user!.rol_id);
 
       let empleado = null;
@@ -539,25 +561,11 @@ export const authController = {
         }
       }
 
-      const staticRole = rolesData.find(r => r.id === decoded.rol_id);
-      const rolNombre = staticRole?.nombre || 'empleado';
+      const rolNombre = await getNombreRol(decoded.rol_id);
       const permisos = await getPermisosForUsuario(user.usuario_id, decoded.rol_id);
 
-      // Verificar si el colaborador tiene autorizado el autoconsumo (rol_id 8 asignado)
-      const autoconsumoCheck = await pool.query(
-        `SELECT 1 FROM usuario_rol 
-         WHERE usuario_id = $1 AND rol_id = 8`,
-        [user.usuario_id]
-      );
-      const permitirAutoconsumo = autoconsumoCheck.rows.length > 0;
-
-      // Verificar si el colaborador tiene autorizado firmar requerimientos (rol_id 9 asignado)
-      const firmasCheck = await pool.query(
-        `SELECT 1 FROM usuario_rol 
-         WHERE usuario_id = $1 AND rol_id = 9`,
-        [user.usuario_id]
-      );
-      const permitirFirmas = decoded.rol_id === 1 || firmasCheck.rows.length > 0;
+      const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
+      const permitirFirmas = decoded.rol_id === 1 || permisos.includes('requerimientos.firmar');
 
       res.json({
         success: true,

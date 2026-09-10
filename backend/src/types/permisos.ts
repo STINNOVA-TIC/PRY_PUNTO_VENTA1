@@ -81,7 +81,15 @@ export type Permiso =
   | 'autoconsumo.eliminar'
 
   // ============ REQUERIMIENTOS ============
-  | 'requerimientos.firmar';
+  | 'requerimientos.firmar'
+
+  // ============ COMPRAS ============
+  | 'compras.ver'
+  | 'compras.requerimientos.crear'
+  | 'compras.requerimientos.editar'
+  | 'compras.requerimientos.aprobar'
+  | 'compras.requerimientos.recibir'
+  | 'compras.requerimientos.eliminar';
 
 // Grupos de permisos para facilitar la asignación
 export const GruposPermisos = {
@@ -106,7 +114,9 @@ export const GruposPermisos = {
     'nomina.configurar_descuentos',
     'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
     'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar',
-    'requerimientos.firmar'
+    'requerimientos.firmar',
+    'compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar',
+    'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar'
   ] as Permiso[],
 
   // GUARDIA: Solo entregas y verificación
@@ -122,7 +132,8 @@ export const GruposPermisos = {
     'reportes.ver_consumo_empleados',
     'inventario.ver',  // Para ubicar productos en stock
     'productos.ver',    // Para ver detalles del producto a entregar
-    'autoconsumo.ver', 'autoconsumo.entregar'
+    'autoconsumo.ver', 'autoconsumo.entregar',
+    'compras.ver', 'compras.requerimientos.crear'
   ] as Permiso[],
 
   // EMPLEADO: Compras y ver propio consumo
@@ -147,7 +158,8 @@ export const GruposPermisos = {
     'reportes.ver', 'reportes.ver_inventario', 'reportes.exportar',
     'proveedores.ver', 'proveedores.crear', 'proveedores.editar',
     'categorias.ver', 'categorias.crear', 'categorias.editar',
-    'autoconsumo.ver', 'empleados.ver'
+    'autoconsumo.ver', 'empleados.ver',
+    'compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.recibir'
   ] as Permiso[],
 
   // TTHH: Gestión de nómina, devoluciones y gastos de empleados
@@ -160,6 +172,7 @@ export const GruposPermisos = {
     'nomina.configurar_descuentos',
     'empleados.ver',
     'empleados.ver_datos_sensibles',
-    'autoconsumo.ver', 'autoconsumo.aprobar'
+    'autoconsumo.ver', 'autoconsumo.aprobar',
+    'compras.ver', 'compras.requerimientos.crear'
   ] as Permiso[]
 };

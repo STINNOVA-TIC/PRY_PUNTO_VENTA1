@@ -44,26 +44,69 @@ exports.devolucionesController = {
             const devInsertRes = await client.query(`INSERT INTO devolucion (solicitud_entrega_id, autoconsumo_id, empleado_id, usuario_entrega_id, devolucion_motivo, devolucion_estado) 
          VALUES ($1, $2, $3, $4, $5, 'pendiente') RETURNING devolucion_id`, [solicitud_entrega_id || null, autoconsumo_id || null, empleadoId, usuarioEntregaId, motivo.trim()]);
             const devolucionId = devInsertRes.rows[0].devolucion_id;
-            // Si detalles se envían, insertamos detalles específicos
+            // Si detalles se envían, validamos contra lo disponible y los insertamos
             if (detalles && Array.isArray(detalles) && detalles.length > 0) {
                 for (const d of detalles) {
                     if (d.cantidad_devuelta > 0) {
+                        // Validar saldo disponible de este producto
+                        if (tipoOrigen === 'autoconsumo') {
+                            const origRes = await client.query(`SELECT autoconsumo_detalle_cantidad FROM autoconsumo_detalle WHERE autoconsumo_id = $1 AND producto_id = $2`, [autoconsumo_id, d.producto_id]);
+                            const origQty = parseInt(origRes.rows[0]?.autoconsumo_detalle_cantidad || '0');
+                            const devRes = await client.query(`SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as devuelto
+                 FROM devolucion_detalle dd
+                 JOIN devolucion dev ON dd.devolucion_id = dev.devolucion_id
+                 WHERE dev.autoconsumo_id = $1 AND dd.producto_id = $2 AND dev.devolucion_estado IN ('aprobado', 'ejecutado')`, [autoconsumo_id, d.producto_id]);
+                            const alreadyDev = parseInt(devRes.rows[0]?.devuelto || '0');
+                            const disponible = Math.max(0, origQty - alreadyDev);
+                            if (d.cantidad_devuelta > disponible) {
+                                throw new error_middleware_1.AppError(`La cantidad a devolver (${d.cantidad_devuelta}) supera las unidades disponibles restantes (${disponible}) para el producto ID ${d.producto_id}`, 400);
+                            }
+                        }
+                        else {
+                            const origRes = await client.query(`SELECT solicitud_entrega_detalle_cantidad FROM solicitud_entrega_detalle WHERE solicitud_entrega_id = $1 AND producto_id = $2`, [solicitud_entrega_id, d.producto_id]);
+                            const origQty = parseInt(origRes.rows[0]?.solicitud_entrega_detalle_cantidad || '0');
+                            const devRes = await client.query(`SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as devuelto
+                 FROM devolucion_detalle dd
+                 JOIN devolucion dev ON dd.devolucion_id = dev.devolucion_id
+                 WHERE dev.solicitud_entrega_id = $1 AND dd.producto_id = $2 AND dev.devolucion_estado IN ('aprobado', 'ejecutado')`, [solicitud_entrega_id, d.producto_id]);
+                            const alreadyDev = parseInt(devRes.rows[0]?.devuelto || '0');
+                            const disponible = Math.max(0, origQty - alreadyDev);
+                            if (d.cantidad_devuelta > disponible) {
+                                throw new error_middleware_1.AppError(`La cantidad a devolver (${d.cantidad_devuelta}) supera las unidades disponibles restantes (${disponible}) para el producto ID ${d.producto_id}`, 400);
+                            }
+                        }
                         await client.query(`INSERT INTO devolucion_detalle (devolucion_id, producto_id, cantidad_devuelta) VALUES ($1, $2, $3)`, [devolucionId, d.producto_id, d.cantidad_devuelta]);
                     }
                 }
             }
             else if (tipoOrigen === 'autoconsumo') {
-                // De lo contrario, por compatibilidad, insertamos todos los productos del autoconsumo como devolución
+                // De lo contrario, por compatibilidad, insertamos solo las cantidades disponibles restantes
                 const itemsRes = await client.query(`SELECT producto_id, autoconsumo_detalle_cantidad FROM autoconsumo_detalle WHERE autoconsumo_id = $1`, [autoconsumo_id]);
                 for (const item of itemsRes.rows) {
-                    await client.query(`INSERT INTO devolucion_detalle (devolucion_id, producto_id, cantidad_devuelta) VALUES ($1, $2, $3)`, [devolucionId, item.producto_id, item.autoconsumo_detalle_cantidad]);
+                    const devRes = await client.query(`SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as devuelto
+             FROM devolucion_detalle dd
+             JOIN devolucion dev ON dd.devolucion_id = dev.devolucion_id
+             WHERE dev.autoconsumo_id = $1 AND dd.producto_id = $2 AND dev.devolucion_estado IN ('aprobado', 'ejecutado')`, [autoconsumo_id, item.producto_id]);
+                    const alreadyDev = parseInt(devRes.rows[0]?.devuelto || '0');
+                    const disponible = Math.max(0, item.autoconsumo_detalle_cantidad - alreadyDev);
+                    if (disponible > 0) {
+                        await client.query(`INSERT INTO devolucion_detalle (devolucion_id, producto_id, cantidad_devuelta) VALUES ($1, $2, $3)`, [devolucionId, item.producto_id, disponible]);
+                    }
                 }
             }
             else {
-                // De lo contrario, por compatibilidad, insertamos todos los productos de la solicitud como devolución
+                // De lo contrario, por compatibilidad, insertamos solo las cantidades disponibles restantes
                 const itemsRes = await client.query(`SELECT producto_id, solicitud_entrega_detalle_cantidad FROM solicitud_entrega_detalle WHERE solicitud_entrega_id = $1`, [solicitud_entrega_id]);
                 for (const item of itemsRes.rows) {
-                    await client.query(`INSERT INTO devolucion_detalle (devolucion_id, producto_id, cantidad_devuelta) VALUES ($1, $2, $3)`, [devolucionId, item.producto_id, item.solicitud_entrega_detalle_cantidad]);
+                    const devRes = await client.query(`SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as devuelto
+             FROM devolucion_detalle dd
+             JOIN devolucion dev ON dd.devolucion_id = dev.devolucion_id
+             WHERE dev.solicitud_entrega_id = $1 AND dd.producto_id = $2 AND dev.devolucion_estado IN ('aprobado', 'ejecutado')`, [solicitud_entrega_id, item.producto_id]);
+                    const alreadyDev = parseInt(devRes.rows[0]?.devuelto || '0');
+                    const disponible = Math.max(0, item.solicitud_entrega_detalle_cantidad - alreadyDev);
+                    if (disponible > 0) {
+                        await client.query(`INSERT INTO devolucion_detalle (devolucion_id, producto_id, cantidad_devuelta) VALUES ($1, $2, $3)`, [devolucionId, item.producto_id, disponible]);
+                    }
                 }
             }
             await client.query('COMMIT');
@@ -190,16 +233,19 @@ exports.devolucionesController = {
                     autoconsumoId
                 ]);
             }
-            // 4. Determinar si es devolución total o parcial
+            // 4. Determinar si es devolución total o parcial sumando todas las devoluciones históricas (incluyendo la actual que se está aprobando/ejecutando)
             const originalDetailsCount = await client.query('SELECT COALESCE(SUM(autoconsumo_detalle_cantidad), 0) as total FROM autoconsumo_detalle WHERE autoconsumo_id = $1', [autoconsumoId]);
-            const returnedDetailsCount = await client.query('SELECT COALESCE(SUM(cantidad_devuelta), 0) as total FROM devolucion_detalle WHERE devolucion_id = $1', [devolucion.devolucion_id]);
+            const allReturnedDetailsCount = await client.query(`SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as total 
+         FROM devolucion_detalle dd
+         JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+         WHERE d.autoconsumo_id = $1 AND (d.devolucion_estado = 'ejecutado' OR d.devolucion_id = $2)`, [autoconsumoId, devolucion.devolucion_id]);
             const originalTotal = parseInt(originalDetailsCount.rows[0].total || '0');
-            const returnedTotal = parseInt(returnedDetailsCount.rows[0].total || '0');
+            const returnedTotal = parseInt(allReturnedDetailsCount.rows[0].total || '0');
             const isTotalDevolucion = returnedTotal >= originalTotal;
             const nuevoEstadoAutoconsumo = isTotalDevolucion ? 'cancelado' : 'entregado';
             const obsAutoconsumo = isTotalDevolucion
-                ? (motivo || 'Devolución total aprobada por TTHH')
-                : `Devolución parcial aprobada por TTHH. Se devolvieron ${returnedTotal} de ${originalTotal} unidades.`;
+                ? (motivo || 'Devolución total ejecutada en bodega')
+                : `Devolución parcial ejecutada. Se han devuelto ${returnedTotal} de ${originalTotal} unidades en total.`;
             await client.query(`UPDATE autoconsumo 
          SET autoconsumo_estado = $1, autoconsumo_observacion = $2 
          WHERE autoconsumo_id = $3`, [nuevoEstadoAutoconsumo, obsAutoconsumo, autoconsumoId]);

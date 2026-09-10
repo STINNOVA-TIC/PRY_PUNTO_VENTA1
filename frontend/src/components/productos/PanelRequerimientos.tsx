@@ -26,6 +26,7 @@ export const PanelRequerimientos: React.FC = () => {
   const loggedEmpleadoId = user?.empleado?.id;
   const isEmployeeRole = user?.rol?.nombre === 'empleado';
   const canSign = user?.rol?.id === 1 || user?.rol?.nombre === 'admin' || !!user?.permitir_firmas || hasPermission('requerimientos.firmar');
+  const canCreateRequirement = canSign || hasPermission('compras.requerimientos.crear');
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -36,6 +37,8 @@ export const PanelRequerimientos: React.FC = () => {
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [colaboradores, setColaboradores] = useState<any[]>([]);
+  const aprobadores = colaboradores.filter(c => c.puede_aprobar);
+  const receptores = colaboradores.filter(c => c.puede_recibir);
 
   // Búsquedas y Tooltips
   const [productSearch, setProductSearch] = useState('');
@@ -214,11 +217,17 @@ export const PanelRequerimientos: React.FC = () => {
 
   // Actualizar elaboradoPor y preseleccionar departamento/centro de costos cuando carguen los datos del usuario
   useEffect(() => {
-    if (user && user.empleado) {
-      const deptoLabel = user.empleado.departamento || 'TIC';
-      const primerNombre = user.empleado.nombre.split(' ')[0] || '';
-      const primerApellido = user.empleado.apellido.split(' ')[0] || '';
-      setElaboradoPor(`${deptoLabel}: ${primerNombre} ${primerApellido}`);
+    if (user) {
+      if (user.empleado) {
+        const deptoLabel = user.empleado.departamento || 'General';
+        const primerNombre = user.empleado.nombre.split(' ')[0] || '';
+        const primerApellido = user.empleado.apellido.split(' ')[0] || '';
+        setElaboradoPor(`${deptoLabel}: ${primerNombre} ${primerApellido}`);
+      } else {
+        const departamentoSeleccionado = departamentos.find(d => d.departamento_id === departamentoId);
+        const deptoLabel = departamentoSeleccionado?.departamento_nombre || 'Compras';
+        setElaboradoPor(`${deptoLabel}: ${user.nombre}`);
+      }
     }
     if (user && user.empleado && departamentos.length > 0) {
       const userDepto = departamentos.find(
@@ -239,33 +248,36 @@ export const PanelRequerimientos: React.FC = () => {
         setCentroCostosId(userCC.centro_costos_id);
       }
     }
-  }, [user, departamentos, centrosCosto]);
+  }, [user, departamentos, centrosCosto, departamentoId]);
 
   // Control de acceso inicial al submodulo
   useEffect(() => {
-    if (!canSign && moduloActivo === 'requerimiento') {
+    if (!canCreateRequirement && moduloActivo === 'requerimiento') {
       setModuloActivo('historial');
     }
-  }, [canSign, moduloActivo]);
+  }, [canCreateRequirement, moduloActivo]);
 
   // Pre-seleccionar Dominique Veloz y Mishell Paucar por defecto al cargar colaboradores
   useEffect(() => {
-    if (colaboradores.length > 0) {
-      const dom = colaboradores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('dominique veloz'));
+    if (aprobadores.length > 0) {
+      const dom = aprobadores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('dominique veloz'));
       if (dom) {
         setEmpleadoAprobadorId(dom.id);
         const label = `${dom.departamento || 'General'}: ${dom.nombre} ${dom.apellido}`;
         setAprobadoPor(label);
         setAprobadorSearch(label);
       } else {
-        const first = colaboradores[0];
+        const first = aprobadores[0];
         setEmpleadoAprobadorId(first.id);
         const label = `${first.departamento || 'General'}: ${first.nombre} ${first.apellido}`;
         setAprobadoPor(label);
         setAprobadorSearch(label);
       }
 
-      const mish = colaboradores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('mishell paucar'));
+    }
+
+    if (receptores.length > 0) {
+      const mish = receptores.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes('mishell paucar'));
       if (mish) {
         setEmpleadoReceptorId(mish.id);
         const cc = (mish.centro_costos || '').trim() || 'Compras';
@@ -273,7 +285,7 @@ export const PanelRequerimientos: React.FC = () => {
         setRecibidoPor(label);
         setReceptorSearch(label);
       } else {
-        const first = colaboradores[0];
+        const first = receptores[0];
         setEmpleadoReceptorId(first.id);
         const cc = (first.centro_costos || '').trim() || 'Compras';
         const label = `${cc}: ${first.nombre} ${first.apellido}`;
@@ -284,17 +296,26 @@ export const PanelRequerimientos: React.FC = () => {
   }, [colaboradores]);
 
   const cargarDatos = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      const [empRes, sucRes, depRes, ccRes, prodRes, provRes, ordRes, colabRes] = await Promise.all([
+      const colabRes = await empleadosAPI.getCatalogoCompras();
+      setColaboradores(colabRes.data || []);
+    } catch (err) {
+      console.error('Error cargando firmantes autorizados:', err);
+      setColaboradores([]);
+      setError('No se pudo cargar el directorio de firmantes autorizados.');
+    }
+
+    try {
+      const [empRes, sucRes, depRes, ccRes, prodRes, provRes, ordRes] = await Promise.all([
         adminAPI.read('empresa'),
         adminAPI.read('sucursal'),
         adminAPI.read('departamento'),
         adminAPI.read('centro_costos'),
-        productosAPI.getAll(),
+        productosAPI.getAll().catch(() => ({ data: [] })),
         productosAPI.getProveedores(),
-        ordenesAPI.getAll(),
-        empleadosAPI.getAll()
+        ordenesAPI.getAll()
       ]);
 
       // Filtrar y establecer empresas (ej: ST INNOVA y ST DRIVE)
@@ -350,7 +371,6 @@ export const PanelRequerimientos: React.FC = () => {
       setProductos(prodRes.data || []);
       setProveedores(provRes.data || []);
       setOrdenes(ordRes.data || []);
-      setColaboradores(colabRes.data || []);
     } catch (err) {
       console.error('Error cargando datos para requerimientos:', err);
       setError('Error al conectar con la base de datos para cargar catálogos.');
@@ -510,7 +530,7 @@ export const PanelRequerimientos: React.FC = () => {
     setError('');
     setSuccess('');
 
-    if (!canSign) {
+    if (!canCreateRequirement) {
       setShowNoPermisoModal(true);
       return;
     }
@@ -786,7 +806,7 @@ export const PanelRequerimientos: React.FC = () => {
         <button
           type="button"
           onClick={() => {
-            if (!canSign) {
+            if (!canCreateRequirement) {
               setShowNoPermisoModal(true);
               return;
             }
@@ -821,7 +841,7 @@ export const PanelRequerimientos: React.FC = () => {
       {moduloActivo === 'requerimiento' && (
       <>
       {/* FORMULARIO DE REQUERIMIENTO */}
-      {canSign && (
+      {canCreateRequirement && (
       <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
         
         {/* SECCIÓN A: METADATOS Y CABECERA */}
@@ -984,11 +1004,11 @@ export const PanelRequerimientos: React.FC = () => {
             
             {/* Seleccionar Producto (Combobox unificado) */}
             <div className="relative">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Producto (Almacén)</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Producto de inventario (opcional)</label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Buscar y seleccionar producto..."
+                  placeholder="Solo si es una reposición de inventario..."
                   value={productSearch}
                   onChange={(e) => {
                     setProductSearch(e.target.value);
@@ -1050,12 +1070,12 @@ export const PanelRequerimientos: React.FC = () => {
 
             {/* Descripción (si es servicio o para editar) */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Descripción / Nombre del Servicio</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Bien o servicio solicitado</label>
               <input
                 type="text"
                 value={itemDescripcion}
                 onChange={(e) => setItemDescripcion(e.target.value)}
-                placeholder="Ej. ESIM PLAN DE DATOS"
+                placeholder="Ej. Laptop empresarial, licencia de software o mantenimiento"
                 className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white"
               />
             </div>
@@ -1505,7 +1525,7 @@ export const PanelRequerimientos: React.FC = () => {
 
               {aprobadorDropdownOpen && (
                 <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                  {colaboradores
+                  {aprobadores
                     .filter(c => {
                       const q = aprobadorSearch.toLowerCase().trim();
                       if (!q) return true;
@@ -1528,11 +1548,11 @@ export const PanelRequerimientos: React.FC = () => {
                           className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                         >
                           <span className="font-semibold text-gray-800">{label}</span>
-                          <span className="block text-[10px] text-gray-400">Cédula: {c.codigo_empleado || c.cedula || 'N/A'}</span>
+                          <span className="block text-[10px] text-gray-400">{c.cargo}</span>
                         </button>
                       );
                     })}
-                  {colaboradores.filter(c => {
+                  {aprobadores.filter(c => {
                     const q = aprobadorSearch.toLowerCase().trim();
                     if (!q) return true;
                     const label = `${c.departamento || 'General'} ${c.nombre} ${c.apellido}`.toLowerCase();
@@ -1575,7 +1595,7 @@ export const PanelRequerimientos: React.FC = () => {
 
               {receptorDropdownOpen && (
                 <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                  {colaboradores
+                  {receptores
                     .filter(c => {
                       const q = receptorSearch.toLowerCase().trim();
                       if (!q) return true;
@@ -1600,11 +1620,11 @@ export const PanelRequerimientos: React.FC = () => {
                           className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                         >
                           <span className="font-semibold text-gray-800">{label}</span>
-                          <span className="block text-[10px] text-gray-400">Cédula: {c.codigo_empleado || c.cedula || 'N/A'}</span>
+                          <span className="block text-[10px] text-gray-400">{c.cargo}</span>
                         </button>
                       );
                     })}
-                  {colaboradores.filter(c => {
+                  {receptores.filter(c => {
                     const q = receptorSearch.toLowerCase().trim();
                     if (!q) return true;
                     const cc = (c.centro_costos || '').trim() || 'Compras';

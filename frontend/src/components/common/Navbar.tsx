@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX, BsBoxSeam, BsClipboardCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -45,11 +45,10 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
               
-              {/* Recepción de Requerimientos */}
-              {(rol === 'admin' || rol === 'guardia' || rol === 'inventario') && (
-                <Link to="/recepcion-requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                  <BsClipboardCheck className="h-4 w-4" />
-                  Recepción Reqs
+              {(rol === 'admin' || hasPermission('compras.ver')) && (
+                <Link to="/compras" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition flex items-center gap-1.5">
+                  <BsCartCheck className="h-4 w-4" />
+                  Compras
                 </Link>
               )}
               
@@ -62,10 +61,6 @@ export const Navbar: React.FC = () => {
                   </Link>
                   {(rol === 'inventario' || rol === 'admin') && (
                     <>
-                      <Link to="/requerimientos" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
-                        <BsFileEarmarkText className="h-4 w-4" />
-                        Requerimientos
-                      </Link>
                       {rol === 'inventario' && !hasPermission('roles.ver') && !hasPermission('roles.crear') && (
                         <Link to="/admin/tablas" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-55 transition flex items-center gap-1.5">
                           <BsGrid1X2Fill className="h-4 w-4" />
@@ -122,7 +117,7 @@ export const Navbar: React.FC = () => {
                 }}
                 className="px-4 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5 active:scale-95"
               >
-                Volver a Compras
+                Volver a Beneficios
               </button>
             )}
             <button
@@ -171,15 +166,14 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
 
-          {/* Recepción de Requerimientos */}
-          {(rol === 'admin' || rol === 'guardia' || rol === 'inventario') && (
+          {(rol === 'admin' || hasPermission('compras.ver')) && (
             <Link
-              to="/recepcion-requerimientos"
+              to="/compras"
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
             >
-              <BsClipboardCheck className="h-4 w-4 text-gray-400" />
-              Recepción Reqs
+              <BsCartCheck className="h-4 w-4 text-gray-400" />
+              Compras
             </Link>
           )}
 
@@ -196,14 +190,6 @@ export const Navbar: React.FC = () => {
               </Link>
               {(rol === 'inventario' || rol === 'admin') && (
                 <>
-                  <Link
-                    to="/requerimientos"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
-                  >
-                    <BsFileEarmarkText className="h-4 w-4 text-gray-400" />
-                    Requerimientos
-                  </Link>
                   {rol === 'inventario' && !hasPermission('roles.ver') && !hasPermission('roles.crear') && (
                     <Link
                       to="/admin/tablas"

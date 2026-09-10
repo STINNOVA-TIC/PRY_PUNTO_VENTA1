@@ -143,12 +143,16 @@ export const ConfirmarEntrega: React.FC = () => {
     }
   };
 
+  const hayDevoluciones = solicitud.detalles?.some((d: any) => (d.cantidad_devuelta || 0) > 0);
+  const esDevolucionCompleta = solicitud.detalles && solicitud.detalles.length > 0 && solicitud.detalles.every((d: any) => (d.cantidad_disponible ?? (d.cantidad - (d.cantidad_devuelta || 0))) === 0);
+  const esPendiente = solicitud.estado === 'pendiente';
+
   return (
     <div className="max-w-2xl mx-auto font-sans space-y-6">
       
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <BsBoxSeam className="text-gray-600" /> Confirmar Despacho en Bodega
+          <BsBoxSeam className="text-gray-600" /> {esPendiente ? 'Confirmar Despacho en Bodega' : 'Detalle de Entrega en Bodega'}
         </h2>
         <button
           onClick={() => navigate('/entregas')}
@@ -164,7 +168,34 @@ export const ConfirmarEntrega: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-gray-100">
           <div>
             <span className="text-xs uppercase font-semibold text-gray-400">Código de Retiro</span>
-            <p className="text-base font-mono font-bold text-gray-800">{solicitud.codigo_entrega || `#${solicitud.id}`}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-base font-mono font-bold text-gray-800">{solicitud.codigo_entrega || `#${solicitud.id}`}</p>
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                solicitud.estado === 'entregado'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : solicitud.estado === 'pendiente'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}>
+                {solicitud.estado}
+              </span>
+              {solicitud.devolucion && (
+                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                  solicitud.devolucion.estado === 'aprobado' || solicitud.devolucion.estado === 'ejecutado'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    : solicitud.devolucion.estado === 'pendiente'
+                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                    : 'bg-rose-50 text-rose-600 border-rose-200'
+                }`}>
+                  Devolución: {solicitud.devolucion.estado}
+                </span>
+              )}
+              {esDevolucionCompleta && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                  Devuelto Total
+                </span>
+              )}
+            </div>
           </div>
           <div>
             <span className="text-xs uppercase font-semibold text-gray-400">Fecha de Solicitud</span>
@@ -172,9 +203,24 @@ export const ConfirmarEntrega: React.FC = () => {
           </div>
         </div>
 
+        {/* Aviso de Devolución si aplica */}
+        {hayDevoluciones && (
+          <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2.5">
+            <BsArrowClockwise className="text-amber-600 text-base mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold">Esta entrega registra productos devueltos a bodega</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                Las cantidades mostradas reflejan los artículos despachados originalmente, las unidades devueltas y el remanente en posesión del colaborador.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Productos a Entregar */}
         <div>
-          <h3 className="text-xs uppercase font-semibold text-gray-400 mb-3">Productos a Entregar (Ubicación en Anaquel)</h3>
+          <h3 className="text-xs uppercase font-semibold text-gray-400 mb-3">
+            {esPendiente ? 'Productos a Entregar (Ubicación en Anaquel)' : 'Productos de la Entrega'}
+          </h3>
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -185,26 +231,43 @@ export const ConfirmarEntrega: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {solicitud.detalles ? (
-                  solicitud.detalles.map((d: any) => (
-                    <tr key={d.id} className="text-gray-700">
-                      <td className="px-4 py-3 font-semibold text-gray-800">
-                        <div className="flex items-center flex-wrap">
-                          <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px] flex-shrink-0">
-                            {d.producto_codigo}
-                          </span>
-                          <span className="text-gray-850">
-                            {d.producto_nombre}
-                            {d.producto_descripcion && (
-                              <span className="text-[11px] text-gray-400 font-normal ml-1">
-                                - {d.producto_descripcion}
+                  solicitud.detalles.map((d: any) => {
+                    const devuelto = d.cantidad_devuelta || 0;
+                    const disponible = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devuelto);
+                    return (
+                      <tr key={d.id} className="text-gray-700">
+                        <td className="px-4 py-3 font-semibold text-gray-800">
+                          <div className="flex items-center flex-wrap">
+                            <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px] flex-shrink-0">
+                              {d.producto_codigo}
+                            </span>
+                            <span className="text-gray-850">
+                              {d.producto_nombre}
+                              {d.producto_descripcion && (
+                                <span className="text-[11px] text-gray-400 font-normal ml-1">
+                                  - {d.producto_descripcion}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {devuelto > 0 ? (
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold text-gray-900">
+                                x{disponible} <span className="text-gray-400 font-normal">de {d.cantidad}</span>
                               </span>
-                            )}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold">{d.cantidad}</td>
-                    </tr>
-                  ))
+                              <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded mt-0.5 border border-amber-200/60 font-medium">
+                                -{devuelto} devueltas
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-bold">{d.cantidad}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr className="text-gray-700">
                     <td className="px-4 py-3 font-semibold text-gray-800">

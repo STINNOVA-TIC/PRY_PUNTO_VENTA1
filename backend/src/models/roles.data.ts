@@ -67,7 +67,9 @@ export const rolesData: IRol[] = [
       'nomina.ver_todos',
       'ventas.ver',
       'empleados.ver',
-      'empleados.ver_datos_sensibles'
+      'empleados.ver_datos_sensibles',
+      'compras.ver',
+      'compras.requerimientos.crear'
     ] as Permiso[],
     nivel: 70
   },

@@ -8,6 +8,62 @@ const db_1 = __importDefault(require("../config/db"));
 const error_middleware_1 = require("../middleware/error.middleware");
 const validators_1 = require("../utils/validators");
 exports.empleadosController = {
+    // Catálogo mínimo para responsables de requerimientos de compra.
+    // No expone cédula, correo, firma, fotografía ni permisos del colaborador.
+    getCatalogoCompras: async (_req, res) => {
+        try {
+            const result = await db_1.default.query(`WITH permisos_efectivos AS (
+           SELECT DISTINCT u.empleado_id, p.permiso_clave
+           FROM usuario u
+           JOIN usuario_rol ur ON ur.usuario_id = u.usuario_id
+           JOIN rol_permiso rp ON rp.rol_id = ur.rol_id
+           JOIN permiso p ON p.permiso_id = rp.permiso_id AND p.permiso_estado = 'activo'
+           WHERE u.usuario_estado = 'activo'
+             AND u.empleado_id IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM usuario_permiso up
+               WHERE up.usuario_id = u.usuario_id
+                 AND up.permiso_id = p.permiso_id
+                 AND up.tipo = 'denegar'
+             )
+           UNION
+           SELECT DISTINCT u.empleado_id, p.permiso_clave
+           FROM usuario u
+           JOIN usuario_permiso up ON up.usuario_id = u.usuario_id AND up.tipo = 'conceder'
+           JOIN permiso p ON p.permiso_id = up.permiso_id AND p.permiso_estado = 'activo'
+           WHERE u.usuario_estado = 'activo' AND u.empleado_id IS NOT NULL
+         )
+         SELECT e.empleado_id AS id,
+                e.empleado_nombre AS nombre,
+                e.empleado_apellido AS apellido,
+                e.departamento_id,
+                COALESCE(d.departamento_nombre, 'Sin Departamento') AS departamento,
+                e.centro_costos_id,
+                COALESCE(cc.centro_costos_nombre, 'Sin Centro de Costos') AS centro_costos,
+                COALESCE(e.empleado_cargo, 'Empleado') AS cargo,
+                bool_or(pe.permiso_clave IN ('compras.requerimientos.aprobar', 'requerimientos.firmar')) AS puede_aprobar,
+                bool_or(pe.permiso_clave IN ('compras.requerimientos.recibir', 'requerimientos.firmar')) AS puede_recibir
+         FROM empleado e
+         JOIN permisos_efectivos pe ON pe.empleado_id = e.empleado_id
+         LEFT JOIN departamento d ON d.departamento_id = e.departamento_id
+         LEFT JOIN centro_costos cc ON cc.centro_costos_id = e.centro_costos_id
+         WHERE e.empleado_estado = 'activo'
+           AND pe.permiso_clave IN (
+             'compras.requerimientos.aprobar',
+             'compras.requerimientos.recibir',
+             'requerimientos.firmar'
+           )
+         GROUP BY e.empleado_id, e.empleado_nombre, e.empleado_apellido,
+                  e.departamento_id, d.departamento_nombre,
+                  e.centro_costos_id, cc.centro_costos_nombre, e.empleado_cargo
+         ORDER BY e.empleado_nombre ASC, e.empleado_apellido ASC`);
+            res.json({ success: true, data: result.rows });
+            return;
+        }
+        catch (_error) {
+            throw new error_middleware_1.AppError('Error al obtener responsables de compras', 500);
+        }
+    },
     // Obtener todos los empleados
     getAll: async (req, res) => {
         try {
@@ -166,7 +222,9 @@ exports.empleadosController = {
         }
     },
     create: async (req, res) => {
+        const client = await db_1.default.connect();
         try {
+            await client.query('BEGIN');
             const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo, permitir_firmas } = req.body;
             if (!cedula || !nombre || !apellido) {
                 throw new error_middleware_1.AppError('Cédula, nombre y apellido son requeridos', 400);
@@ -177,11 +235,11 @@ exports.empleadosController = {
             if (email && !(0, validators_1.isValidEmail)(email)) {
                 throw new error_middleware_1.AppError('Formato de correo electrónico inválido', 400);
             }
-            const dupRes = await db_1.default.query('SELECT empleado_id FROM empleado WHERE empleado_cedula = $1', [cedula.trim()]);
+            const dupRes = await client.query('SELECT empleado_id FROM empleado WHERE empleado_cedula = $1', [cedula.trim()]);
             if (dupRes.rows.length > 0) {
                 throw new error_middleware_1.AppError('Ya existe un empleado con esa cédula', 400);
             }
-            const insertRes = await db_1.default.query(`INSERT INTO empleado (empleado_cedula, empleado_nombre, empleado_apellido, departamento_id, centro_costos_id, empleado_email, empleado_cargo, empleado_foto, empleado_firma, empleado_estado)
+            const insertRes = await client.query(`INSERT INTO empleado (empleado_cedula, empleado_nombre, empleado_apellido, departamento_id, centro_costos_id, empleado_email, empleado_cargo, empleado_foto, empleado_firma, empleado_estado)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`, [
                 cedula.trim(),
                 nombre.trim(),
@@ -196,27 +254,40 @@ exports.empleadosController = {
             ]);
             const empleado = insertRes.rows[0];
             if (permitir_autoconsumo || permitir_firmas) {
-                const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-           VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
-                    `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
-                    empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
-                    '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82', // bcrypt hash for 'autoconsumo123'
-                    empleado.empleado_id
-                ]);
-                const userId = userRes.rows[0].usuario_id;
-                // Asegurar que tenga rol base de empleado (rol_id = 3)
-                await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 3) ON CONFLICT DO NOTHING`, [userId]);
+                const usuarioEmail = empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`;
+                const existingUserRes = await client.query(`SELECT usuario_id, empleado_id FROM usuario WHERE lower(usuario_email) = lower($1) FOR UPDATE`, [usuarioEmail]);
+                let userId;
+                if (existingUserRes.rows.length > 0) {
+                    const existingUser = existingUserRes.rows[0];
+                    if (existingUser.empleado_id && existingUser.empleado_id !== empleado.empleado_id) {
+                        throw new error_middleware_1.AppError('El correo ya está vinculado a otro colaborador', 400);
+                    }
+                    userId = existingUser.usuario_id;
+                    await client.query(`UPDATE usuario SET empleado_id = $1, usuario_fecha_modificacion = CURRENT_TIMESTAMP WHERE usuario_id = $2`, [empleado.empleado_id, userId]);
+                }
+                else {
+                    const userRes = await client.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
+             VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
+                        `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
+                        usuarioEmail,
+                        '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',
+                        empleado.empleado_id
+                    ]);
+                    userId = userRes.rows[0].usuario_id;
+                    await client.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, 3) ON CONFLICT DO NOTHING`, [userId]);
+                }
                 if (permitir_autoconsumo) {
-                    await db_1.default.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+                    await client.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
              SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'autoconsumo.crear'
              ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`, [userId]);
                 }
                 if (permitir_firmas) {
-                    await db_1.default.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+                    await client.query(`INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
              SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'requerimientos.firmar'
              ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`, [userId]);
                 }
             }
+            await client.query('COMMIT');
             res.status(201).json({
                 success: true,
                 data: empleado,
@@ -225,9 +296,14 @@ exports.empleadosController = {
             return;
         }
         catch (error) {
+            await client.query('ROLLBACK');
             if (error instanceof error_middleware_1.AppError)
                 throw error;
+            console.error('Error al crear empleado:', error);
             throw new error_middleware_1.AppError('Error al crear empleado en base de datos', 500);
+        }
+        finally {
+            client.release();
         }
     },
     update: async (req, res) => {

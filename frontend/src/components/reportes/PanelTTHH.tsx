@@ -52,6 +52,7 @@ export const PanelTTHH: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedCC, setSelectedCC] = useState('');
   const [selectedCat, setSelectedCat] = useState('');
+  const [selectedEstadoAuto, setSelectedEstadoAuto] = useState('');
   const [groupBy, setGroupBy] = useState<'none' | 'empleado' | 'producto' | 'categoria' | 'centro_costos' | 'departamento'>('none');
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
 
@@ -261,27 +262,29 @@ export const PanelTTHH: React.FC = () => {
     return autoconsumos.filter(a => {
       if (!a) return false;
       const matchEmpleado = searchEmpleado ? (
-        a.empleado.nombre.toLowerCase().includes(searchEmpleado.toLowerCase()) ||
-        a.empleado.cedula.includes(searchEmpleado)
+        a.empleado?.nombre?.toLowerCase().includes(searchEmpleado.toLowerCase()) ||
+        a.empleado?.cedula?.includes(searchEmpleado)
       ) : true;
 
-      const matchDept = selectedDept ? a.departamento.nombre === selectedDept : true;
+      const matchProducto = searchProducto ? (
+        a.detalles?.some((d: any) =>
+          d.producto_nombre?.toLowerCase().includes(searchProducto.toLowerCase()) ||
+          d.producto_codigo?.toLowerCase().includes(searchProducto.toLowerCase()) ||
+          (d.producto_descripcion || '').toLowerCase().includes(searchProducto.toLowerCase())
+        )
+      ) : true;
 
-      const date = new Date(a.fecha_solicitud);
-      if (fechaInicio) {
-        const start = new Date(fechaInicio);
-        start.setHours(0,0,0,0);
-        if (date < start) return false;
-      }
-      if (fechaFin) {
-        const end = new Date(fechaFin);
-        end.setHours(23,59,59,999);
-        if (date > end) return false;
-      }
+      const matchDept = selectedDept ? (a.departamento?.nombre === selectedDept || (a.departamento as any) === selectedDept) : true;
+      const matchCC = selectedCC ? (a.centro_costos?.codigo === selectedCC || a.centro_costos?.nombre === selectedCC || (a.centro_costos as any) === selectedCC) : true;
+      const matchEstado = selectedEstadoAuto ? a.estado?.toLowerCase() === selectedEstadoAuto.toLowerCase() : true;
 
-      return matchEmpleado && matchDept;
+      const dateStr = a.fecha_solicitud ? a.fecha_solicitud.slice(0, 10) : '';
+      if (fechaInicio && dateStr && dateStr < fechaInicio) return false;
+      if (fechaFin && dateStr && dateStr > fechaFin) return false;
+
+      return matchEmpleado && matchProducto && matchDept && matchCC && matchEstado;
     });
-  }, [autoconsumos, searchEmpleado, selectedDept, fechaInicio, fechaFin]);
+  }, [autoconsumos, searchEmpleado, searchProducto, selectedDept, selectedCC, selectedEstadoAuto, fechaInicio, fechaFin]);
 
   // Filtrado de consumo acumulado (resumen nomina)
   const reporteConsumoFiltrado = useMemo(() => {
@@ -351,9 +354,19 @@ export const PanelTTHH: React.FC = () => {
     }));
   }, [autoconsumosFiltrados, groupBy]);
 
-  // Filtros dinamicos extraidos de transacciones activas
-  const departamentosUnicos = useMemo(() => Array.from(new Set(transacciones.map(t => t.departamento).filter(Boolean))), [transacciones]);
-  const centrosCostosUnicos = useMemo(() => Array.from(new Set(transacciones.map(t => t.centro_costos).filter(Boolean))), [transacciones]);
+  // Filtros dinamicos extraidos de transacciones y autoconsumos
+  const departamentosUnicos = useMemo(() => {
+    const fromT = transacciones.map(t => t.departamento);
+    const fromA = autoconsumos.map(a => typeof a.departamento === 'object' ? a.departamento?.nombre : a.departamento);
+    return Array.from(new Set([...fromT, ...fromA].filter(Boolean)));
+  }, [transacciones, autoconsumos]);
+
+  const centrosCostosUnicos = useMemo(() => {
+    const fromT = transacciones.map(t => t.centro_costos);
+    const fromA = autoconsumos.map(a => typeof a.centro_costos === 'object' ? (a.centro_costos?.codigo || a.centro_costos?.nombre) : a.centro_costos);
+    return Array.from(new Set([...fromT, ...fromA].filter(Boolean)));
+  }, [transacciones, autoconsumos]);
+
   const categoriasUnicas = useMemo(() => Array.from(new Set(transacciones.map(t => t.categoria).filter(Boolean))), [transacciones]);
 
   // Agrupamiento
@@ -394,7 +407,7 @@ export const PanelTTHH: React.FC = () => {
   // Reiniciar a la primera página cuando cambian filtros, pestañas o tamaño de página
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, groupBy, searchEmpleado, searchProducto, selectedDept, selectedCC, selectedCat, fechaInicio, fechaFin, itemsPerPage]);
+  }, [activeTab, groupBy, searchEmpleado, searchProducto, selectedDept, selectedCC, selectedCat, selectedEstadoAuto, fechaInicio, fechaFin, itemsPerPage]);
 
   // Reiniciar página del historial al cambiar de módulo
   useEffect(() => {
@@ -551,19 +564,33 @@ export const PanelTTHH: React.FC = () => {
       return;
     }
 
+    const filtrosActivos = [
+      selectedDept ? `Dpto: ${selectedDept}` : '',
+      selectedCC ? `C. Costos: ${selectedCC}` : '',
+      selectedEstadoAuto ? `Estado: ${selectedEstadoAuto.toUpperCase()}` : '',
+      searchEmpleado ? `Empleado: ${searchEmpleado}` : '',
+      searchProducto ? `Producto: ${searchProducto}` : ''
+    ].filter(Boolean).join(' | ');
+
     const headers = ['Codigo', 'Fecha Solicitud', 'Empleado', 'Cedula', 'Departamento', 'Centro de Costos', 'Justificacion', 'Productos', 'Estado', 'Aprobador', 'Despachador', 'Total'];
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join(' | ') || '-';
+      const productsText = a.detalles?.map((d: any) => {
+        const devueltas = d.cantidad_devuelta || 0;
+        const restantes = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devueltas);
+        return devueltas > 0
+          ? `${d.producto_nombre} (x${restantes} de ${d.cantidad} - ${devueltas} dev) - $${d.subtotal.toFixed(2)}`
+          : `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`;
+      }).join(' | ') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
-        a.empleado.nombre,
-        a.empleado.cedula,
-        a.departamento.nombre,
-        a.centro_costos?.codigo || '-',
-        a.justificacion,
+        a.empleado?.nombre || '-',
+        a.empleado?.cedula || '-',
+        typeof a.departamento === 'object' ? a.departamento?.nombre : (a.departamento || '-'),
+        typeof a.centro_costos === 'object' ? (a.centro_costos?.codigo || a.centro_costos?.nombre || '-') : (a.centro_costos || '-'),
+        a.justificacion || '-',
         productsText,
         a.estado,
         a.aprobador || '-',
@@ -572,7 +599,16 @@ export const PanelTTHH: React.FC = () => {
       ];
     });
 
+    const metadataRows = [
+      `"Reporte de Autoconsumos - Talento Humano"`,
+      `"Rango de Fechas: ${fechaInicio || 'INICIO'} a ${fechaFin || 'FIN'}"`,
+      filtrosActivos ? `"Filtros aplicados: ${filtrosActivos.replace(/"/g, '""')}"` : `""`,
+      `"Fecha de Emisión: ${new Date().toLocaleString()}"`,
+      `""`
+    ].filter(Boolean);
+
     const csvContent = [
+      ...metadataRows,
       headers.join(','),
       ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
     ].join('\n');
@@ -583,9 +619,10 @@ export const PanelTTHH: React.FC = () => {
 
     const fInicio = fechaInicio || 'INICIO';
     const fFin = fechaFin || 'FIN';
+    const sufijoEstado = selectedEstadoAuto ? `_${selectedEstadoAuto.toUpperCase()}` : '';
 
     link.setAttribute('href', url);
-    link.setAttribute('download', `Reporte_Autoconsumos_${fInicio}_a_${fFin}.csv`);
+    link.setAttribute('download', `Reporte_Autoconsumos${sufijoEstado}_${fInicio}_a_${fFin}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -606,15 +643,21 @@ export const PanelTTHH: React.FC = () => {
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join(', ') || '-';
+      const productsText = a.detalles?.map((d: any) => {
+        const devueltas = d.cantidad_devuelta || 0;
+        const restantes = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devueltas);
+        return devueltas > 0
+          ? `${d.producto_nombre} (x${restantes} de ${d.cantidad} - ${devueltas} dev) - $${d.subtotal.toFixed(2)}`
+          : `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`;
+      }).join(', ') || '-';
       return {
         'Código': a.codigo,
         'Fecha Solicitud': new Date(a.fecha_solicitud).toLocaleString(),
-        'Empleado': a.empleado.nombre,
-        'Cédula': a.empleado.cedula,
-        'Departamento': a.departamento.nombre,
-        'Centro de Costos': a.centro_costos?.codigo || '-',
-        'Justificación': a.justificacion,
+        'Empleado': a.empleado?.nombre || '-',
+        'Cédula': a.empleado?.cedula || '-',
+        'Departamento': typeof a.departamento === 'object' ? a.departamento?.nombre : (a.departamento || '-'),
+        'Centro de Costos': typeof a.centro_costos === 'object' ? (a.centro_costos?.codigo || a.centro_costos?.nombre || '-') : (a.centro_costos || '-'),
+        'Justificación': a.justificacion || '-',
         'Productos': productsText,
         'Estado': a.estado,
         'Aprobador': a.aprobador || '-',
@@ -629,7 +672,8 @@ export const PanelTTHH: React.FC = () => {
 
     const fInicio = fechaInicio || 'INICIO';
     const fFin = fechaFin || 'FIN';
-    XLSX.writeFile(workbook, `Reporte_Autoconsumos_${fInicio}_a_${fFin}.xlsx`);
+    const sufijoEstado = selectedEstadoAuto ? `_${selectedEstadoAuto.toUpperCase()}` : '';
+    XLSX.writeFile(workbook, `Reporte_Autoconsumos${sufijoEstado}_${fInicio}_a_${fFin}.xlsx`);
   };
 
   // Exportar Autoconsumos a PDF
@@ -657,23 +701,49 @@ export const PanelTTHH: React.FC = () => {
     const fInicio = fechaInicio || 'INICIO';
     const fFin = fechaFin || 'FIN';
     doc.text(`Rango de Fechas: ${fInicio} a ${fFin}`, 14, 22);
-    doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, 27);
+
+    const filtrosActivos = [
+      selectedDept ? `Dpto: ${selectedDept}` : '',
+      selectedCC ? `C. Costos: ${selectedCC}` : '',
+      selectedEstadoAuto ? `Estado: ${selectedEstadoAuto.toUpperCase()}` : '',
+      searchEmpleado ? `Empleado: ${searchEmpleado}` : '',
+      searchProducto ? `Producto: ${searchProducto}` : ''
+    ].filter(Boolean).join(' | ');
+
+    let currentY = 27;
+    if (filtrosActivos) {
+      doc.setFontSize(9);
+      doc.setTextColor(75, 85, 99);
+      doc.text(`Filtros aplicados: ${filtrosActivos}`, 14, currentY);
+      currentY += 5;
+      doc.setTextColor(0, 0, 0);
+    }
+
+    doc.setFontSize(10);
+    doc.text(`Fecha de Emisión: ${new Date().toLocaleString()}`, 14, currentY);
+    currentY += 6;
 
     const headers = [['Código', 'Fecha Solicitud', 'Empleado', 'Cédula', 'Departamento', 'Centro de Costos', 'Justificación', 'Productos', 'Estado', 'Total']];
 
     const rows = listado.map(a => {
       const total = a.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
-      const productsText = a.detalles?.map((d: any) => `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`).join('\n') || '-';
+      const productsText = a.detalles?.map((d: any) => {
+        const devueltas = d.cantidad_devuelta || 0;
+        const restantes = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devueltas);
+        return devueltas > 0
+          ? `${d.producto_nombre} (x${restantes} de ${d.cantidad} - ${devueltas} dev) - $${d.subtotal.toFixed(2)}`
+          : `${d.producto_nombre} (x${d.cantidad}) - $${d.subtotal.toFixed(2)}`;
+      }).join('\n') || '-';
       return [
         a.codigo,
         new Date(a.fecha_solicitud).toLocaleString(),
-        a.empleado.nombre,
-        a.empleado.cedula,
-        a.departamento.nombre,
-        a.centro_costos?.codigo || '-',
-        a.justificacion.length > 25 ? a.justificacion.substring(0, 23) + '..' : a.justificacion,
+        a.empleado?.nombre || '-',
+        a.empleado?.cedula || '-',
+        typeof a.departamento === 'object' ? a.departamento?.nombre : (a.departamento || '-'),
+        typeof a.centro_costos === 'object' ? (a.centro_costos?.codigo || a.centro_costos?.nombre || '-') : (a.centro_costos || '-'),
+        (a.justificacion || '').length > 25 ? (a.justificacion || '').substring(0, 23) + '..' : (a.justificacion || '-'),
         productsText,
-        a.estado.toUpperCase(),
+        (a.estado || '').toUpperCase(),
         `$${total.toFixed(2)}`
       ];
     });
@@ -681,13 +751,14 @@ export const PanelTTHH: React.FC = () => {
     autoTable(doc, {
       head: headers,
       body: rows,
-      startY: 32,
+      startY: currentY,
       theme: 'striped',
       headStyles: { fillColor: [30, 41, 59] },
       styles: { fontSize: 8, cellPadding: 2.5 }
     });
 
-    doc.save(`Reporte_Autoconsumos_${fInicio}_a_${fFin}.pdf`);
+    const sufijoEstado = selectedEstadoAuto ? `_${selectedEstadoAuto.toUpperCase()}` : '';
+    doc.save(`Reporte_Autoconsumos${sufijoEstado}_${fInicio}_a_${fFin}.pdf`);
   };
 
   // Exportar a CSV (Registro Detallado)
@@ -1003,7 +1074,7 @@ export const PanelTTHH: React.FC = () => {
           </div>
 
           {/* FILTROS AVANZADOS GENERALES */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-7 gap-3 text-xs">
             <div>
               <label className="block text-gray-500 mb-1 font-semibold">Buscar Colaborador</label>
               <input
@@ -1061,6 +1132,20 @@ export const PanelTTHH: React.FC = () => {
                 {categoriasUnicas.map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1 font-semibold">Estado Pedido</label>
+              <select
+                value={selectedEstadoAuto}
+                onChange={(e) => setSelectedEstadoAuto(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none bg-white text-gray-700"
+              >
+                <option value="">Todos los Estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="aprobado">Aprobado</option>
+                <option value="entregado">Entregado</option>
+                <option value="cancelado">Cancelado</option>
               </select>
             </div>
             <div>
@@ -1386,9 +1471,16 @@ export const PanelTTHH: React.FC = () => {
             {activeTab === 'autoconsumos_reporte' && (
               groupBy === 'none' ? (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                  <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs font-semibold text-gray-500 uppercase">
-                    <span>Listado de consumos internos</span>
-                    <span>Filtrado: {fechaInicio || 'Todo'} - {fechaFin || 'Todo'}</span>
+                  <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-wrap justify-between items-center text-xs font-semibold text-gray-500 uppercase gap-2">
+                    <span>Listado de consumos internos ({autoconsumosFiltrados.length} encontrados)</span>
+                    <span className="text-gray-600 normal-case font-normal">
+                      Filtrado: <span className="font-semibold">{fechaInicio || 'Todo'}</span> a <span className="font-semibold">{fechaFin || 'Todo'}</span>
+                      {selectedEstadoAuto && <span> • Estado: <span className="font-semibold uppercase text-blue-600">{selectedEstadoAuto}</span></span>}
+                      {selectedDept && <span> • Dpto: <span className="font-semibold text-gray-800">{selectedDept}</span></span>}
+                      {selectedCC && <span> • CC: <span className="font-semibold text-gray-800">{selectedCC}</span></span>}
+                      {searchEmpleado && <span> • Empleado: <span className="font-semibold text-gray-800">"{searchEmpleado}"</span></span>}
+                      {searchProducto && <span> • Producto: <span className="font-semibold text-gray-800">"{searchProducto}"</span></span>}
+                    </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
@@ -1430,19 +1522,31 @@ export const PanelTTHH: React.FC = () => {
                                 </td>
                                 <td className="px-5 py-4">
                                   <div className="space-y-1 text-[10px] text-gray-600 font-mono min-w-[185px]">
-                                    {a.detalles?.map((d: any) => (
-                                      <div key={d.id} className="flex justify-between items-center gap-2 border-b border-gray-50 pb-0.5 last:border-b-0">
-                                        <div className="min-w-0">
-                                          <span className="font-semibold text-gray-800">• {d.producto_nombre}</span>
-                                          {d.producto_descripcion && (
-                                            <span className="block text-[8px] text-gray-400 truncate">{d.producto_descripcion}</span>
-                                          )}
+                                    {a.detalles?.map((d: any) => {
+                                      const devueltas = d.cantidad_devuelta || 0;
+                                      const restantes = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devueltas);
+                                      return (
+                                        <div key={d.id} className="flex justify-between items-center gap-2 border-b border-gray-50 pb-0.5 last:border-b-0">
+                                          <div className="min-w-0">
+                                            <span className="font-semibold text-gray-800">• {d.producto_nombre}</span>
+                                            {d.producto_descripcion && (
+                                              <span className="block text-[8px] text-gray-400 truncate">{d.producto_descripcion}</span>
+                                            )}
+                                          </div>
+                                          <div className="text-right shrink-0">
+                                            {devueltas > 0 ? (
+                                              <span className="text-gray-750 font-bold block">
+                                                (x{restantes} de {d.cantidad}) {devueltas > 0 && <span className="text-amber-600 font-normal">(-{devueltas} dev)</span>} - ${d.subtotal.toFixed(2)}
+                                              </span>
+                                            ) : (
+                                              <span className="text-gray-750 font-bold block">
+                                                (x{d.cantidad}) - ${d.subtotal.toFixed(2)}
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
-                                        <span className="text-gray-750 font-bold shrink-0">
-                                          (x{d.cantidad}) - ${d.subtotal.toFixed(2)}
-                                        </span>
-                                      </div>
-                                    )) || '-'}
+                                      );
+                                    }) || '-'}
                                   </div>
                                 </td>
                                 <td className="px-5 py-4">
@@ -1911,21 +2015,32 @@ export const PanelTTHH: React.FC = () => {
                 Productos Consumidos
               </span>
               <div className="border border-gray-100 rounded-lg overflow-hidden divide-y divide-gray-100 bg-gray-50">
-                {detalleAutoconsumo.detalles?.map((det: any) => (
-                  <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
-                    <div>
-                      <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
-                      {det.producto_descripcion && (
-                        <span className="block text-[10px] text-gray-400">{det.producto_descripcion}</span>
-                      )}
-                      <span className="block font-mono text-[10px] text-gray-400">Cód: {det.producto_codigo}</span>
+                {detalleAutoconsumo.detalles?.map((det: any) => {
+                  const devueltas = det.cantidad_devuelta || 0;
+                  const restantes = det.cantidad_disponible !== undefined ? det.cantidad_disponible : (det.cantidad - devueltas);
+                  return (
+                    <div key={det.id} className="flex justify-between items-center px-3 py-2 text-[11px]">
+                      <div>
+                        <span className="font-semibold text-gray-800">{det.producto_nombre}</span>
+                        {det.producto_descripcion && (
+                          <span className="block text-[10px] text-gray-400">{det.producto_descripcion}</span>
+                        )}
+                        <span className="block font-mono text-[10px] text-gray-400">Cód: {det.producto_codigo}</span>
+                      </div>
+                      <div className="text-right">
+                        {devueltas > 0 ? (
+                          <>
+                            <span className="font-bold text-gray-700 block">x{restantes} de {det.cantidad}</span>
+                            <span className="text-[9px] text-amber-600 block font-medium">({devueltas} devueltas)</span>
+                          </>
+                        ) : (
+                          <span className="font-bold text-gray-700 block">x{det.cantidad}</span>
+                        )}
+                        <span className="text-[10px] text-gray-400">${det.subtotal.toFixed(2)}</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-gray-700 block">x{det.cantidad}</span>
-                      <span className="text-[10px] text-gray-400">${det.subtotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex justify-between items-center font-bold text-gray-800 text-xs border-t border-gray-100 pt-2">
                 <span>Total asumido por la empresa:</span>

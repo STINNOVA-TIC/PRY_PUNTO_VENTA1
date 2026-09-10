@@ -59,12 +59,26 @@ export const autoconsumoController = {
           [row.autoconsumo_id]
         );
 
-        // Buscar si tiene alguna devolución registrada
+        // Buscar la devolución más reciente (si existe)
         const devRes = await pool.query(
-          'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1',
+          'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1 ORDER BY devolucion_id DESC LIMIT 1',
           [row.autoconsumo_id]
         );
         const devInfo = devRes.rows[0] || null;
+
+        // Calcular cantidades devueltas históricas por producto (devoluciones aprobadas o ejecutadas)
+        const devSumRes = await pool.query(
+          `SELECT dd.producto_id, COALESCE(SUM(dd.cantidad_devuelta), 0) as total_devuelto
+           FROM devolucion_detalle dd
+           JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+           WHERE d.autoconsumo_id = $1 AND d.devolucion_estado IN ('aprobado', 'ejecutado')
+           GROUP BY dd.producto_id`,
+          [row.autoconsumo_id]
+        );
+        const devSumMap: Record<number, number> = {};
+        devSumRes.rows.forEach(r => {
+          devSumMap[r.producto_id] = parseInt(r.total_devuelto || '0');
+        });
 
         list.push({
           id: row.autoconsumo_id,
@@ -96,16 +110,26 @@ export const autoconsumoController = {
             nombre: row.centro_costos_nombre,
             codigo: row.centro_costos_codigo
           },
-          detalles: detailsRes.rows.map(d => ({
-            id: d.autoconsumo_detalle_id,
-            producto_id: d.producto_id,
-            producto_nombre: d.producto_nombre,
-            producto_codigo: d.producto_codigo,
-            producto_descripcion: d.producto_descripcion || '',
-            cantidad: d.autoconsumo_detalle_cantidad,
-            precio_unitario: parseFloat(d.autoconsumo_detalle_precio_unitario),
-            subtotal: parseFloat(d.autoconsumo_detalle_subtotal)
-          }))
+          detalles: detailsRes.rows.map(d => {
+            const devuelto = devSumMap[d.producto_id] || 0;
+            const original = d.autoconsumo_detalle_cantidad;
+            const disponible = Math.max(0, original - devuelto);
+            const precioUnit = parseFloat(d.autoconsumo_detalle_precio_unitario);
+            const subtotalNeto = disponible * precioUnit;
+            return {
+              id: d.autoconsumo_detalle_id,
+              producto_id: d.producto_id,
+              producto_nombre: d.producto_nombre,
+              producto_codigo: d.producto_codigo,
+              producto_descripcion: d.producto_descripcion || '',
+              cantidad: original,
+              cantidad_devuelta: devuelto,
+              cantidad_disponible: disponible,
+              precio_unitario: precioUnit,
+              subtotal: subtotalNeto,
+              subtotal_original: parseFloat(d.autoconsumo_detalle_subtotal)
+            };
+          })
         });
       }
 
@@ -158,12 +182,26 @@ export const autoconsumoController = {
         [row.autoconsumo_id]
       );
 
-      // Buscar si existe alguna devolución asociada y su estado
+      // Buscar la devolución más reciente (si existe)
       const devRes = await pool.query(
-        'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1',
+        'SELECT devolucion_estado, devolucion_id FROM devolucion WHERE autoconsumo_id = $1 ORDER BY devolucion_id DESC LIMIT 1',
         [row.autoconsumo_id]
       );
       const devInfo = devRes.rows[0] || null;
+
+      // Calcular cantidades devueltas históricas por producto (devoluciones aprobadas o ejecutadas)
+      const devSumRes = await pool.query(
+        `SELECT dd.producto_id, COALESCE(SUM(dd.cantidad_devuelta), 0) as total_devuelto
+         FROM devolucion_detalle dd
+         JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+         WHERE d.autoconsumo_id = $1 AND d.devolucion_estado IN ('aprobado', 'ejecutado')
+         GROUP BY dd.producto_id`,
+        [row.autoconsumo_id]
+      );
+      const devSumMap: Record<number, number> = {};
+      devSumRes.rows.forEach(r => {
+        devSumMap[r.producto_id] = parseInt(r.total_devuelto || '0');
+      });
 
       res.json({
         success: true,
@@ -197,16 +235,26 @@ export const autoconsumoController = {
             nombre: row.centro_costos_nombre,
             codigo: row.centro_costos_codigo
           },
-          detalles: detailsRes.rows.map(d => ({
-            id: d.autoconsumo_detalle_id,
-            producto_id: d.producto_id,
-            producto_nombre: d.producto_nombre,
-            producto_codigo: d.producto_codigo,
-            producto_descripcion: d.producto_descripcion || '',
-            cantidad: d.autoconsumo_detalle_cantidad,
-            precio_unitario: parseFloat(d.autoconsumo_detalle_precio_unitario),
-            subtotal: parseFloat(d.autoconsumo_detalle_subtotal)
-          }))
+          detalles: detailsRes.rows.map(d => {
+            const devuelto = devSumMap[d.producto_id] || 0;
+            const original = d.autoconsumo_detalle_cantidad;
+            const disponible = Math.max(0, original - devuelto);
+            const precioUnit = parseFloat(d.autoconsumo_detalle_precio_unitario);
+            const subtotalNeto = disponible * precioUnit;
+            return {
+              id: d.autoconsumo_detalle_id,
+              producto_id: d.producto_id,
+              producto_nombre: d.producto_nombre,
+              producto_codigo: d.producto_codigo,
+              producto_descripcion: d.producto_descripcion || '',
+              cantidad: original,
+              cantidad_devuelta: devuelto,
+              cantidad_disponible: disponible,
+              precio_unitario: precioUnit,
+              subtotal: subtotalNeto,
+              subtotal_original: parseFloat(d.autoconsumo_detalle_subtotal)
+            };
+          })
         }
       });
     } catch (error) {

@@ -20,11 +20,12 @@ import { PanelAdminUsuarios } from './components/admin/PanelAdminUsuarios';
 import { PanelAdminCrudGeneral } from './components/admin/PanelAdminCrudGeneral';
 import { PanelRequerimientos } from './components/productos/PanelRequerimientos';
 import { RecepcionRequerimientos } from './components/productos/RecepcionRequerimientos';
+import { ComprasLayout } from './components/compras/ComprasLayout';
 
 import { useAuth } from './context/AuthContext';
 
 function Home() {
-  const { user, isShopSession } = useAuth();
+  const { user, isShopSession, hasPermission } = useAuth();
 
   if (isShopSession) {
     return <CarritoCompras />;
@@ -45,8 +46,18 @@ function Home() {
   if (user?.rol.nombre === 'guardia') {
     return <Navigate to="/entregas" replace />;
   }
+  if (hasPermission('compras.ver')) {
+    return <Navigate to="/compras/requerimientos" replace />;
+  }
 
   return <Navigate to="/login" replace />;
+}
+
+function RequerimientosEntry() {
+  const { isSignatureSession } = useAuth();
+  return isSignatureSession
+    ? <PanelRequerimientos />
+    : <Navigate to="/compras/requerimientos" replace />;
 }
 
 function App() {
@@ -138,17 +149,28 @@ function App() {
             <Route path="/requerimientos" element={
               <ProtectedRoute>
                 <Layout>
-                  <PanelRequerimientos />
+                  <RequerimientosEntry />
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/recepcion-requerimientos" element={
+            <Route path="/compras" element={
               <ProtectedRoute>
                 <Layout>
-                  <RecepcionRequerimientos />
+                  <PermissionGuard permiso="compras.ver">
+                    <ComprasLayout />
+                  </PermissionGuard>
                 </Layout>
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<Navigate to="requerimientos" replace />} />
+              <Route path="requerimientos" element={<PanelRequerimientos />} />
+              <Route path="recepcion" element={
+                <PermissionGuard permiso="compras.requerimientos.recibir">
+                  <RecepcionRequerimientos />
+                </PermissionGuard>
+              } />
+            </Route>
+            <Route path="/recepcion-requerimientos" element={<Navigate to="/compras/recepcion" replace />} />
             <Route path="/tthh" element={
               <ProtectedRoute>
                 <Layout>

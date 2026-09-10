@@ -40,12 +40,26 @@ export const entregasController = {
           [row.solicitud_entrega_id]
         );
 
-        // Buscar si tiene alguna devolución registrada
+        // Buscar la devolución más reciente (si existe)
         const devRes = await pool.query(
-          'SELECT devolucion_estado FROM devolucion WHERE solicitud_entrega_id = $1',
+          'SELECT devolucion_estado FROM devolucion WHERE solicitud_entrega_id = $1 ORDER BY devolucion_id DESC LIMIT 1',
           [row.solicitud_entrega_id]
         );
         const devState = devRes.rows[0]?.devolucion_estado || null;
+
+        // Calcular cantidades devueltas acumuladas por producto (aprobadas o ejecutadas)
+        const devSumRes = await pool.query(
+          `SELECT dd.producto_id, COALESCE(SUM(dd.cantidad_devuelta), 0) as total_devuelto
+           FROM devolucion_detalle dd
+           JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+           WHERE d.solicitud_entrega_id = $1 AND d.devolucion_estado IN ('aprobado', 'ejecutado')
+           GROUP BY dd.producto_id`,
+          [row.solicitud_entrega_id]
+        );
+        const devSumMap: Record<number, number> = {};
+        devSumRes.rows.forEach(r => {
+          devSumMap[r.producto_id] = parseInt(r.total_devuelto || '0');
+        });
 
         items.push({
           id: row.solicitud_entrega_id,
@@ -62,15 +76,22 @@ export const entregasController = {
             departamento: row.departamento_nombre || 'General',
             foto: row.empleado_foto
           },
-          detalles: detailsRes.rows.map(d => ({
-            id: d.solicitud_entrega_detalle_id,
-            producto_id: d.producto_id,
-            producto_nombre: d.producto_nombre,
-            producto_codigo: d.producto_codigo,
-            producto_descripcion: d.producto_descripcion,
-            cantidad: d.solicitud_entrega_detalle_cantidad,
-            precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
-          })),
+          detalles: detailsRes.rows.map(d => {
+            const devuelto = devSumMap[d.producto_id] || 0;
+            const original = d.solicitud_entrega_detalle_cantidad;
+            const disponible = Math.max(0, original - devuelto);
+            return {
+              id: d.solicitud_entrega_detalle_id,
+              producto_id: d.producto_id,
+              producto_nombre: d.producto_nombre,
+              producto_codigo: d.producto_codigo,
+              producto_descripcion: d.producto_descripcion,
+              cantidad: original,
+              cantidad_devuelta: devuelto,
+              cantidad_disponible: disponible,
+              precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
+            };
+          }),
           devolucion_estado: devState
         });
       }
@@ -123,12 +144,26 @@ export const entregasController = {
         [row.solicitud_entrega_id]
       );
 
-      // Buscar si existe alguna devolución asociada y su estado
+      // Buscar si existe alguna devolución asociada y su estado (la más reciente)
       const devRes = await pool.query(
-        'SELECT devolucion_estado, devolucion_motivo, devolucion_observacion_tthh FROM devolucion WHERE solicitud_entrega_id = $1',
+        'SELECT devolucion_estado, devolucion_motivo, devolucion_observacion_tthh FROM devolucion WHERE solicitud_entrega_id = $1 ORDER BY devolucion_id DESC LIMIT 1',
         [row.solicitud_entrega_id]
       );
       const devInfo = devRes.rows[0] || null;
+
+      // Calcular cantidades devueltas acumuladas por producto (aprobadas o ejecutadas)
+      const devSumRes = await pool.query(
+        `SELECT dd.producto_id, COALESCE(SUM(dd.cantidad_devuelta), 0) as total_devuelto
+         FROM devolucion_detalle dd
+         JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+         WHERE d.solicitud_entrega_id = $1 AND d.devolucion_estado IN ('aprobado', 'ejecutado')
+         GROUP BY dd.producto_id`,
+        [row.solicitud_entrega_id]
+      );
+      const devSumMap: Record<number, number> = {};
+      devSumRes.rows.forEach(r => {
+        devSumMap[r.producto_id] = parseInt(r.total_devuelto || '0');
+      });
 
       res.json({
         success: true,
@@ -148,15 +183,22 @@ export const entregasController = {
             cargo: row.empleado_cargo,
             foto: row.empleado_foto
           },
-          detalles: detailsRes.rows.map(d => ({
-            id: d.solicitud_entrega_detalle_id,
-            producto_id: d.producto_id,
-            producto_nombre: d.producto_nombre,
-            producto_codigo: d.producto_codigo,
-            producto_descripcion: d.producto_descripcion,
-            cantidad: d.solicitud_entrega_detalle_cantidad,
-            precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
-          })),
+          detalles: detailsRes.rows.map(d => {
+            const devuelto = devSumMap[d.producto_id] || 0;
+            const original = d.solicitud_entrega_detalle_cantidad;
+            const disponible = Math.max(0, original - devuelto);
+            return {
+              id: d.solicitud_entrega_detalle_id,
+              producto_id: d.producto_id,
+              producto_nombre: d.producto_nombre,
+              producto_codigo: d.producto_codigo,
+              producto_descripcion: d.producto_descripcion,
+              cantidad: original,
+              cantidad_devuelta: devuelto,
+              cantidad_disponible: disponible,
+              precio_unitario: parseFloat(d.solicitud_entrega_detalle_precio_unitario)
+            };
+          }),
           devolucion: devInfo ? {
             estado: devInfo.devolucion_estado,
             motivo: devInfo.devolucion_motivo,
@@ -196,10 +238,24 @@ export const entregasController = {
 
         // Buscar si tiene alguna devolución registrada
         const devRes = await pool.query(
-          'SELECT devolucion_estado FROM devolucion WHERE solicitud_entrega_id = $1',
+          'SELECT devolucion_estado FROM devolucion WHERE solicitud_entrega_id = $1 ORDER BY devolucion_id DESC LIMIT 1',
           [row.solicitud_entrega_id]
         );
         const devState = devRes.rows[0]?.devolucion_estado || null;
+
+        // Calcular cantidades devueltas acumuladas por producto
+        const devSumRes = await pool.query(
+          `SELECT dd.producto_id, COALESCE(SUM(dd.cantidad_devuelta), 0) as total_devuelto
+           FROM devolucion_detalle dd
+           JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+           WHERE d.solicitud_entrega_id = $1 AND d.devolucion_estado IN ('aprobado', 'ejecutado')
+           GROUP BY dd.producto_id`,
+          [row.solicitud_entrega_id]
+        );
+        const devSumMap: Record<number, number> = {};
+        devSumRes.rows.forEach(r => {
+          devSumMap[r.producto_id] = parseInt(r.total_devuelto || '0');
+        });
 
         items.push({
           id: row.solicitud_entrega_id,
@@ -214,14 +270,21 @@ export const entregasController = {
             departamento: row.departamento_nombre || 'General',
             foto: row.empleado_foto
           },
-          detalles: detailsRes.rows.map(d => ({
-            id: d.solicitud_entrega_detalle_id,
-            producto_id: d.producto_id,
-            producto_nombre: d.producto_nombre,
-            producto_codigo: d.producto_codigo,
-            producto_descripcion: d.producto_descripcion,
-            cantidad: d.solicitud_entrega_detalle_cantidad
-          })),
+          detalles: detailsRes.rows.map(d => {
+            const devuelto = devSumMap[d.producto_id] || 0;
+            const original = d.solicitud_entrega_detalle_cantidad;
+            const disponible = Math.max(0, original - devuelto);
+            return {
+              id: d.solicitud_entrega_detalle_id,
+              producto_id: d.producto_id,
+              producto_nombre: d.producto_nombre,
+              producto_codigo: d.producto_codigo,
+              producto_descripcion: d.producto_descripcion,
+              cantidad: original,
+              cantidad_devuelta: devuelto,
+              cantidad_disponible: disponible
+            };
+          }),
           devolucion_estado: devState
         });
       }
@@ -366,24 +429,27 @@ export const entregasController = {
         );
       }
 
-      // 4. Calcular si es devolución total o parcial
+      // 4. Calcular si es devolución total o parcial sumando todas las devoluciones históricas (incluyendo la actual que se está aprobando/ejecutando)
       const originalDetailsCount = await client.query(
         'SELECT COALESCE(SUM(solicitud_entrega_detalle_cantidad), 0) as total FROM solicitud_entrega_detalle WHERE solicitud_entrega_id = $1',
         [id]
       );
-      const returnedDetailsCount = await client.query(
-        'SELECT COALESCE(SUM(cantidad_devuelta), 0) as total FROM devolucion_detalle WHERE devolucion_id = $1',
-        [devolucionId]
+      const allReturnedDetailsCount = await client.query(
+        `SELECT COALESCE(SUM(dd.cantidad_devuelta), 0) as total 
+         FROM devolucion_detalle dd
+         JOIN devolucion d ON dd.devolucion_id = d.devolucion_id
+         WHERE d.solicitud_entrega_id = $1 AND (d.devolucion_estado = 'ejecutado' OR d.devolucion_id = $2)`,
+        [id, devolucionId]
       );
       
       const originalTotal = parseInt(originalDetailsCount.rows[0].total || '0');
-      const returnedTotal = parseInt(returnedDetailsCount.rows[0].total || '0');
+      const returnedTotal = parseInt(allReturnedDetailsCount.rows[0].total || '0');
 
       const isTotalDevolucion = returnedTotal >= originalTotal;
       const nuevoEstadoEntrega = isTotalDevolucion ? 'cancelado' : 'entregado';
       const obsEntrega = isTotalDevolucion 
-        ? (motivo || 'Devolución total aprobada por TTHH') 
-        : `Devolución parcial aprobada por TTHH. Se devolvieron ${returnedTotal} de ${originalTotal} unidades.`;
+        ? (motivo || 'Devolución total aprobada y ejecutada en bodega') 
+        : `Devolución parcial ejecutada. Se han devuelto ${returnedTotal} de ${originalTotal} unidades en total.`;
 
       await client.query(
         `UPDATE solicitud_entrega 

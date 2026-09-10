@@ -69,6 +69,30 @@ async function getUsuarioPermisos(userId, defaultRolId) {
     }
     return { permissions: allPermisos, isAdmin, roles: rolesNames.length > 0 ? rolesNames : ['empleado'] };
 }
+// Las sesiones por cédula nunca heredan roles corporativos de una cuenta vinculada.
+// Solo admiten los permisos base del colaborador y las excepciones personales de acceso rápido.
+async function getPermisosPeticion(req) {
+    if (!req.empleado) {
+        return getUsuarioPermisos(req.user?.id || 0, req.user?.rol_id || 3);
+    }
+    const base = await getUsuarioPermisos(0, 3);
+    const allowedQuickPermissions = ['autoconsumo.crear', 'requerimientos.firmar'];
+    const customRes = await db_1.default.query(`SELECT p.permiso_clave, up.tipo
+     FROM usuario u
+     JOIN usuario_permiso up ON up.usuario_id = u.usuario_id
+     JOIN permiso p ON p.permiso_id = up.permiso_id
+     WHERE u.empleado_id = $1
+       AND u.usuario_estado = 'activo'
+       AND p.permiso_estado = 'activo'
+       AND p.permiso_clave = ANY($2)`, [req.empleado.empleado_id, allowedQuickPermissions]);
+    customRes.rows.forEach(({ permiso_clave, tipo }) => {
+        if (tipo === 'conceder')
+            base.permissions.add(permiso_clave);
+        if (tipo === 'denegar')
+            base.permissions.delete(permiso_clave);
+    });
+    return { permissions: base.permissions, isAdmin: false, roles: ['empleado'] };
+}
 // Verificar si el usuario tiene un permiso específico
 const requirePermission = (permiso) => {
     return async (req, res, next) => {
@@ -80,7 +104,7 @@ const requirePermission = (permiso) => {
                 });
                 return;
             }
-            const { permissions, isAdmin, roles } = await getUsuarioPermisos(req.user.id, req.user.rol_id);
+            const { permissions, isAdmin, roles } = await getPermisosPeticion(req);
             if (roles.length === 0) {
                 res.status(403).json({
                     success: false,
@@ -116,7 +140,7 @@ const requireAnyPermission = (...permisos) => {
                 });
                 return;
             }
-            const { permissions, isAdmin, roles } = await getUsuarioPermisos(req.user.id, req.user.rol_id);
+            const { permissions, isAdmin, roles } = await getPermisosPeticion(req);
             if (roles.length === 0) {
                 res.status(403).json({
                     success: false,
@@ -153,7 +177,7 @@ const requireAllPermissions = (...permisos) => {
                 });
                 return;
             }
-            const { permissions, isAdmin, roles } = await getUsuarioPermisos(req.user.id, req.user.rol_id);
+            const { permissions, isAdmin, roles } = await getPermisosPeticion(req);
             if (roles.length === 0) {
                 res.status(403).json({
                     success: false,
@@ -190,7 +214,7 @@ const requireSelfOrPermission = (permiso) => {
                 });
                 return;
             }
-            const { permissions, isAdmin, roles } = await getUsuarioPermisos(req.user.id, req.user.rol_id);
+            const { permissions, isAdmin, roles } = await getPermisosPeticion(req);
             if (roles.length === 0) {
                 res.status(403).json({
                     success: false,

@@ -151,6 +151,11 @@ export const PanelAdminUsuarios: React.FC = () => {
     }));
   };
 
+  const handleQuitarTodosLosPermisos = () => {
+    if (!canManageUserPermissions()) return;
+    setPermisosUsuario(prev => prev.map(p => ({ ...p, activo: false })));
+  };
+
   const handleGuardarPermisosPersonalizados = async () => {
     if (!usuarioPermisosSelected || !canManageUserPermissions()) return;
     try {
@@ -170,6 +175,23 @@ export const PanelAdminUsuarios: React.FC = () => {
   };
 
   const camposOperador: CampoFormulario[] = [
+    {
+      name: 'empleado_id',
+      label: 'Colaborador vinculado',
+      tipo: 'select',
+      placeholder: 'Selecciona un colaborador...',
+      colSpan: 2,
+      required: true,
+      opciones: empleados
+        .filter(emp => !usuarios.some(u => u.empleado?.id === emp.id && u.id !== editingUsuario?.id))
+        .map((emp) => ({ value: emp.id, label: `${emp.nombre} ${emp.apellido} (Ced: ${emp.codigo_empleado})` })),
+      completarAlCambiar: (empleadoId) => {
+        const empleado = empleados.find(emp => emp.id === Number(empleadoId));
+        return empleado
+          ? { nombre: `${empleado.nombre} ${empleado.apellido}`.trim(), email: empleado.email || '' }
+          : { nombre: '', email: '' };
+      }
+    },
     { name: 'nombre', label: 'Nombre de Usuario', tipo: 'texto', placeholder: 'Ej. Carlos Martínez', required: true },
     { name: 'email', label: 'Email / Login', tipo: 'email', placeholder: 'carlos.martinez@empresa.com', required: true },
     {
@@ -186,14 +208,6 @@ export const PanelAdminUsuarios: React.FC = () => {
       opciones: roles.map((r) => ({ value: r.id, label: `${r.nombre.toUpperCase()} - ${r.descripcion}` })),
       required: true
     },
-    {
-      name: 'empleado_id',
-      label: 'Vincular a un Colaborador de Nómina (Opcional)',
-      tipo: 'select',
-      placeholder: 'Ninguno / Usuario Operador General',
-      colSpan: 2,
-      opciones: empleados.map((emp) => ({ value: emp.id, label: `${emp.nombre} ${emp.apellido} (Ced: ${emp.codigo_empleado})` }))
-    },
     { name: 'activo', label: 'Usuario Habilitado / Activo', tipo: 'checkbox' }
   ];
 
@@ -207,8 +221,8 @@ export const PanelAdminUsuarios: React.FC = () => {
   });
 
   const handleGuardarOperador = async (valores: Record<string, any>) => {
-    if (!valores.nombre || !valores.email || (!editingUsuario && !valores.password) || !valores.rol_id) {
-      throw new Error('Nombre, email, contraseña (para nuevos) y rol son requeridos.');
+    if (!valores.nombre || !valores.email || (!editingUsuario && !valores.password) || !valores.rol_id || !valores.empleado_id) {
+      throw new Error('Nombre, email, contraseña (para nuevos), rol y colaborador son requeridos.');
     }
 
     const payload = {
@@ -567,6 +581,16 @@ export const PanelAdminUsuarios: React.FC = () => {
                 )}
               </div>
               <div className="flex gap-2">
+                {canManageUserPermissions() && (
+                  <button
+                    type="button"
+                    onClick={handleQuitarTodosLosPermisos}
+                    disabled={guardandoPermisos || !permisosUsuario.some(p => p.activo)}
+                    className="px-4 py-2 border border-red-200 text-red-700 hover:bg-red-50 rounded-lg text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Quitar todos
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsPermisosModalAbierto(false)}

@@ -93,7 +93,10 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
     );
   }
 
-  const total = autoconsumo.detalles?.reduce((sum: number, d: any) => sum + d.subtotal, 0) || 0;
+  const totalNeto = autoconsumo.detalles?.reduce((sum: number, d: any) => sum + (d.subtotal ?? (d.cantidad_disponible ?? d.cantidad) * d.precio_unitario), 0) || 0;
+  const totalOriginal = autoconsumo.detalles?.reduce((sum: number, d: any) => sum + (d.subtotal_original ?? d.cantidad * d.precio_unitario), 0) || 0;
+  const hayDevoluciones = autoconsumo.detalles?.some((d: any) => (d.cantidad_devuelta || 0) > 0);
+  const esDevolucionCompleta = autoconsumo.detalles && autoconsumo.detalles.length > 0 && autoconsumo.detalles.every((d: any) => (d.cantidad_disponible ?? (d.cantidad - (d.cantidad_devuelta || 0))) === 0);
   const esAprobado = autoconsumo.estado === 'aprobado';
 
   return (
@@ -101,7 +104,7 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
 
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <BsBoxSeam className="text-gray-600" /> Confirmar Despacho de Autoconsumo
+          <BsBoxSeam className="text-gray-600" /> {esAprobado ? 'Confirmar Despacho de Autoconsumo' : 'Detalle de Autoconsumo'}
         </h2>
         <button
           onClick={() => navigate('/entregas')}
@@ -117,7 +120,34 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-gray-100">
           <div>
             <span className="text-xs uppercase font-semibold text-gray-400">Código de Autoconsumo</span>
-            <p className="text-base font-mono font-bold text-gray-800">{autoconsumo.codigo}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-base font-mono font-bold text-gray-800">{autoconsumo.codigo}</p>
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                autoconsumo.estado === 'entregado'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : autoconsumo.estado === 'aprobado'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-gray-50 text-gray-700 border-gray-200'
+              }`}>
+                {autoconsumo.estado}
+              </span>
+              {autoconsumo.devolucion && (
+                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                  autoconsumo.devolucion.estado === 'aprobado' || autoconsumo.devolucion.estado === 'ejecutado'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    : autoconsumo.devolucion.estado === 'pendiente'
+                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                    : 'bg-rose-50 text-rose-600 border-rose-200'
+                }`}>
+                  Devolución: {autoconsumo.devolucion.estado}
+                </span>
+              )}
+              {esDevolucionCompleta && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                  Devuelto Total
+                </span>
+              )}
+            </div>
           </div>
           <div>
             <span className="text-xs uppercase font-semibold text-gray-400">Fecha de Solicitud</span>
@@ -149,9 +179,24 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
           {autoconsumo.justificacion}
         </div>
 
+        {/* Aviso de Devolución si aplica */}
+        {hayDevoluciones && (
+          <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2.5">
+            <BsArrowClockwise className="text-amber-600 text-base mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold">Este autoconsumo registra productos devueltos a bodega</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                Las cantidades mostradas reflejan los artículos despachados originalmente, las unidades devueltas y el total neto vigente para costo de la empresa.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Productos a Entregar */}
         <div>
-          <h3 className="text-xs uppercase font-semibold text-gray-400 mb-3">Artículos a Entregar (Ubicación en Anaquel)</h3>
+          <h3 className="text-xs uppercase font-semibold text-gray-400 mb-3">
+            {esAprobado ? 'Artículos a Entregar (Ubicación en Anaquel)' : 'Artículos del Autoconsumo'}
+          </h3>
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -162,26 +207,57 @@ export const ConfirmarDespachoAutoconsumo: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {autoconsumo.detalles?.map((d: any) => (
-                  <tr key={d.id} className="text-gray-700">
-                    <td className="px-4 py-3 font-semibold text-gray-800">
-                      <div className="flex items-center flex-wrap">
-                        <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px] flex-shrink-0">
-                          {d.producto_codigo}
-                        </span>
-                        <span className="text-gray-850">{d.producto_nombre}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center font-bold">{d.cantidad}</td>
-                    <td className="px-4 py-3 text-right font-semibold">${d.subtotal.toFixed(2)}</td>
-                  </tr>
-                ))}
+                {autoconsumo.detalles?.map((d: any) => {
+                  const devuelto = d.cantidad_devuelta || 0;
+                  const disponible = d.cantidad_disponible !== undefined ? d.cantidad_disponible : (d.cantidad - devuelto);
+                  return (
+                    <tr key={d.id} className="text-gray-700">
+                      <td className="px-4 py-3 font-semibold text-gray-800">
+                        <div className="flex items-center flex-wrap">
+                          <span className="font-mono text-gray-400 mr-2 bg-gray-50 px-2 py-0.5 border border-gray-150 rounded text-[10px] flex-shrink-0">
+                            {d.producto_codigo}
+                          </span>
+                          <span className="text-gray-850">{d.producto_nombre}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {devuelto > 0 ? (
+                          <div className="flex flex-col items-center">
+                            <span className="font-bold text-gray-900">
+                              x{disponible} <span className="text-gray-400 font-normal">de {d.cantidad}</span>
+                            </span>
+                            <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded mt-0.5 border border-amber-200/60 font-medium">
+                              -{devuelto} devueltas
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-bold">{d.cantidad}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="font-semibold text-gray-900">${d.subtotal.toFixed(2)}</div>
+                        {devuelto > 0 && d.subtotal_original && (
+                          <div className="text-[10px] text-gray-400 line-through">
+                            ${d.subtotal_original.toFixed(2)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="flex justify-between items-center mt-3 font-bold text-gray-800 text-sm border-t border-gray-100 pt-2">
-            <span>Total asumido por la empresa:</span>
-            <span className="text-emerald-700">${total.toFixed(2)}</span>
+            <div>
+              <span>Total asumido por la empresa:</span>
+              {hayDevoluciones && totalOriginal > totalNeto && (
+                <span className="text-xs text-gray-400 line-through ml-2 font-normal">
+                  ${totalOriginal.toFixed(2)}
+                </span>
+              )}
+            </div>
+            <span className="text-emerald-700">${totalNeto.toFixed(2)}</span>
           </div>
         </div>
 
