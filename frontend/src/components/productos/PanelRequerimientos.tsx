@@ -27,6 +27,7 @@ export const PanelRequerimientos: React.FC = () => {
   const loggedEmpleadoId = user?.empleado?.id;
   const isEmployeeRole = user?.rol?.nombre === 'empleado';
   const canCreateRequirement = hasPermission('compras.requerimientos.crear');
+  const canEditRequirement = hasPermission('compras.requerimientos.editar');
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -127,6 +128,22 @@ export const PanelRequerimientos: React.FC = () => {
   const [modalFirmaPreview, setModalFirmaPreview] = useState<string | null>(null);
 
   const hasSignature = !!currentFirma || !!user?.empleado?.firma;
+
+  const obtenerCentroCostosEmpleado = (catalogo: any[]) => {
+    const centroId = Number(user?.empleado?.centro_costos_id || 0);
+    if (centroId) {
+      const coincidenciaPorId = catalogo.find((cc) => Number(cc.centro_costos_id) === centroId);
+      if (coincidenciaPorId) return coincidenciaPorId;
+    }
+
+    const centroTexto = (user?.empleado?.centro_costos || '').trim().toLowerCase();
+    if (!centroTexto || centroTexto === 'n/a') return undefined;
+    return catalogo.find((cc) => {
+      const codigo = String(cc.centro_costos_codigo || '').trim().toLowerCase();
+      const nombre = String(cc.centro_costos_nombre || '').trim().toLowerCase();
+      return centroTexto === codigo || centroTexto === nombre || centroTexto === `${codigo} - ${nombre}`;
+    });
+  };
 
   // Estado para edición de requerimiento (solo admin)
   const [editingOrdenId, setEditingOrdenId] = useState<number | null>(null);
@@ -245,24 +262,21 @@ export const PanelRequerimientos: React.FC = () => {
       }
     }
     if (user && user.empleado && centrosCosto.length > 0) {
-      const userCCStr = user.empleado.centro_costos || '';
-      const userCC = centrosCosto.find((cc) => {
-        return userCCStr.toLowerCase().includes(cc.centro_costos_nombre.toLowerCase().trim()) ||
-               userCCStr.toLowerCase().includes(cc.centro_costos_codigo.toLowerCase().trim()) ||
-               cc.centro_costos_nombre.toLowerCase().trim() === userCCStr.toLowerCase().trim();
-      });
+      const userCC = obtenerCentroCostosEmpleado(centrosCosto);
       if (userCC) {
         setCentroCostosId(userCC.centro_costos_id);
+      } else {
+        setCentroCostosId('');
       }
     }
-  }, [user, departamentos, centrosCosto, departamentoId]);
+  }, [user, departamentos, centrosCosto]);
 
   // Control de acceso inicial al submodulo
   useEffect(() => {
-    if (!canCreateRequirement && moduloActivo === 'requerimiento') {
+    if (!canCreateRequirement && !editingOrdenId && moduloActivo === 'requerimiento') {
       setModuloActivo('historial');
     }
-  }, [canCreateRequirement, moduloActivo]);
+  }, [canCreateRequirement, editingOrdenId, moduloActivo]);
 
   // Pre-seleccionar Dominique Veloz y Mishell Paucar por defecto al cargar colaboradores
   useEffect(() => {
@@ -356,24 +370,16 @@ export const PanelRequerimientos: React.FC = () => {
       const ccData = ccRes.data || [];
       setCentrosCosto(ccData);
 
-      let ccSelectedId: number | '' = centroCostosId || '';
-      if (!ccSelectedId && user && user.empleado) {
-        const userCCStr = user.empleado.centro_costos || '';
-        const userCC = ccData.find((cc: any) => {
-          return userCCStr.toLowerCase().includes(cc.centro_costos_nombre.toLowerCase().trim()) ||
-                 userCCStr.toLowerCase().includes(cc.centro_costos_codigo.toLowerCase().trim()) ||
-                 cc.centro_costos_nombre.toLowerCase().trim() === userCCStr.toLowerCase().trim();
-        });
+      let ccSelectedId: number | '' = '';
+      if (user && user.empleado) {
+        const userCC = obtenerCentroCostosEmpleado(ccData);
         if (userCC) {
           ccSelectedId = userCC.centro_costos_id;
         }
+      } else if (centroCostosId && ccData.some((cc: any) => cc.centro_costos_id === centroCostosId)) {
+        ccSelectedId = centroCostosId;
       }
-      if (!ccSelectedId && ccData.length > 0) {
-        ccSelectedId = ccData[0].centro_costos_id;
-      }
-      if (ccSelectedId) {
-        setCentroCostosId(ccSelectedId);
-      }
+      setCentroCostosId(ccSelectedId);
 
       setProductos(prodRes.data || []);
       setProveedores(provRes.data || []);
@@ -560,12 +566,13 @@ export const PanelRequerimientos: React.FC = () => {
     setError('');
     setSuccess('');
 
-    if (!canCreateRequirement) {
+    const editandoRequerimiento = editingOrdenId !== null;
+    if ((!editandoRequerimiento && !canCreateRequirement) || (editandoRequerimiento && !canEditRequirement)) {
       setShowNoPermisoModal(true);
       return;
     }
 
-    if (!hasSignature) {
+    if (!editandoRequerimiento && !hasSignature) {
       setShowSubirFirmaModal(true);
       return;
     }
@@ -886,7 +893,7 @@ export const PanelRequerimientos: React.FC = () => {
       {moduloActivo === 'requerimiento' && (
       <>
       {/* FORMULARIO DE REQUERIMIENTO */}
-      {canCreateRequirement && (
+      {(canCreateRequirement || (editingOrdenId !== null && canEditRequirement)) && (
       <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
         
         {/* SECCIÓN A: METADATOS Y CABECERA */}

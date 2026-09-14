@@ -168,7 +168,9 @@ exports.authController = {
                             cargo: empleado.empleado_cargo,
                             foto_perfil: empleado.empleado_foto,
                             firma: empleado.empleado_firma || null,
+                            departamento_id: empleado.departamento_id || null,
                             departamento: empleado.departamento_nombre || 'General',
+                            centro_costos_id: empleado.centro_costos_id || null,
                             centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
                         }
                     }
@@ -230,9 +232,10 @@ exports.authController = {
             // Obtener datos del empleado asociado si existe
             let empleado = null;
             if (user.empleado_id) {
-                const empRes = await db_1.default.query(`SELECT e.*, d.departamento_nombre 
+                const empRes = await db_1.default.query(`SELECT e.*, d.departamento_nombre, cc.centro_costos_nombre, cc.centro_costos_codigo
            FROM empleado e 
-           LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
+           LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
+           LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
            WHERE e.empleado_id = $1`, [user.empleado_id]);
                 const emp = empRes.rows[0];
                 if (emp) {
@@ -244,7 +247,9 @@ exports.authController = {
                         cargo: emp.empleado_cargo,
                         foto_perfil: emp.empleado_foto,
                         firma: emp.empleado_firma || null,
+                        departamento_id: emp.departamento_id || null,
                         departamento: emp.departamento_nombre || 'Sin Departamento',
+                        centro_costos_id: emp.centro_costos_id || null,
                         centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
                     };
                 }
@@ -300,7 +305,9 @@ exports.authController = {
                     codigo_empleado: req.empleado.empleado_cedula,
                     nombre: req.empleado.empleado_nombre,
                     apellido: req.empleado.empleado_apellido,
+                    departamento_id: req.empleado.departamento_id || null,
                     departamento: req.empleado.departamento_nombre || 'Sin Departamento',
+                    centro_costos_id: req.empleado.centro_costos_id || null,
                     centro_costos: req.empleado.centro_costos_nombre ? `${req.empleado.centro_costos_codigo} - ${req.empleado.centro_costos_nombre}` : 'N/A',
                     cargo: req.empleado.empleado_cargo,
                     foto_perfil: req.empleado.empleado_foto
@@ -326,7 +333,9 @@ exports.authController = {
                             cargo: emp.empleado_cargo,
                             foto_perfil: emp.empleado_foto,
                             firma: emp.empleado_firma || null,
+                            departamento_id: emp.departamento_id || null,
                             departamento: emp.departamento_nombre || 'Sin Departamento',
+                            centro_costos_id: emp.centro_costos_id || null,
                             centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
                         };
                     }
@@ -420,7 +429,9 @@ exports.authController = {
                                 cargo: empleado.empleado_cargo,
                                 foto_perfil: empleado.empleado_foto,
                                 firma: empleado.empleado_firma || null,
+                                departamento_id: empleado.departamento_id || null,
                                 departamento: empleado.departamento_nombre || 'General',
+                                centro_costos_id: empleado.centro_costos_id || null,
                                 centro_costos: empleado.centro_costos_nombre ? `${empleado.centro_costos_codigo} - ${empleado.centro_costos_nombre}` : 'N/A'
                             }
                         }
@@ -450,7 +461,9 @@ exports.authController = {
                         cargo: emp.empleado_cargo,
                         foto_perfil: emp.empleado_foto,
                         firma: emp.empleado_firma || null,
+                        departamento_id: emp.departamento_id || null,
                         departamento: emp.departamento_nombre || 'Sin Departamento',
+                        centro_costos_id: emp.centro_costos_id || null,
                         centro_costos: emp.centro_costos_nombre ? `${emp.centro_costos_codigo} - ${emp.centro_costos_nombre}` : 'N/A'
                     };
                 }

@@ -89,10 +89,14 @@ exports.ordenesController = {
                 }
             }
             // Obtener firma del Elaborador para estamparla inmediatamente
-            const empFirmaRes = await client.query('SELECT empleado_firma, empleado_nombre, empleado_apellido FROM empleado WHERE empleado_id = $1', [empleadoId]);
+            const empFirmaRes = await client.query('SELECT empleado_firma, empleado_nombre, empleado_apellido, centro_costos_id FROM empleado WHERE empleado_id = $1', [empleadoId]);
             const firmaElaborador = empFirmaRes.rows[0]?.empleado_firma || null;
             if (!firmaElaborador) {
                 throw new error_middleware_1.AppError('Debes registrar y subir tu firma digital antes de crear un requerimiento de compra.', 400);
+            }
+            const centroCostosAsignadoId = empFirmaRes.rows[0]?.centro_costos_id;
+            if (!centroCostosAsignadoId) {
+                throw new error_middleware_1.AppError('El colaborador no tiene un centro de costos asignado. Actualiza su ficha antes de crear el requerimiento.', 400);
             }
             const fechaFirmaElaborador = new Date();
             const elaboradoPorName = empFirmaRes.rows[0] ? `${empFirmaRes.rows[0].empleado_nombre} ${empFirmaRes.rows[0].empleado_apellido}` : elaborado_por;
@@ -116,7 +120,7 @@ exports.ordenesController = {
                 sucursal_id,
                 departamento_id,
                 empleadoId,
-                centro_costos_id,
+                centroCostosAsignadoId,
                 proveedor_id || null,
                 usuarioId,
                 codigoOC,

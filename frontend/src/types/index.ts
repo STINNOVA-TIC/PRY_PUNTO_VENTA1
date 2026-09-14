@@ -16,7 +16,9 @@ export interface Usuario {
     codigo_empleado: string;
     nombre: string;
     apellido: string;
+    departamento_id?: number;
     departamento: string;
+    centro_costos_id?: number;
     centro_costos?: string;
     cargo: string;
     foto_perfil?: string;
