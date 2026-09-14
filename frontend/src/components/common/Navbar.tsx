@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -69,6 +69,9 @@ export const Navbar: React.FC = () => {
               {isSignatureSession ? (
                 renderNavLink('/requerimientos', 'Requerimientos', <BsFileEarmarkText />)
               ) : (<>
+              {/* Inicio / Dashboard */}
+              {renderNavLink('/', 'Inicio', <BsHouseDoor />)}
+
               {/* Guardia / Admin */}
               {(rol === 'guardia' || rol === 'admin') && (
                 renderNavLink('/entregas', 'Entregas', <BsBoxSeam />)
@@ -162,6 +165,16 @@ export const Navbar: React.FC = () => {
               Requerimientos
             </Link>
           ) : (<>
+          {/* Inicio / Dashboard */}
+          <Link
+            to="/"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
+          >
+            <BsHouseDoor className="h-4 w-4 text-gray-400" />
+            Inicio
+          </Link>
+
           {/* Guardia / Admin */}
           {(rol === 'guardia' || rol === 'admin') && (
             <Link

@@ -21,36 +21,24 @@ import { PanelAdminCrudGeneral } from './components/admin/PanelAdminCrudGeneral'
 import { PanelRequerimientos } from './components/productos/PanelRequerimientos';
 import { RecepcionRequerimientos } from './components/productos/RecepcionRequerimientos';
 import { ComprasLayout } from './components/compras/ComprasLayout';
+import { DashboardHome } from './components/dashboard/DashboardHome';
 
 import { useAuth } from './context/AuthContext';
 
 function Home() {
-  const { user, isShopSession, hasPermission } = useAuth();
+  const { user, isShopSession } = useAuth();
 
   if (isShopSession) {
     return <CarritoCompras />;
   }
 
+  // Empleados que solo firman o hacen solicitudes en módulo de firma
   if (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar') {
     return <Navigate to="/requerimientos" replace />;
   }
-  if (user?.rol.nombre === 'admin') {
-    return <Navigate to="/admin/empleados" replace />;
-  }
-  if (user?.rol.nombre === 'inventario') {
-    return <Navigate to="/inventario" replace />;
-  }
-  if (user?.rol.nombre === 'tthh') {
-    return <Navigate to="/tthh" replace />;
-  }
-  if (user?.rol.nombre === 'guardia') {
-    return <Navigate to="/entregas" replace />;
-  }
-  if (hasPermission('compras.ver')) {
-    return <Navigate to="/compras/requerimientos" replace />;
-  }
 
-  return <Navigate to="/login" replace />;
+  // Para usuarios del sistema (admin, guardia, inventario, tthh, compras o cualquier nuevo rol creado)
+  return <DashboardHome />;
 }
 
 function RequerimientosEntry() {

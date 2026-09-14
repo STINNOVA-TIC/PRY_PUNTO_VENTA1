@@ -154,9 +154,22 @@ export const productosController = {
         throw new AppError('Producto no encontrado', 404);
       }
 
+      const prodActualizado = updateRes.rows[0];
+
+      // Emitir evento por WebSockets para auditoría y actualización en tiempo real
+      if (req.io) {
+        req.io.emit('stock-actualizado', {
+          producto_id: id,
+          producto_nombre: prodActualizado.producto_nombre,
+          stock_nuevo: prodActualizado.producto_stock,
+          usuario_nombre: req.user?.nombre || 'Inventario',
+          tipo_evento: 'ajuste_stock'
+        });
+      }
+
       res.json({
         success: true,
-        data: updateRes.rows[0],
+        data: prodActualizado,
         message: 'Stock actualizado exitosamente'
       });
       return;
