@@ -9,7 +9,7 @@ const router = (0, express_1.Router)();
 // Todas las rutas requieren autenticación
 router.use(auth_middleware_1.authenticate);
 // Catálogo limitado para seleccionar aprobadores y receptores en Compras.
-router.get('/catalogo-compras', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'requerimientos.firmar'), empleados_controller_1.empleadosController.getCatalogoCompras);
+router.get('/catalogo-compras', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), empleados_controller_1.empleadosController.getCatalogoCompras);
 // GET /api/empleados - Ver todos los empleados
 router.get('/', (0, permisos_middleware_1.requirePermission)('empleados.ver'), empleados_controller_1.empleadosController.getAll);
 // GET /api/empleados/departamentos

@@ -171,7 +171,11 @@ export const ModalFormulario: React.FC<ModalFormularioProps> = ({
                     <label className="block text-xs text-gray-500 mb-1">{campo.label}</label>
                     <select
                       value={valores[campo.name] ?? ''}
-                      onChange={(e) => setValorCampo(campo, e.target.value ? Number(e.target.value) : '')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const opcion = campo.opciones?.find((opt) => String(opt.value) === value);
+                        setValorCampo(campo, !value ? '' : (typeof opcion?.value === 'number' ? Number(value) : value));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none"
                       required={campo.required}
                     >

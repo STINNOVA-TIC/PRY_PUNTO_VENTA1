@@ -17,6 +17,7 @@ export const productosController = {
         codigo_barras: row.producto_codigo,
         nombre: row.producto_nombre,
         descripcion: row.producto_descripcion || '',
+        tipo_articulo: row.producto_tipo_articulo || 'OTROS',
         precio_costo: parseFloat(row.producto_precio_compra || '0'),
         precio_venta: parseFloat(row.producto_precio || '0'),
         stock_actual: row.producto_stock,
@@ -55,6 +56,7 @@ export const productosController = {
           codigo_barras: row.producto_codigo,
           nombre: row.producto_nombre,
           descripcion: row.producto_descripcion || '',
+          tipo_articulo: row.producto_tipo_articulo || 'OTROS',
           precio_costo: parseFloat(row.producto_precio_compra || '0'),
           precio_venta: parseFloat(row.producto_precio || '0'),
           stock_actual: row.producto_stock,
@@ -84,7 +86,8 @@ export const productosController = {
         stock_actual, 
         categoria_id, 
         proveedor_id, 
-        foto 
+        foto,
+        tipo_articulo
       } = req.body;
 
       if (!codigo_barras || !nombre || !precio_venta || !stock_actual) {
@@ -106,20 +109,21 @@ export const productosController = {
       const defaultFoto = foto || 'https://img.icons8.com/fluent/1200/fast-moving-consumer-goods.jpg';
 
       const insertRes = await pool.query(
-        `INSERT INTO producto (categoria_id, proveedor_id, producto_codigo, producto_nombre, producto_descripcion, producto_precio, producto_precio_compra, producto_stock, producto_foto, producto_estado) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo') 
+        `INSERT INTO producto (categoria_id, proveedor_id, producto_codigo, producto_nombre, producto_descripcion, producto_tipo_articulo, producto_precio, producto_precio_compra, producto_stock, producto_foto, producto_estado)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'activo')
          ON CONFLICT (producto_codigo) DO UPDATE SET
            categoria_id = EXCLUDED.categoria_id,
            proveedor_id = EXCLUDED.proveedor_id,
            producto_nombre = EXCLUDED.producto_nombre,
            producto_descripcion = EXCLUDED.producto_descripcion,
+           producto_tipo_articulo = EXCLUDED.producto_tipo_articulo,
            producto_precio = EXCLUDED.producto_precio,
            producto_precio_compra = EXCLUDED.producto_precio_compra,
            producto_stock = EXCLUDED.producto_stock,
            producto_foto = EXCLUDED.producto_foto,
            producto_estado = 'activo'
          RETURNING *`,
-        [catId, provId, String(codigo_barras).trim(), String(nombre).trim(), descripcion || '', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]
+        [catId, provId, String(codigo_barras).trim(), String(nombre).trim(), descripcion || '', tipo_articulo || 'OTROS', parseFloat(precio_venta), parseFloat(precio_costo || '0'), parseInt(stock_actual), defaultFoto]
       );
 
       res.status(201).json({

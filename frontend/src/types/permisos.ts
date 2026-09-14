@@ -60,10 +60,10 @@ export type Permiso =
   | 'autoconsumo.eliminar'
 
   // ============ REQUERIMIENTOS ============
-  | 'requerimientos.firmar'
 
   // ============ COMPRAS ============
   | 'compras.ver'
+  | 'compras.requerimientos.ver_todos'
   | 'compras.requerimientos.crear'
   | 'compras.requerimientos.editar'
   | 'compras.requerimientos.aprobar'

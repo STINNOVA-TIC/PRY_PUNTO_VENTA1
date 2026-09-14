@@ -21,6 +21,7 @@ export const productosAPI = {
     stock_actual: number; 
     categoria_id: number;
     proveedor_id: number;
+    tipo_articulo?: string;
     foto?: string;
   }) => {
     const response = await api.post('/productos', data);

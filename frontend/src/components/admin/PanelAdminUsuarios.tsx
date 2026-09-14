@@ -151,9 +151,21 @@ export const PanelAdminUsuarios: React.FC = () => {
     }));
   };
 
+  const perteneceAlModuloSeleccionado = (permiso: PermisoItemUsuario) =>
+    filtroModuloPermiso === 'TODOS' || permiso.modulo_nombre === filtroModuloPermiso;
+
+  const handleMarcarTodosLosPermisos = () => {
+    if (!canManageUserPermissions()) return;
+    setPermisosUsuario(prev => prev.map(p =>
+      perteneceAlModuloSeleccionado(p) ? { ...p, activo: true } : p
+    ));
+  };
+
   const handleQuitarTodosLosPermisos = () => {
     if (!canManageUserPermissions()) return;
-    setPermisosUsuario(prev => prev.map(p => ({ ...p, activo: false })));
+    setPermisosUsuario(prev => prev.map(p =>
+      perteneceAlModuloSeleccionado(p) ? { ...p, activo: false } : p
+    ));
   };
 
   const handleGuardarPermisosPersonalizados = async () => {
@@ -584,8 +596,18 @@ export const PanelAdminUsuarios: React.FC = () => {
                 {canManageUserPermissions() && (
                   <button
                     type="button"
+                    onClick={handleMarcarTodosLosPermisos}
+                    disabled={guardandoPermisos || !permisosUsuario.some(p => perteneceAlModuloSeleccionado(p) && !p.activo)}
+                    className="px-4 py-2 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Marcar todos
+                  </button>
+                )}
+                {canManageUserPermissions() && (
+                  <button
+                    type="button"
                     onClick={handleQuitarTodosLosPermisos}
-                    disabled={guardandoPermisos || !permisosUsuario.some(p => p.activo)}
+                    disabled={guardandoPermisos || !permisosUsuario.some(p => perteneceAlModuloSeleccionado(p) && p.activo)}
                     className="px-4 py-2 border border-red-200 text-red-700 hover:bg-red-50 rounded-lg text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Quitar todos

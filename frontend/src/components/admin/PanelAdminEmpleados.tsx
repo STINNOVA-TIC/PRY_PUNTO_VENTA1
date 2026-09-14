@@ -114,7 +114,6 @@ export const PanelAdminEmpleados: React.FC = () => {
     },
     { name: 'activo', label: 'Colaborador Activo', tipo: 'checkbox' },
     { name: 'permitir_autoconsumo', label: 'Autorizar Autoconsumo (Consumo Interno)', tipo: 'checkbox' },
-    { name: 'permitir_firmas', label: 'Autorizar Firma de Requerimientos', tipo: 'checkbox' }
   ];
 
   const valoresInicialesColaborador = (emp: any) => ({
@@ -129,7 +128,6 @@ export const PanelAdminEmpleados: React.FC = () => {
     centro_costos_id: emp?.centro_costos_id || '',
     activo: emp?.activo !== undefined ? emp.activo : true,
     permitir_autoconsumo: emp?.permitir_autoconsumo || false,
-    permitir_firmas: emp?.permitir_firmas || false
   });
 
   const handleGuardarColaborador = async (valores: Record<string, any>) => {
@@ -145,7 +143,6 @@ export const PanelAdminEmpleados: React.FC = () => {
       centro_costos_id: valores.centro_costos_id ? Number(valores.centro_costos_id) : null,
       activo: !!valores.activo,
       permitir_autoconsumo: !!valores.permitir_autoconsumo,
-      permitir_firmas: !!valores.permitir_firmas
     };
 
     if (editingEmpleado) {

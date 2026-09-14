@@ -19,14 +19,14 @@ import {
   BsX 
 } from 'react-icons/bs';
 import { Paginacion } from '../common/Paginacion';
+import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
 
 export const PanelRequerimientos: React.FC = () => {
   const { user, hasPermission } = useAuth();
   const { showConfirm } = useModal();
   const loggedEmpleadoId = user?.empleado?.id;
   const isEmployeeRole = user?.rol?.nombre === 'empleado';
-  const canSign = user?.rol?.id === 1 || user?.rol?.nombre === 'admin' || !!user?.permitir_firmas || hasPermission('requerimientos.firmar');
-  const canCreateRequirement = canSign || hasPermission('compras.requerimientos.crear');
+  const canCreateRequirement = hasPermission('compras.requerimientos.crear');
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -49,6 +49,10 @@ export const PanelRequerimientos: React.FC = () => {
   const [moduloActivo, setModuloActivo] = useState<'requerimiento' | 'historial'>('requerimiento');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [historialBusqueda, setHistorialBusqueda] = useState('');
+  const [historialDepartamento, setHistorialDepartamento] = useState<string | number>('ALL');
+  const [historialEstado, setHistorialEstado] = useState('ALL');
+  const [historialFecha, setHistorialFecha] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -61,7 +65,6 @@ export const PanelRequerimientos: React.FC = () => {
   const [departamentoId, setDepartamentoId] = useState<number | ''>('');
   const [centroCostosId, setCentroCostosId] = useState<number | ''>('');
   const [justificacion, setJustificacion] = useState('');
-  const [tipoArticulo, setTipoArticulo] = useState('OTROS');
   const [secuencialPreview, setSecuencialPreview] = useState('Cargando...');
   const [tipoCompra, setTipoCompra] = useState('LOCAL');
 
@@ -73,10 +76,13 @@ export const PanelRequerimientos: React.FC = () => {
   const [itemFormaPago, setItemFormaPago] = useState('CONTADO');
   const [itemPlazoPago, setItemPlazoPago] = useState('INMEDIATO');
   const [itemTiempoEntrega, setItemTiempoEntrega] = useState('INMEDIATO');
+  const [itemTipoArticulo, setItemTipoArticulo] = useState('OTROS');
   const [itemComentario, setItemComentario] = useState('');
-  const [itemPrecioUnitario, setItemPrecioUnitario] = useState('0.00');
+  const [itemPrecioUnitario, setItemPrecioUnitario] = useState('');
   const [itemIncluyeIva, setItemIncluyeIva] = useState(true);
   const [itemProveedorId, setItemProveedorId] = useState<number | ''>('');
+  const [proveedorSearch, setProveedorSearch] = useState('');
+  const [proveedorDropdownOpen, setProveedorDropdownOpen] = useState(false);
   const [itemDescripcion, setItemDescripcion] = useState('');
   const [itemFoto, setItemFoto] = useState('');
 
@@ -399,10 +405,14 @@ export const PanelRequerimientos: React.FC = () => {
       const prodRes = await productosAPI.getById(prodId);
       const prod = prodRes.data;
       if (prod) {
-        setItemPrecioUnitario(Number(prod.producto_precio_compra || prod.producto_precio || 0).toFixed(2));
+        const precioProducto = Number(prod.precio_costo ?? prod.precio_venta ?? prod.producto_precio_compra ?? prod.producto_precio ?? 0);
+        setItemPrecioUnitario(precioProducto > 0 ? precioProducto.toFixed(2) : '');
+        const proveedor = proveedores.find((p: any) => p.id === prod.proveedor_id);
         setItemProveedorId(prod.proveedor_id || '');
-        setItemDescripcion(prod.producto_nombre || '');
-        setItemFoto(prod.producto_foto || '');
+        setProveedorSearch(proveedor?.nombre || '');
+        setItemDescripcion(prod.nombre || prod.producto_nombre || '');
+        setItemFoto(prod.foto || prod.producto_foto || '');
+        setItemTipoArticulo(prod.tipo_articulo || prod.producto_tipo_articulo || 'OTROS');
       }
     } catch (err) {
       console.error('Error cargando detalle de producto:', err);
@@ -416,7 +426,7 @@ export const PanelRequerimientos: React.FC = () => {
     }
 
     const qty = parseInt(itemCantidad);
-    const price = parseFloat(itemPrecioUnitario);
+    const price = parseFloat(itemPrecioUnitario) || 0;
     if (isNaN(qty) || qty <= 0) {
       setError('La cantidad debe ser un número entero mayor a 0.');
       return;
@@ -443,6 +453,7 @@ export const PanelRequerimientos: React.FC = () => {
       forma_pago: itemFormaPago,
       plazo_pago: itemPlazoPago,
       tiempo_entrega: itemTiempoEntrega,
+      tipo_articulo: itemTipoArticulo,
       comentario: finalComment,
       precio_unitario: price,
       subtotal,
@@ -466,10 +477,13 @@ export const PanelRequerimientos: React.FC = () => {
     setProductDropdownOpen(false);
     setItemCantidad('1');
     setItemNegociacion('NO');
+    setItemTipoArticulo('OTROS');
     setItemComentario('');
-    setItemPrecioUnitario('0.00');
+    setItemPrecioUnitario('');
     setItemIncluyeIva(true);
     setItemProveedorId('');
+    setProveedorSearch('');
+    setProveedorDropdownOpen(false);
     setItemDescripcion('');
     setItemFoto('');
     setItemCentrosCostoIds([]);
@@ -493,10 +507,13 @@ export const PanelRequerimientos: React.FC = () => {
     setItemFormaPago(item.forma_pago || 'CONTADO');
     setItemPlazoPago(item.plazo_pago || 'INMEDIATO');
     setItemTiempoEntrega(item.tiempo_entrega || 'INMEDIATO');
+    setItemTipoArticulo(item.tipo_articulo || 'OTROS');
     setItemComentario(item.comentario || '');
-    setItemPrecioUnitario(Number(item.precio_unitario || 0).toFixed(2));
+    setItemPrecioUnitario(Number(item.precio_unitario || 0) > 0 ? Number(item.precio_unitario).toFixed(2) : '');
     setItemIncluyeIva(item.incluye_iva !== false);
     setItemProveedorId(item.proveedor_id || '');
+    setProveedorSearch(proveedores.find((p: any) => p.id === item.proveedor_id)?.nombre || '');
+    setProveedorDropdownOpen(false);
     setItemDescripcion(item.producto_id ? '' : item.descripcion || '');
     setItemFoto(item.foto || '');
     setItemCentrosCostoIds([]);
@@ -514,10 +531,13 @@ export const PanelRequerimientos: React.FC = () => {
       setProductDropdownOpen(false);
       setItemCantidad('1');
       setItemNegociacion('NO');
+      setItemTipoArticulo('OTROS');
       setItemComentario('');
-      setItemPrecioUnitario('0.00');
+      setItemPrecioUnitario('');
       setItemIncluyeIva(true);
       setItemProveedorId('');
+      setProveedorSearch('');
+      setProveedorDropdownOpen(false);
       setItemDescripcion('');
       setItemFoto('');
       setItemCentrosCostoIds([]);
@@ -560,7 +580,7 @@ export const PanelRequerimientos: React.FC = () => {
         centro_costos_id: Number(centroCostosId),
         proveedor_id: detallesLocales[0]?.proveedor_id || null, // Hereda el proveedor del primer ítem
         justificacion,
-        tipo_articulo: tipoArticulo,
+        tipo_articulo: detallesLocales[0]?.tipo_articulo || 'OTROS',
         negociacion_previa: detallesLocales[0]?.negociacion_previa || 'NO',
         forma_pago: detallesLocales[0]?.forma_pago || 'CONTADO',
         plazo_pago: detallesLocales[0]?.plazo_pago || 'INMEDIATO',
@@ -639,7 +659,6 @@ export const PanelRequerimientos: React.FC = () => {
       setDepartamentoId(oc.departamento_id || '');
       setCentroCostosId(oc.centro_costos_id || '');
       setJustificacion(oc.orden_compra_justificacion || '');
-      setTipoArticulo(oc.orden_compra_tipo_articulo || 'OTROS');
       setTipoCompra(oc.orden_compra_tipo_compra || 'LOCAL');
       setLugarRecepcion(oc.orden_compra_lugar_recepcion || 'OTROS');
       setRequiereContrato(!!oc.orden_compra_requiere_contrato);
@@ -670,6 +689,7 @@ export const PanelRequerimientos: React.FC = () => {
         subtotal: Number(d.orden_compra_detalle_subtotal || d.subtotal || 0),
         foto: d.orden_compra_detalle_foto || d.foto || '',
         negociacion_previa: d.orden_compra_detalle_negociacion_previa || d.negociacion_previa || 'NO',
+        tipo_articulo: d.orden_compra_detalle_tipo_articulo || d.tipo_articulo || 'OTROS',
         incluye_iva: d.orden_compra_detalle_incluye_iva === undefined ? (d.incluye_iva === undefined ? true : !!d.incluye_iva) : !!d.orden_compra_detalle_incluye_iva,
         comentario: d.orden_compra_detalle_comentario || d.comentario || ''
       }));
@@ -765,13 +785,24 @@ export const PanelRequerimientos: React.FC = () => {
     );
   }
 
-  const ordenesFiltradas = isEmployeeRole && loggedEmpleadoId
+  const ordenesPorAcceso = isEmployeeRole && loggedEmpleadoId
     ? ordenes.filter(oc => 
         oc.empleado_id === loggedEmpleadoId || 
         oc.empleado_aprobador_id === loggedEmpleadoId || 
         oc.empleado_receptor_id === loggedEmpleadoId
       )
     : ordenes;
+
+  const ordenesFiltradas = ordenesPorAcceso.filter((oc) => {
+    const busqueda = historialBusqueda.trim().toLowerCase();
+    const solicitante = `${oc.empleado_nombre || ''} ${oc.orden_compra_elaborado_por || ''} ${oc.elaborado_por || ''}`.toLowerCase();
+    const coincideBusqueda = !busqueda || String(oc.codigo || oc.orden_compra_codigo || '').toLowerCase().includes(busqueda) || solicitante.includes(busqueda);
+    const coincideDepartamento = historialDepartamento === 'ALL' || String(oc.departamento_id || '') === String(historialDepartamento);
+    const coincideEstado = historialEstado === 'ALL' || oc.estado === historialEstado || oc.orden_compra_estado === historialEstado;
+    const fechaOrden = String(oc.fecha_solicitud || oc.orden_compra_fecha_solicitud || '').slice(0, 10);
+    const coincideFecha = !historialFecha || fechaOrden === historialFecha;
+    return coincideBusqueda && coincideDepartamento && coincideEstado && coincideFecha;
+  });
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -958,43 +989,7 @@ export const PanelRequerimientos: React.FC = () => {
           </div>
         </div>
 
-        {/* SECCIÓN B: TIPO DE ARTÍCULO */}
-        <div className="border-b border-gray-100 pb-4">
-          <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">
-            Tipo de Artículo
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-            {[
-              { label: 'Materia Prima', val: 'MATERIA PRIMA' },
-              { label: 'Herramienta', val: 'HERRAMIENTA' },
-              { label: 'Servicio', val: 'SERVICIO' },
-              { label: 'Maquinaria o Equipo', val: 'MAQUINARIA O EQUIPO' },
-              { label: 'Suministros / Consumibles', val: 'SUMINISTROS/ CONSUMIBLES' },
-              { label: 'Otros', val: 'OTROS' }
-            ].map(tipo => (
-              <label
-                key={tipo.val}
-                className={`flex items-center gap-2 px-3 py-2 border rounded-xl cursor-pointer text-xs font-semibold select-none transition ${
-                  tipoArticulo === tipo.val
-                    ? 'border-gray-800 bg-gray-50 text-gray-850'
-                    : 'border-gray-200 hover:bg-gray-50/50 text-gray-600'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="tipoArticulo"
-                  value={tipo.val}
-                  checked={tipoArticulo === tipo.val}
-                  onChange={(e) => setTipoArticulo(e.target.value)}
-                  className="h-3.5 w-3.5 text-gray-800 focus:ring-gray-850"
-                />
-                <span>{tipo.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* SECCIÓN C: AÑADIR ARTÍCULOS O SERVICIOS (Formulario local) */}
+        {/* SECCIÓN B: AÑADIR ARTÍCULOS O SERVICIOS (Formulario local) */}
         <div className="border-b border-gray-100 pb-5 space-y-4">
           <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
             Agregar Productos o Servicios al Detalle
@@ -1033,7 +1028,6 @@ export const PanelRequerimientos: React.FC = () => {
                 <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-lg max-h-52 overflow-y-auto">
                   {productos
                     .filter(p => {
-                      if (!p.activo) return false;
                       const q = productSearch.toLowerCase().trim();
                       if (!q) return true;
                       return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
@@ -1050,12 +1044,14 @@ export const PanelRequerimientos: React.FC = () => {
                         }}
                         className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                       >
-                        <span className="font-semibold text-gray-800">{p.codigo_barras} - {p.nombre}</span>
+                        <span className="font-semibold text-gray-800">
+                          {p.codigo_barras} - {p.nombre}
+                          {!p.activo && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">INACTIVO</span>}
+                        </span>
                         <span className="block text-[10px] text-gray-400">{p.descripcion || 'Sin detalle'} (Stock: {p.stock_actual})</span>
                       </button>
                     ))}
                   {productos.filter(p => {
-                    if (!p.activo) return false;
                     const q = productSearch.toLowerCase().trim();
                     if (!q) return true;
                     return p.nombre.toLowerCase().includes(q) || p.codigo_barras.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
@@ -1113,6 +1109,23 @@ export const PanelRequerimientos: React.FC = () => {
 
             {/* Precio Unitario */}
             <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo de Artículo</label>
+              <select
+                value={itemTipoArticulo}
+                onChange={(e) => setItemTipoArticulo(e.target.value)}
+                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
+              >
+                <option value="MATERIA PRIMA">Materia Prima</option>
+                <option value="HERRAMIENTA">Herramienta</option>
+                <option value="SERVICIO">Servicio</option>
+                <option value="MAQUINARIA O EQUIPO">Maquinaria o Equipo</option>
+                <option value="SUMINISTROS/ CONSUMIBLES">Suministros / Consumibles</option>
+                <option value="OTROS">Otros</option>
+              </select>
+            </div>
+
+            {/* Precio Unitario */}
+            <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Precio Unitario ($)</label>
               <input
                 type="number"
@@ -1140,18 +1153,52 @@ export const PanelRequerimientos: React.FC = () => {
             </div>
 
             {/* Proveedor Sugerido */}
-            <div>
+            <div className="relative">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Proveedor Sugerido</label>
-              <select
-                value={itemProveedorId}
-                onChange={(e) => setItemProveedorId(Number(e.target.value))}
-                className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700 focus:outline-none"
+              <input
+                type="text"
+                value={proveedorSearch}
+                onFocus={() => setProveedorDropdownOpen(true)}
+                onChange={(e) => {
+                  setProveedorSearch(e.target.value);
+                  setItemProveedorId('');
+                  setProveedorDropdownOpen(true);
+                }}
+                placeholder="Buscar proveedor..."
+                className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3.5 pr-9 text-sm text-gray-700 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setProveedorDropdownOpen(!proveedorDropdownOpen)}
+                className="absolute bottom-2 right-2 text-xs font-bold text-gray-400 hover:text-gray-700"
+                tabIndex={-1}
               >
-                <option value="">Seleccionar proveedor...</option>
-                {proveedores.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre}</option>
-                ))}
-              </select>
+                {proveedorDropdownOpen ? '▲' : '▼'}
+              </button>
+              {proveedorDropdownOpen && (
+                <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-gray-300 bg-white shadow-lg">
+                  {proveedores
+                    .filter((p: any) => p.nombre.toLowerCase().includes(proveedorSearch.toLowerCase().trim()))
+                    .map((p: any) => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setItemProveedorId(p.id);
+                          setProveedorSearch(p.nombre);
+                          setProveedorDropdownOpen(false);
+                        }}
+                        className="w-full border-b border-gray-100 px-3 py-2 text-left text-xs hover:bg-gray-50 last:border-b-0"
+                      >
+                        {p.nombre}
+                      </button>
+                    ))}
+                  {proveedores.filter((p: any) => p.nombre.toLowerCase().includes(proveedorSearch.toLowerCase().trim())).length === 0 && (
+                    <div className="px-3 py-3 text-xs italic text-gray-400">No se encontraron proveedores.</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Negociación Previa */}
@@ -1315,6 +1362,7 @@ export const PanelRequerimientos: React.FC = () => {
                     <th className="px-4 py-2 w-[8%]">Cant</th>
                     <th className="px-4 py-2 w-[12%]">Unidad</th>
                     <th className="px-4 py-2 w-[25%] text-left">Descripción</th>
+                    <th className="px-4 py-2 w-[12%]">Tipo</th>
                     <th className="px-4 py-2 w-[10%]">Negociación</th>
                     <th className="px-4 py-2 w-[12%]">Precio Unit</th>
                     <th className="px-4 py-2 w-[13%]">Subtotal</th>
@@ -1330,10 +1378,13 @@ export const PanelRequerimientos: React.FC = () => {
                         <span className="font-semibold text-gray-800">{item.descripcion}</span>
                         {item.comentario && <span className="text-[10px] text-gray-400 block italic">{item.comentario}</span>}
                       </td>
+                      <td className="px-4 py-3 font-medium text-gray-600">{item.tipo_articulo}</td>
                       <td className="px-4 py-3 font-medium text-gray-600">{item.negociacion_previa}</td>
                       <td className="px-4 py-3 font-mono">
-                        ${item.precio_unitario.toFixed(2)}
-                        {item.incluye_iva && <span className="text-gray-400"> + IVA</span>}
+                        {item.precio_unitario > 0 && <>
+                          ${item.precio_unitario.toFixed(2)}
+                          {item.incluye_iva && <span className="text-gray-400"> + IVA</span>}
+                        </>}
                       </td>
                       <td className="px-4 py-3 font-mono font-bold text-gray-800">
                         ${item.subtotal.toFixed(2)}
@@ -1729,6 +1780,74 @@ export const PanelRequerimientos: React.FC = () => {
           <p className="text-xs text-gray-400">Listado de requerimientos emitidos y herramientas de descarga oficial</p>
         </div>
 
+        <div className="space-y-3">
+          <SearchAndFilterBar
+            searchPlaceholder="Buscar por secuencial o solicitante..."
+            searchValue={historialBusqueda}
+            onSearchChange={(value) => {
+              setHistorialBusqueda(value);
+              setCurrentPage(1);
+            }}
+            totalResults={ordenesFiltradas.length}
+            totalCount={ordenesPorAcceso.length}
+            resultsLabel="requerimientos"
+            selectFilters={[
+              {
+                id: 'departamento',
+                placeholder: 'Todos los departamentos',
+                value: historialDepartamento,
+                onChange: (value) => {
+                  setHistorialDepartamento(value);
+                  setCurrentPage(1);
+                },
+                options: departamentos.map((departamento: any) => ({
+                  value: departamento.departamento_id,
+                  label: departamento.departamento_nombre,
+                })),
+              },
+              {
+                id: 'estado',
+                placeholder: 'Todos los estados',
+                value: historialEstado,
+                onChange: (value) => {
+                  setHistorialEstado(value);
+                  setCurrentPage(1);
+                },
+                options: Array.from(new Set(ordenesPorAcceso.map((oc: any) => oc.estado || oc.orden_compra_estado).filter(Boolean))).map((estado) => ({
+                  value: String(estado),
+                  label: String(estado).charAt(0).toUpperCase() + String(estado).slice(1),
+                })),
+              },
+            ]}
+          />
+          <div className="flex justify-end">
+            <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+              Fecha:
+              <input
+                type="date"
+                value={historialFecha}
+                onChange={(e) => {
+                  setHistorialFecha(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-10 rounded-lg border border-gray-300 px-3 text-xs font-normal text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              />
+              {historialFecha && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistorialFecha('');
+                    setCurrentPage(1);
+                  }}
+                  className="text-[10px] font-bold text-gray-500 hover:text-gray-800"
+                >
+                  Limpiar
+                </button>
+              )}
+            </label>
+          </div>
+        </div>
+
         {ordenesFiltradas.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl text-gray-400 text-xs font-medium">
             No se han registrado requerimientos u órdenes de compra aún.
@@ -1797,8 +1916,7 @@ export const PanelRequerimientos: React.FC = () => {
                           <BsDiagram3 className="h-3 w-3" />
                           Flujo
                         </button>
-                        {user?.rol.nombre === 'admin' && (
-                          <>
+                        {hasPermission('compras.requerimientos.editar') && (
                           <button
                             onClick={() => handleEdit(oc)}
                             title="Editar Requerimiento"
@@ -1806,6 +1924,8 @@ export const PanelRequerimientos: React.FC = () => {
                           >
                             <BsPencil className="h-4 w-4" />
                           </button>
+                        )}
+                        {hasPermission('compras.requerimientos.eliminar') && (
                           <button
                             onClick={() => handleEliminarOrden(oc.id)}
                             title="Eliminar Orden"
@@ -1813,7 +1933,6 @@ export const PanelRequerimientos: React.FC = () => {
                           >
                             <BsTrash className="h-4 w-4" />
                           </button>
-                          </>
                         )}
                       </td>
                     </tr>
@@ -1861,10 +1980,10 @@ export const PanelRequerimientos: React.FC = () => {
 
             <div className="text-center space-y-2">
               <h3 className="text-lg font-bold text-gray-900">
-                Autorización de Firma Requerida
+                Permiso de Compras Requerido
               </h3>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Tu usuario no cuenta con el permiso para <strong className="text-gray-700">firmar y emitir requerimientos de compra</strong>.
+                Tu usuario no cuenta con el permiso para <strong className="text-gray-700">crear requerimientos de compra</strong>.
               </p>
               <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-left text-xs text-amber-900 space-y-1">
                 <p className="font-semibold flex items-center gap-1.5 text-amber-800">
@@ -1875,7 +1994,7 @@ export const PanelRequerimientos: React.FC = () => {
                 </p>
               </div>
               <p className="text-[11px] text-gray-400 pt-1">
-                Solicita a un <strong>Administrador o a Talento Humano</strong> que active la opción <em className="text-gray-600">"Autorizar Firma de Requerimientos"</em> en tu ficha de empleado.
+                Solicita a un <strong>Administrador</strong> que te asigne un rol o permiso de <em className="text-gray-600">Compras</em>.
               </p>
             </div>
 

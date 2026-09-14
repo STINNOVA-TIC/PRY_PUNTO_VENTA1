@@ -40,8 +40,8 @@ export const empleadosController = {
                 e.centro_costos_id,
                 COALESCE(cc.centro_costos_nombre, 'Sin Centro de Costos') AS centro_costos,
                 COALESCE(e.empleado_cargo, 'Empleado') AS cargo,
-                bool_or(pe.permiso_clave IN ('compras.requerimientos.aprobar', 'requerimientos.firmar')) AS puede_aprobar,
-                bool_or(pe.permiso_clave IN ('compras.requerimientos.recibir', 'requerimientos.firmar')) AS puede_recibir
+                bool_or(pe.permiso_clave = 'compras.requerimientos.aprobar') AS puede_aprobar,
+                bool_or(pe.permiso_clave = 'compras.requerimientos.recibir') AS puede_recibir
          FROM empleado e
          JOIN permisos_efectivos pe ON pe.empleado_id = e.empleado_id
          LEFT JOIN departamento d ON d.departamento_id = e.departamento_id
@@ -49,8 +49,7 @@ export const empleadosController = {
          WHERE e.empleado_estado = 'activo'
            AND pe.permiso_clave IN (
              'compras.requerimientos.aprobar',
-             'compras.requerimientos.recibir',
-             'requerimientos.firmar'
+             'compras.requerimientos.recibir'
            )
          GROUP BY e.empleado_id, e.empleado_nombre, e.empleado_apellido,
                   e.departamento_id, d.departamento_nombre,
@@ -75,13 +74,7 @@ export const empleadosController = {
                  JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
                  JOIN permiso p ON up.permiso_id = p.permiso_id
                  WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'autoconsumo.crear' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
-               ) as permitir_autoconsumo,
-               EXISTS (
-                 SELECT 1 FROM usuario u 
-                 JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
-                 JOIN permiso p ON up.permiso_id = p.permiso_id
-                 WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'requerimientos.firmar' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
-               ) as permitir_firmas
+               ) as permitir_autoconsumo
         FROM empleado e
         LEFT JOIN departamento d ON e.departamento_id = d.departamento_id
         LEFT JOIN centro_costos cc ON e.centro_costos_id = cc.centro_costos_id
@@ -117,8 +110,7 @@ export const empleadosController = {
         foto_perfil: row.empleado_foto || `https://ui-avatars.com/api/?name=${row.empleado_nombre}+${row.empleado_apellido}&size=128`,
         firma: row.empleado_firma || null,
         activo: row.empleado_estado === 'activo',
-        permitir_autoconsumo: row.permitir_autoconsumo || false,
-        permitir_firmas: row.permitir_firmas || false
+        permitir_autoconsumo: row.permitir_autoconsumo || false
       }));
 
       res.json({
@@ -143,13 +135,7 @@ export const empleadosController = {
                   JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
                   JOIN permiso p ON up.permiso_id = p.permiso_id
                   WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'autoconsumo.crear' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
-                ) as permitir_autoconsumo,
-                EXISTS (
-                  SELECT 1 FROM usuario u 
-                  JOIN usuario_permiso up ON u.usuario_id = up.usuario_id 
-                  JOIN permiso p ON up.permiso_id = p.permiso_id
-                  WHERE u.empleado_id = e.empleado_id AND p.permiso_clave = 'requerimientos.firmar' AND up.tipo = 'conceder' AND u.usuario_estado = 'activo'
-                ) as permitir_firmas
+                ) as permitir_autoconsumo
          FROM empleado e 
          LEFT JOIN departamento d ON e.departamento_id = d.departamento_id 
          WHERE e.empleado_id = $1`,
@@ -180,8 +166,7 @@ export const empleadosController = {
           foto_perfil: empleado.empleado_foto || `https://ui-avatars.com/api/?name=${empleado.empleado_nombre}+${empleado.empleado_apellido}&size=128`,
           firma: empleado.empleado_firma || null,
           activo: empleado.empleado_estado === 'activo',
-          permitir_autoconsumo: empleado.permitir_autoconsumo || false,
-          permitir_firmas: empleado.permitir_firmas || false
+          permitir_autoconsumo: empleado.permitir_autoconsumo || false
         }
       });
       return;
@@ -243,7 +228,7 @@ export const empleadosController = {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo, permitir_firmas } = req.body;
+      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
 
       if (!cedula || !nombre || !apellido) {
         throw new AppError('Cédula, nombre y apellido son requeridos', 400);
@@ -281,7 +266,7 @@ export const empleadosController = {
 
       const empleado = insertRes.rows[0];
 
-      if (permitir_autoconsumo || permitir_firmas) {
+      if (permitir_autoconsumo) {
         const usuarioEmail = empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`;
         const existingUserRes = await client.query(
           `SELECT usuario_id, empleado_id FROM usuario WHERE lower(usuario_email) = lower($1) FOR UPDATE`,
@@ -325,14 +310,6 @@ export const empleadosController = {
             [userId]
           );
         }
-        if (permitir_firmas) {
-          await client.query(
-            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
-             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'requerimientos.firmar'
-             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
-            [userId]
-          );
-        }
       }
 
       await client.query('COMMIT');
@@ -356,7 +333,7 @@ export const empleadosController = {
   update: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo, permitir_firmas } = req.body;
+      const { cedula, nombre, apellido, departamento_id, centro_costos_id, email, cargo, foto_perfil, firma, activo, permitir_autoconsumo } = req.body;
 
       if (!cedula || !nombre || !apellido) {
         throw new AppError('Cédula, nombre y apellido son requeridos', 400);
@@ -406,7 +383,7 @@ export const empleadosController = {
       
       if (userCheck.rows.length > 0) {
         userId = userCheck.rows[0].usuario_id;
-      } else if (permitir_autoconsumo || permitir_firmas) {
+      } else if (permitir_autoconsumo) {
         // Crear usuario nuevo para el colaborador
         const userRes = await pool.query(
           `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
@@ -444,22 +421,6 @@ export const empleadosController = {
           );
         }
 
-        // Permiso de Firma (requerimientos.firmar)
-        if (permitir_firmas) {
-          await pool.query(
-            `INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
-             SELECT $1, permiso_id, 'conceder' FROM permiso WHERE permiso_clave = 'requerimientos.firmar'
-             ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder'`,
-            [userId]
-          );
-        } else {
-          await pool.query(
-            `DELETE FROM usuario_permiso 
-             WHERE usuario_id = $1 
-               AND permiso_id IN (SELECT permiso_id FROM permiso WHERE permiso_clave = 'requerimientos.firmar')`,
-            [userId]
-          );
-        }
       }
 
       res.json({

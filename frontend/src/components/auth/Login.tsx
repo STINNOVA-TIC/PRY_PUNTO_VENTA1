@@ -21,7 +21,7 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      await loginByCedula(cedula, false);
+      await loginByCedula(cedula);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Cédula no registrada o inválida');

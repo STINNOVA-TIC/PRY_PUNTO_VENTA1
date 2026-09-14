@@ -20,7 +20,9 @@ const TABLE_WHITELIST = [
     'rol',
     'modulo',
     'permiso',
-    'rol_permiso'
+    'rol_permiso',
+    'formato_requerimiento_config',
+    'formato_requerimiento_cambio'
 ];
 exports.adminController = {
     // Obtener todas las filas de una tabla

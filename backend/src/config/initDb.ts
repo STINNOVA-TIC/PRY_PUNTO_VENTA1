@@ -76,13 +76,103 @@ export const initDb = async () => {
     // 4.2. Migración: indicador de IVA por línea de detalle de orden de compra
     await pool.query(`
       ALTER TABLE orden_compra_detalle
-        ADD COLUMN IF NOT EXISTS orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE;
+        ADD COLUMN IF NOT EXISTS orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS orden_compra_detalle_tipo_articulo VARCHAR(50) NOT NULL DEFAULT 'OTROS'
+          CHECK (orden_compra_detalle_tipo_articulo IN ('MATERIA PRIMA', 'HERRAMIENTA', 'SERVICIO', 'MAQUINARIA O EQUIPO', 'SUMINISTROS/ CONSUMIBLES', 'OTROS'));
+    `);
+
+    // 4.2.2 Recepciones parciales por detalle y factura de requerimiento.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orden_compra_detalle_recepcion (
+        orden_compra_detalle_recepcion_id SERIAL PRIMARY KEY,
+        orden_compra_detalle_id INTEGER NOT NULL REFERENCES orden_compra_detalle(orden_compra_detalle_id) ON DELETE CASCADE,
+        factura_codigo VARCHAR(100) NOT NULL,
+        cantidad_recibida INTEGER NOT NULL CHECK (cantidad_recibida > 0),
+        usuario_receptor_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+        fecha_recepcion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_oc_detalle_recepcion_detalle ON orden_compra_detalle_recepcion(orden_compra_detalle_id);
+
+      DO $$
+      DECLARE nombre_restriccion TEXT;
+      BEGIN
+        SELECT conname INTO nombre_restriccion
+        FROM pg_constraint
+        WHERE conrelid = 'orden_compra'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) LIKE '%orden_compra_estado%'
+        LIMIT 1;
+        IF nombre_restriccion IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE orden_compra DROP CONSTRAINT %I', nombre_restriccion);
+        END IF;
+        ALTER TABLE orden_compra ADD CONSTRAINT orden_compra_estado_check
+          CHECK (orden_compra_estado IN ('pendiente', 'aprobada', 'rechazada', 'comprada', 'recibida', 'recibida_parcial', 'cancelada', 'entregado'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    // 4.2.1 Migración: clasificación de cada producto para Compras.
+    await pool.query(`
+      ALTER TABLE producto
+        ADD COLUMN IF NOT EXISTS producto_tipo_articulo VARCHAR(50) NOT NULL DEFAULT 'OTROS'
+          CHECK (producto_tipo_articulo IN ('MATERIA PRIMA', 'HERRAMIENTA', 'SERVICIO', 'MAQUINARIA O EQUIPO', 'SUMINISTROS/ CONSUMIBLES', 'OTROS'));
     `);
 
     // 4.3. Migración: firma digital en empleado
     await pool.query(`
       ALTER TABLE empleado
         ADD COLUMN IF NOT EXISTS empleado_firma VARCHAR(255) NULL;
+    `);
+
+    // 4.3.1 Formato administrable de requerimientos corporativos.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS formato_requerimiento_config (
+        formato_requerimiento_config_id SERIAL PRIMARY KEY,
+        encabezado_sistema VARCHAR(200) NOT NULL,
+        encabezado_titulo VARCHAR(255) NOT NULL,
+        encabezado_codigo VARCHAR(80) NOT NULL,
+        encabezado_version VARCHAR(10) NOT NULL,
+        referencia_norma VARCHAR(200) NOT NULL,
+        referencia_capitulo VARCHAR(200) NOT NULL,
+        referencia_recursos VARCHAR(200) NOT NULL,
+        elaborado_por VARCHAR(200) NOT NULL,
+        revisado_por VARCHAR(200) NOT NULL,
+        aprobado_por VARCHAR(200) NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS formato_requerimiento_cambio (
+        formato_requerimiento_cambio_id SERIAL PRIMARY KEY,
+        cambio_version VARCHAR(10) NOT NULL,
+        cambio_fecha VARCHAR(20) NOT NULL,
+        cambio_motivo TEXT NOT NULL,
+        cambio_aprobado_por VARCHAR(200) NOT NULL,
+        cambio_fecha_aprobacion VARCHAR(20) NOT NULL,
+        cambio_orden INTEGER NOT NULL DEFAULT 0,
+        formato_requerimiento_cambio_estado VARCHAR(20) NOT NULL DEFAULT 'activo'
+          CHECK (formato_requerimiento_cambio_estado IN ('activo', 'inactivo'))
+      );
+      ALTER TABLE formato_requerimiento_cambio
+        ADD COLUMN IF NOT EXISTS formato_requerimiento_cambio_estado VARCHAR(20) NOT NULL DEFAULT 'activo'
+          CHECK (formato_requerimiento_cambio_estado IN ('activo', 'inactivo'));
+
+      INSERT INTO formato_requerimiento_config (
+        encabezado_sistema, encabezado_titulo, encabezado_codigo, encabezado_version,
+        referencia_norma, referencia_capitulo, referencia_recursos,
+        elaborado_por, revisado_por, aprobado_por
+      )
+      SELECT 'Sistema Integrado de Gestión', 'Requerimiento de Bienes y/o Servicios', 'STI-ADQ-RG-001', '02',
+             'ISO 9001:2015|Sistema Gestión de Calidad', 'CAP 7|Apoyo', '7.1|Recursos|7.1.1|Generalidades',
+             'Analista de Adquisiciones', 'Especialista de Adquisiciones', 'Gerente Administrativa Financiera'
+      WHERE NOT EXISTS (SELECT 1 FROM formato_requerimiento_config);
+
+      INSERT INTO formato_requerimiento_cambio (
+        cambio_version, cambio_fecha, cambio_motivo, cambio_aprobado_por, cambio_fecha_aprobacion, cambio_orden
+      )
+      SELECT * FROM (VALUES
+        ('00', '31/10/2024', 'Versión inicial - Creación del documento', 'Gerente de Operaciones', '31/10/2024', 0),
+        ('01', '22/5/2025', 'Estandarización del formato y se modifica al encargado de aprobar el documento conforme a la estructura organizacional vigente a la fecha', 'Gerente Administrativa Financiera', '26/5/2025', 1),
+        ('02', '14/09/2026', 'Clasificación individual del tipo de artículo, proveedor y precio por cada detalle del requerimiento.', 'Gerente Administrativa Financiera', '14/09/2026', 2)
+      ) AS cambios(version, fecha, motivo, aprobado_por, fecha_aprobacion, orden)
+      WHERE NOT EXISTS (SELECT 1 FROM formato_requerimiento_cambio);
     `);
 
     // 4.4. Migración: firmas digitales y empleados de aprobación/recepción en orden_compra
@@ -272,7 +362,7 @@ export const initDb = async () => {
       (11, 'Aprobar Autoconsumo', 'Permite autorizar solicitudes de consumo interno', 'autoconsumo.aprobar', 'activo'),
       (11, 'Entregar Autoconsumo', 'Permite a bodega registrar entrega de insumos autorizados', 'autoconsumo.entregar', 'activo'),
       (11, 'Eliminar Autoconsumo', 'Permite cancelar o borrar requerimientos de consumo', 'autoconsumo.eliminar', 'activo'),
-      (11, 'Firmar Requerimientos', 'Permite firmar órdenes de compra y requerimientos', 'requerimientos.firmar', 'activo'),
+      (12, 'Firmar Requerimientos', 'Permiso legado migrado a Compras', 'requerimientos.firmar', 'inactivo'),
       (4, 'Ver Proveedores', 'Permite consultar catálogo de proveedores', 'proveedores.ver', 'activo'),
       (4, 'Crear Proveedores', 'Permite registrar nuevos proveedores', 'proveedores.crear', 'activo'),
       (4, 'Editar Proveedores', 'Permite modificar proveedores', 'proveedores.editar', 'activo'),
@@ -280,13 +370,41 @@ export const initDb = async () => {
       (4, 'Crear Categorías', 'Permite crear categorías de productos', 'categorias.crear', 'activo'),
       (4, 'Editar Categorías', 'Permite editar categorías de productos', 'categorias.editar', 'activo'),
       (12, 'Ver Compras', 'Permite acceder al área corporativa de Compras', 'compras.ver', 'activo'),
+      (12, 'Ver Todo el Historial de Requerimientos', 'Permite consultar todos los requerimientos y órdenes de compra de la empresa', 'compras.requerimientos.ver_todos', 'activo'),
       (12, 'Crear Requerimientos de Compra', 'Permite crear requerimientos para el área solicitante', 'compras.requerimientos.crear', 'activo'),
       (12, 'Editar Requerimientos de Compra', 'Permite editar requerimientos corporativos', 'compras.requerimientos.editar', 'activo'),
       (12, 'Aprobar Requerimientos de Compra', 'Permite aprobar y firmar requerimientos corporativos', 'compras.requerimientos.aprobar', 'activo'),
       (12, 'Recibir Compras', 'Permite registrar la recepción de bienes comprados', 'compras.requerimientos.recibir', 'activo'),
       (12, 'Eliminar Requerimientos de Compra', 'Permite eliminar requerimientos corporativos', 'compras.requerimientos.eliminar', 'activo')
       ON CONFLICT (permiso_nombre) DO NOTHING;
+      UPDATE permiso
+      SET modulo_id = 12, permiso_descripcion = 'Permiso legado migrado a Compras'
+      WHERE permiso_clave = 'requerimientos.firmar';
       SELECT setval('permiso_permiso_id_seq', COALESCE((SELECT MAX(permiso_id)+1 FROM permiso), 1), false);
+    `);
+
+    // 6.1.1 Migrar autorizaciones antiguas de firma a permisos corporativos de Compras.
+    await pool.query(`
+      INSERT INTO rol_permiso (rol_id, permiso_id)
+      SELECT rp.rol_id, destino.permiso_id
+      FROM rol_permiso rp
+      JOIN permiso legado ON legado.permiso_id = rp.permiso_id AND legado.permiso_clave = 'requerimientos.firmar'
+      CROSS JOIN permiso destino
+      WHERE destino.permiso_clave IN ('compras.requerimientos.crear', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir')
+      ON CONFLICT (rol_id, permiso_id) DO NOTHING;
+
+      INSERT INTO usuario_permiso (usuario_id, permiso_id, tipo)
+      SELECT up.usuario_id, destino.permiso_id, 'conceder'
+      FROM usuario_permiso up
+      JOIN permiso legado ON legado.permiso_id = up.permiso_id AND legado.permiso_clave = 'requerimientos.firmar'
+      CROSS JOIN permiso destino
+      WHERE up.tipo = 'conceder'
+        AND destino.permiso_clave IN ('compras.requerimientos.crear', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir')
+      ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET tipo = 'conceder';
+
+      DELETE FROM usuario_permiso WHERE permiso_id IN (SELECT permiso_id FROM permiso WHERE permiso_clave = 'requerimientos.firmar');
+      DELETE FROM rol_permiso WHERE permiso_id IN (SELECT permiso_id FROM permiso WHERE permiso_clave = 'requerimientos.firmar');
+      UPDATE permiso SET permiso_estado = 'inactivo' WHERE permiso_clave = 'requerimientos.firmar';
     `);
 
     // 6.2 Asociar Permisos a Roles en rol_permiso (idempotente)

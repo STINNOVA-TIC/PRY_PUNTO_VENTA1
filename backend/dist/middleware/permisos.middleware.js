@@ -76,7 +76,7 @@ async function getPermisosPeticion(req) {
         return getUsuarioPermisos(req.user?.id || 0, req.user?.rol_id || 3);
     }
     const base = await getUsuarioPermisos(0, 3);
-    const allowedQuickPermissions = ['autoconsumo.crear', 'requerimientos.firmar'];
+    const allowedQuickPermissions = ['autoconsumo.crear'];
     const customRes = await db_1.default.query(`SELECT p.permiso_clave, up.tipo
      FROM usuario u
      JOIN usuario_permiso up ON up.usuario_id = u.usuario_id
@@ -222,8 +222,16 @@ const requireSelfOrPermission = (permiso) => {
                 });
                 return;
             }
-            const userId = parseInt(req.params.id);
-            const isSelf = req.user.id === userId;
+            const empleadoObjetivoId = parseInt(req.params.id);
+            let empleadoPropioId = req.empleado?.empleado_id;
+            // Las rutas de colaboradores reciben un empleado_id, mientras que en una
+            // sesión corporativa req.user.id es usuario_id. Resolver el vínculo antes
+            // de decidir si la operación se hace sobre el propio perfil.
+            if (!empleadoPropioId && req.user.id) {
+                const usuarioRes = await db_1.default.query('SELECT empleado_id FROM usuario WHERE usuario_id = $1', [req.user.id]);
+                empleadoPropioId = usuarioRes.rows[0]?.empleado_id;
+            }
+            const isSelf = empleadoPropioId === empleadoObjetivoId;
             const hasPermission = isAdmin || permissions.has(permiso);
             if (!isSelf && !hasPermission) {
                 res.status(403).json({

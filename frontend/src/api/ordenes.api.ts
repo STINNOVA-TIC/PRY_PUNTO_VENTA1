@@ -21,8 +21,8 @@ export const ordenesAPI = {
     return response.data;
   },
 
-  entregar: async (id: number | string, facturas: string[]) => {
-    const response = await api.put(`/ordenes-compra/${id}/entregar`, { facturas });
+  entregar: async (id: number | string, recepciones: Array<{ detalle_id: number; cantidad: number; factura_codigo: string }>) => {
+    const response = await api.put(`/ordenes-compra/${id}/entregar`, { recepciones });
     return response.data;
   },
 

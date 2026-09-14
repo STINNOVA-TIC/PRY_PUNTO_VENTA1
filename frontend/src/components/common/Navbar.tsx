@@ -2,11 +2,11 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsFileEarmarkText, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const { user, logout, isShopSession, isSignatureSession, setIsShopSession, hasPermission } = useAuth();
+  const { user, logout, isShopSession, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,9 +66,7 @@ export const Navbar: React.FC = () => {
             </Link>
             
             <div className="hidden md:flex items-center space-x-1.5">
-              {isSignatureSession ? (
-                renderNavLink('/requerimientos', 'Requerimientos', <BsFileEarmarkText />)
-              ) : (<>
+              {!isShopSession && <>
               {/* Inicio / Dashboard */}
               {renderNavLink('/', 'Inicio', <BsHouseDoor />)}
 
@@ -77,7 +75,7 @@ export const Navbar: React.FC = () => {
                 renderNavLink('/entregas', 'Entregas', <BsBoxSeam />)
               )}
               
-              {(rol === 'admin' || hasPermission('compras.ver')) && (
+              {(rol === 'admin' || hasPermission('compras.ver') || hasPermission('compras.requerimientos.crear') || hasPermission('compras.requerimientos.aprobar') || hasPermission('compras.requerimientos.recibir')) && (
                 renderNavLink('/compras', 'Compras', <BsCartCheck />)
               )}
               
@@ -110,7 +108,7 @@ export const Navbar: React.FC = () => {
               {(rol === 'admin' || hasPermission('roles.ver') || hasPermission('roles.crear') || hasPermission('configuracion.ver')) && (
                 renderNavLink('/admin/tablas', 'Tablas Maestras', <BsGrid1X2Fill />)
               )}
-              </>)}
+              </>}
             </div>
           </div>
 
@@ -119,18 +117,6 @@ export const Navbar: React.FC = () => {
               <span className="font-semibold text-gray-800">{user?.nombre}</span>
               <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px] mt-0.5">{user?.rol.nombre}</span>
             </div>
-            {!isShopSession && (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar') && (
-              <button
-                onClick={() => {
-                  localStorage.setItem('isShopSession', 'true');
-                  setIsShopSession(true);
-                  navigate('/');
-                }}
-                className="px-4 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5 active:scale-95"
-              >
-                Volver a Beneficios
-              </button>
-            )}
             <button
               onClick={handleLogout}
               className="px-4 py-2 rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-55 text-gray-600 hover:text-gray-800 text-xs font-semibold transition flex items-center gap-1.5"
@@ -159,12 +145,7 @@ export const Navbar: React.FC = () => {
       {/* Menú móvil desplegable */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 py-3 px-4 bg-gray-50 space-y-1.5 transition duration-150 animate-fade-in shadow-inner">
-          {isSignatureSession ? (
-            <Link to="/requerimientos" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2">
-              <BsFileEarmarkText className="h-4 w-4 text-gray-400" />
-              Requerimientos
-            </Link>
-          ) : (<>
+          {!isShopSession && <>
           {/* Inicio / Dashboard */}
           <Link
             to="/"
@@ -187,7 +168,7 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
 
-          {(rol === 'admin' || hasPermission('compras.ver')) && (
+          {(rol === 'admin' || hasPermission('compras.ver') || hasPermission('compras.requerimientos.crear') || hasPermission('compras.requerimientos.aprobar') || hasPermission('compras.requerimientos.recibir')) && (
             <Link
               to="/compras"
               onClick={() => setMobileMenuOpen(false)}
@@ -269,7 +250,7 @@ export const Navbar: React.FC = () => {
               Tablas Maestras
             </Link>
           )}
-          </>)}
+          </>}
         </div>
       )}
     </nav>

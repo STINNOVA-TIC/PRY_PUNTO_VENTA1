@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import logoEmpresa from '../../assets/logo.png';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useModal } from '../../context/ModalContext';
 import { BsHourglassSplit, BsDownload } from 'react-icons/bs';
+import { adminAPI } from '../../api/admin.api';
 
 interface VistaImpresionRequerimientoProps {
   orden: any;
@@ -11,9 +12,43 @@ interface VistaImpresionRequerimientoProps {
   onClose: () => void;
 }
 
+// Los centros por artículo se almacenaron históricamente dentro del comentario
+// con el formato "[CC: código 1, código 2]". Separamos ese dato al imprimir
+// para ubicarlo en su columna y conservar solo la observación como comentario.
+const separarCentrosYComentario = (comentario: unknown, centroGeneral?: string) => {
+  const texto = String(comentario || '').trim();
+  const coincidencia = texto.match(/^\s*\[\s*CC\s*:\s*([^\]]+)\]\s*/i);
+
+  return {
+    centros: coincidencia?.[1].trim() || centroGeneral || 'S/C',
+    comentario: texto.replace(/^\s*\[\s*CC\s*:\s*[^\]]+\]\s*/i, '').trim() || 'S/C',
+  };
+};
+
 export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoProps> = ({ orden, empresas, onClose }) => {
   const { showAlert } = useModal();
   const [downloading, setDownloading] = useState(false);
+  const [formato, setFormato] = useState<any>(null);
+  const [cambios, setCambios] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      adminAPI.read('formato_requerimiento_config'),
+      adminAPI.read('formato_requerimiento_cambio'),
+    ]).then(([configRes, cambiosRes]) => {
+      setFormato(configRes.data?.[0] || null);
+      setCambios((cambiosRes.data || [])
+        .filter((cambio: any) => cambio.formato_requerimiento_cambio_estado !== 'inactivo')
+        .sort((a: any, b: any) => Number(a.cambio_orden) - Number(b.cambio_orden)));
+    }).catch(() => {
+      // La plantilla conserva sus valores predeterminados si el formato aún no fue configurado.
+    });
+  }, []);
+
+  const separarReferencia = (valor: string | undefined, partes: number) => {
+    const valores = (valor || '').split('|');
+    return Array.from({ length: partes }, (_, index) => valores[index] || '');
+  };
 
 
   const handleDownloadPDF = async () => {
@@ -139,6 +174,10 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
     return `${pad(fecha.getDate())}/${pad(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${pad(fecha.getHours())}:${pad(fecha.getMinutes())}:${pad(fecha.getSeconds())}`;
   };
 
+  const [normaCodigo, normaDescripcion] = separarReferencia(formato?.referencia_norma || 'ISO 9001:2015|Sistema Gestión de Calidad', 2);
+  const [capituloCodigo, capituloDescripcion] = separarReferencia(formato?.referencia_capitulo || 'CAP 7|Apoyo', 2);
+  const [recursoCodigo, recursoDescripcion, generalidadesCodigo, generalidadesDescripcion] = separarReferencia(formato?.referencia_recursos || '7.1|Recursos|7.1.1|Generalidades', 4);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       {/* Estilos CSS específicos de impresión y previsualización */}
@@ -236,12 +275,12 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     <img src={logoEmpresa} alt="Logo" className="max-h-8 mx-auto object-contain" />
                   </td>
                   <td className="border border-gray-400 p-1 w-[60%] text-center font-bold">
-                    <div className="text-[9px] text-gray-500 font-semibold uppercase">Sistema Integrado de Gestión</div>
-                    <div className="text-[10.5px] uppercase mt-0.5 tracking-wide">Requerimiento de Bienes y/o Servicios</div>
+                    <div className="text-[9px] text-gray-500 font-semibold uppercase">{formato?.encabezado_sistema || 'Sistema Integrado de Gestión'}</div>
+                    <div className="text-[10.5px] uppercase mt-0.5 tracking-wide">{formato?.encabezado_titulo || 'Requerimiento de Bienes y/o Servicios'}</div>
                   </td>
                   <td className="border border-gray-400 p-1 w-[20%] text-center text-[7.5px] font-medium">
-                    <div className="font-bold">STI-ADQ-RG-001</div>
-                    <div className="mt-0.5">Versión 01</div>
+                    <div className="font-bold">{formato?.encabezado_codigo || 'STI-ADQ-RG-001'}</div>
+                    <div className="mt-0.5">Versión {formato?.encabezado_version || '02'}</div>
                   </td>
                 </tr>
               </tbody>
@@ -341,8 +380,8 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
               </tbody>
             </table>
 
-            {/* 3. TIPO DE ARTÍCULO */}
-            <div className="border border-gray-400 rounded overflow-hidden">
+            {/* La clasificación se presenta por cada detalle de la tabla. */}
+            <div className="hidden">
               <div className="bg-black text-white text-center py-0.5 font-bold uppercase tracking-wider text-[7.5px]">
                 Tipo de Artículo
               </div>
@@ -398,7 +437,8 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                 <tr className="bg-gray-100 text-[7px] font-bold uppercase border-b border-gray-400">
                   <th className="border border-gray-400 px-1 py-1 w-[5%]">Cantidad</th>
                   <th className="border border-gray-400 px-1 py-1 w-[8%]">Und de Medida</th>
-                  <th className="border border-gray-400 px-1.5 py-1 w-[22%]">Descripción del Servicio</th>
+                  <th className="border border-gray-400 px-1.5 py-1 w-[18%]">Descripción del Servicio</th>
+                  <th className="border border-gray-400 px-1 py-1 w-[8%]">Tipo</th>
                   <th className="border border-gray-400 px-1 py-1 w-[15%]">Foto o Imagen</th>
                   <th className="border border-gray-400 px-1 py-1 w-[12%]">Proveedor Sugerido</th>
                   <th className="border border-gray-400 px-1 py-1 w-[8%]">Negociación Previa</th>
@@ -411,11 +451,18 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                 </tr>
               </thead>
               <tbody className="text-[7.5px]">
-                {orden.detalles?.map((d: any) => (
+                {orden.detalles?.map((d: any) => {
+                  const { centros, comentario } = separarCentrosYComentario(
+                    d.orden_compra_detalle_comentario || d.comentario,
+                    orden.centro_costos_codigo,
+                  );
+
+                  return (
                   <tr key={d.id}>
                     <td className="border border-gray-400 p-0.5 font-bold">{d.orden_compra_detalle_cantidad}</td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_unidad_medida}</td>
                     <td className="border border-gray-400 p-1 text-left">{d.orden_compra_detalle_descripcion}</td>
+                    <td className="border border-gray-400 p-0.5 font-semibold uppercase">{d.orden_compra_detalle_tipo_articulo || 'OTROS'}</td>
                     <td className="border border-gray-400 p-0.5">
                       {d.orden_compra_detalle_foto || d.producto_foto ? (
                         <img
@@ -427,20 +474,23 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                         <span className="text-gray-300 italic text-[6.5px]">Sin imagen</span>
                       )}
                     </td>
-                    <td className="border border-gray-400 p-0.5 uppercase">{orden.proveedor_nombre || 'N/A'}</td>
+                    <td className="border border-gray-400 p-0.5 uppercase">{d.detalle_proveedor_nombre || orden.proveedor_nombre || 'N/A'}</td>
                     <td className="border border-gray-400 p-0.5 font-semibold">{d.orden_compra_detalle_negociacion_previa}</td>
                     <td className="border border-gray-400 p-0.5 font-mono font-semibold">
-                      {Number(d.orden_compra_detalle_precio_unitario).toFixed(2)} + IVA
+                      {Number(d.orden_compra_detalle_precio_unitario || d.precio_unitario || 0) > 0 && (
+                        <>{Number(d.orden_compra_detalle_precio_unitario || d.precio_unitario).toFixed(2)} + IVA</>
+                      )}
                     </td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_forma_pago || 'CONTADO'}</td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_plazo_pago || 'INMEDIATO'}</td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO'}</td>
-                    <td className="border border-gray-400 p-0.5 font-mono font-semibold uppercase">{orden.centro_costos_codigo}</td>
+                    <td className="border border-gray-400 p-0.5 font-mono font-semibold uppercase">{centros}</td>
                     <td className="border border-gray-400 p-1 text-left text-gray-500 italic">
-                      {d.orden_compra_detalle_comentario || 'S/C'}
+                      {comentario}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
@@ -649,20 +699,19 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-gray-400 text-gray-800">
-                    <td className="border-r border-gray-400 p-0.5 font-semibold font-mono">00</td>
-                    <td className="border-r border-gray-400 p-0.5">31/10/2024</td>
-                    <td className="border-r border-gray-400 p-0.5 text-center">Versión inicial - Creación del documento</td>
-                    <td className="border-r border-gray-400 p-0.5">Gerente de Operaciones</td>
-                    <td className="p-0.5">31/10/2024</td>
-                  </tr>
-                  <tr className="text-gray-800">
-                    <td className="border-r border-gray-400 p-0.5 font-semibold font-mono">01</td>
-                    <td className="border-r border-gray-400 p-0.5">22/5/2025</td>
-                    <td className="border-r border-gray-400 p-0.5 text-center">Estandarización del formato y se modifica al encargado de aprobar el documento conforme a la estructura organizacional vigente a la fecha</td>
-                    <td className="border-r border-gray-400 p-0.5">Gerente Administrativa Financiera</td>
-                    <td className="p-0.5">26/5/2025</td>
-                  </tr>
+                  {(cambios.length > 0 ? cambios : [
+                    { cambio_version: '00', cambio_fecha: '31/10/2024', cambio_motivo: 'Versión inicial - Creación del documento', cambio_aprobado_por: 'Gerente de Operaciones', cambio_fecha_aprobacion: '31/10/2024' },
+                    { cambio_version: '01', cambio_fecha: '22/5/2025', cambio_motivo: 'Estandarización del formato y se modifica al encargado de aprobar el documento conforme a la estructura organizacional vigente a la fecha', cambio_aprobado_por: 'Gerente Administrativa Financiera', cambio_fecha_aprobacion: '26/5/2025' },
+                    { cambio_version: '02', cambio_fecha: '14/09/2026', cambio_motivo: 'Clasificación individual del tipo de artículo, proveedor y precio por cada detalle del requerimiento.', cambio_aprobado_por: 'Gerente Administrativa Financiera', cambio_fecha_aprobacion: '14/09/2026' },
+                  ]).map((cambio: any, index: number, lista: any[]) => (
+                    <tr key={`${cambio.cambio_version}-${index}`} className={`${index < lista.length - 1 ? 'border-b border-gray-400 ' : ''}text-gray-800`}>
+                      <td className="border-r border-gray-400 p-0.5 font-semibold font-mono">{cambio.cambio_version}</td>
+                      <td className="border-r border-gray-400 p-0.5">{cambio.cambio_fecha}</td>
+                      <td className="border-r border-gray-400 p-0.5 text-center">{cambio.cambio_motivo}</td>
+                      <td className="border-r border-gray-400 p-0.5">{cambio.cambio_aprobado_por}</td>
+                      <td className="p-0.5">{cambio.cambio_fecha_aprobacion}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -679,15 +728,15 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                 <tbody>
                   <tr className="bg-gray-100 border-b border-gray-400 text-gray-750 font-semibold text-[6.5px]">
                     <td className="border-r border-gray-400 py-0.5 w-[33.33%]">
-                      <span className="font-bold text-gray-900">ISO 9001:2015</span> Sistema Gestión de Calidad
+                      <span className="font-bold text-gray-900">{normaCodigo}</span> {normaDescripcion}
                     </td>
                     <td className="border-r border-gray-400 py-0.5 w-[33.33%]">
-                      <span className="font-bold text-gray-900">CAP 7</span> Apoyo
+                      <span className="font-bold text-gray-900">{capituloCodigo}</span> {capituloDescripcion}
                     </td>
                     <td className="py-0.5 w-[33.33%] leading-tight">
-                      <span className="font-bold text-gray-900">7.1</span> Recursos
+                      <span className="font-bold text-gray-900">{recursoCodigo}</span> {recursoDescripcion}
                       <br />
-                      <span className="font-bold text-gray-900">7.1.1</span> Generalidades
+                      <span className="font-bold text-gray-900">{generalidadesCodigo}</span> {generalidadesDescripcion}
                     </td>
                   </tr>
                   <tr className="text-gray-800">
@@ -696,7 +745,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                         Elaborado por:
                       </div>
                       <div className="py-0.5 text-[6.5px] bg-white">
-                        Analista de Adquisiciones
+                        {formato?.elaborado_por || 'Analista de Adquisiciones'}
                       </div>
                     </td>
                     <td className="border-r border-gray-400">
@@ -704,7 +753,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                         Revisado por:
                       </div>
                       <div className="py-0.5 text-[6.5px] bg-white">
-                        Especialista de Adquisiciones
+                        {formato?.revisado_por || 'Especialista de Adquisiciones'}
                       </div>
                     </td>
                     <td>
@@ -712,7 +761,7 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                         Aprobado por:
                       </div>
                       <div className="py-0.5 text-[6.5px] bg-white">
-                        Gerente Administrativa Financiera
+                        {formato?.aprobado_por || 'Gerente Administrativa Financiera'}
                       </div>
                     </td>
                   </tr>

@@ -141,6 +141,34 @@ const SCHEMAS: TableSchema[] = [
       { key: 'rol_id', label: 'Rol', type: 'select', refTable: 'rol', refIdKey: 'rol_id', refLabelKey: 'rol_nombre', required: true },
       { key: 'permiso_id', label: 'Permiso', type: 'select', refTable: 'permiso', refIdKey: 'permiso_id', refLabelKey: 'permiso_nombre', required: true }
     ]
+  },
+  {
+    table: 'formato_requerimiento_config',
+    label: 'Formato de Requerimiento',
+    fields: [
+      { key: 'encabezado_sistema', label: 'Encabezado institucional', type: 'text', required: true },
+      { key: 'encabezado_titulo', label: 'Título del documento', type: 'text', required: true },
+      { key: 'encabezado_codigo', label: 'Código del formato', type: 'text', required: true },
+      { key: 'encabezado_version', label: 'Versión vigente', type: 'text', required: true },
+      { key: 'referencia_norma', label: 'Referencia 1 (código|descripción)', type: 'text', required: true },
+      { key: 'referencia_capitulo', label: 'Referencia 2 (código|descripción)', type: 'text', required: true },
+      { key: 'referencia_recursos', label: 'Referencia 3 (código|descripción|código|descripción)', type: 'text', required: true },
+      { key: 'elaborado_por', label: 'Elaborado por', type: 'text', required: true },
+      { key: 'revisado_por', label: 'Revisado por', type: 'text', required: true },
+      { key: 'aprobado_por', label: 'Aprobado por', type: 'text', required: true },
+    ]
+  },
+  {
+    table: 'formato_requerimiento_cambio',
+    label: 'Control de Cambios del Requerimiento',
+    fields: [
+      { key: 'cambio_version', label: 'Versión', type: 'text', required: true },
+      { key: 'cambio_fecha', label: 'Fecha de creación / actualización', type: 'text', required: true },
+      { key: 'cambio_motivo', label: 'Motivo del cambio', type: 'text', required: true },
+      { key: 'cambio_aprobado_por', label: 'Aprobado por', type: 'text', required: true },
+      { key: 'cambio_fecha_aprobacion', label: 'Fecha de aprobación', type: 'text', required: true },
+      { key: 'cambio_orden', label: 'Orden', type: 'number', required: true },
+    ]
   }
 ];
 
@@ -158,6 +186,9 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
     if (user?.rol.nombre === 'inventario') {
       return ['producto', 'proveedor', 'categoria'].includes(s.table);
+    }
+    if (hasPermission('configuracion.ver')) {
+      return ['formato_requerimiento_config', 'formato_requerimiento_cambio'].includes(s.table);
     }
     return false;
   });
@@ -213,6 +244,8 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
   // Funciones de validación de permisos para las tablas maestras
   const canCreateInTable = (table: string) => {
+    if (table === 'formato_requerimiento_config') return false;
+    if (table === 'formato_requerimiento_cambio') return user?.rol?.nombre === 'admin' || hasPermission('configuracion.editar');
     if (user?.rol?.nombre === 'admin') return true;
     if (table === 'rol') return hasPermission('roles.crear');
     if (['modulo', 'permiso', 'rol_permiso'].includes(table)) return hasPermission('roles.crear');
@@ -229,10 +262,13 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     if (table === 'producto') return hasPermission('productos.editar');
     if (table === 'proveedor') return hasPermission('proveedores.editar' as any);
     if (table === 'categoria') return hasPermission('categorias.editar' as any);
+    if (['formato_requerimiento_config', 'formato_requerimiento_cambio'].includes(table)) return hasPermission('configuracion.editar');
     return false;
   };
 
   const canToggleActiveInTable = (table: string, isActivo: boolean) => {
+    if (table === 'formato_requerimiento_config') return false;
+    if (table === 'formato_requerimiento_cambio') return user?.rol?.nombre === 'admin' || hasPermission('configuracion.editar');
     if (user?.rol?.nombre === 'admin') return true;
     if (table === 'rol') return hasPermission('roles.eliminar');
     if (['modulo', 'permiso', 'rol_permiso'].includes(table)) return hasPermission('roles.eliminar');
@@ -590,6 +626,24 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     }
   };
 
+  const handleDeleteControlCambio = async (row: any) => {
+    const confirmed = await showConfirm({
+      title: 'Eliminar cambio de formato',
+      message: `¿Deseas eliminar permanentemente la versión ${row.cambio_version} del control de cambios?`,
+      confirmLabel: 'Eliminar',
+      type: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      await adminAPI.delete('formato_requerimiento_cambio', row.formato_requerimiento_cambio_id);
+      setMensaje('Registro del control de cambios eliminado.');
+      cargarDatos();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo eliminar el registro del control de cambios.');
+    }
+  };
+
   const handleOpenRolePermissions = async (role: any) => {
     setSelectedRole(role);
     setIsRolePermModalOpen(true);
@@ -805,6 +859,12 @@ export const PanelAdminCrudGeneral: React.FC = () => {
                             <BotonAccion
                               tipo="editar"
                               onClick={() => handleEditClick(row)}
+                            />
+                          )}
+                          {activeSchema.table === 'formato_requerimiento_cambio' && canEditInTable(activeSchema.table) && (
+                            <BotonAccion
+                              tipo="eliminar"
+                              onClick={() => handleDeleteControlCambio(row)}
                             />
                           )}
                           {canToggleActiveInTable(activeSchema.table, isActivo) && (

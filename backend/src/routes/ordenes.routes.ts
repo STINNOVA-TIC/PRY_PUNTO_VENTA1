@@ -8,12 +8,12 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/', requireAnyPermission('compras.requerimientos.crear', 'requerimientos.firmar'), ordenesController.crear);
-router.get('/', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'requerimientos.firmar'), ordenesController.getAll);
-router.get('/secuencial/siguiente', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'requerimientos.firmar'), ordenesController.getSiguienteSecuencial);
-router.get('/:id', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'requerimientos.firmar'), ordenesController.getById);
+router.post('/', requirePermission('compras.requerimientos.crear'), ordenesController.crear);
+router.get('/', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getAll);
+router.get('/secuencial/siguiente', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getSiguienteSecuencial);
+router.get('/:id', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getById);
 router.put('/:id/entregar', requirePermission('compras.requerimientos.recibir'), ordenesController.entregar);
-router.put('/:id/firmar', requireAnyPermission('compras.requerimientos.aprobar', 'requerimientos.firmar'), ordenesController.firmar);
+router.put('/:id/firmar', requireAnyPermission('compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.firmar);
 router.put('/:id', requirePermission('compras.requerimientos.editar'), ordenesController.update);
 router.delete('/:id', requirePermission('compras.requerimientos.eliminar'), ordenesController.eliminar);
 

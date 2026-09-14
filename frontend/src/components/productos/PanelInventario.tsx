@@ -110,6 +110,20 @@ export const PanelInventario: React.FC = () => {
       opciones: proveedores.map(prov => ({ value: prov.id, label: prov.nombre })),
       required: true
     },
+    {
+      name: 'tipo_articulo',
+      label: 'Tipo de Artículo',
+      tipo: 'select',
+      opciones: [
+        { value: 'MATERIA PRIMA', label: 'Materia Prima' },
+        { value: 'HERRAMIENTA', label: 'Herramienta' },
+        { value: 'SERVICIO', label: 'Servicio' },
+        { value: 'MAQUINARIA O EQUIPO', label: 'Maquinaria o Equipo' },
+        { value: 'SUMINISTROS/ CONSUMIBLES', label: 'Suministros / Consumibles' },
+        { value: 'OTROS', label: 'Otros' },
+      ],
+      required: true,
+    },
     { name: 'precio_costo', label: 'Precio Compra (Costo)', tipo: 'numero', placeholder: '0.90' },
     { name: 'precio_venta', label: 'Precio Venta (POS)', tipo: 'numero', placeholder: '1.50', required: true },
     ...(editingProduct ? [] : [{ name: 'stock', label: 'Stock Inicial', tipo: 'numero' as const, placeholder: '50', required: true }]),
@@ -129,6 +143,7 @@ export const PanelInventario: React.FC = () => {
     descripcion: p?.descripcion || '',
     categoria_id: p?.categoria_id || (categorias.length > 0 ? categorias[0].id : ''),
     proveedor_id: p?.proveedor_id || (proveedores.length > 0 ? proveedores[0].id : ''),
+    tipo_articulo: p?.tipo_articulo || 'OTROS',
     precio_costo: p ? p.precio_costo : '',
     precio_venta: p ? p.precio_venta : '',
     stock: p ? p.stock_actual : '',
@@ -148,6 +163,7 @@ export const PanelInventario: React.FC = () => {
           producto_codigo: valores.codigo,
           producto_nombre: valores.nombre,
           producto_descripcion: valores.descripcion,
+          producto_tipo_articulo: valores.tipo_articulo,
           producto_precio: parseFloat(valores.precio_venta),
           producto_precio_compra: parseFloat(valores.precio_costo || '0'),
           producto_foto: valores.foto || null
@@ -163,6 +179,7 @@ export const PanelInventario: React.FC = () => {
           stock_actual: parseInt(valores.stock),
           categoria_id: Number(valores.categoria_id),
           proveedor_id: Number(valores.proveedor_id),
+          tipo_articulo: valores.tipo_articulo,
           foto: valores.foto || undefined
         });
         setMensaje('Producto creado exitosamente.');
@@ -232,6 +249,7 @@ export const PanelInventario: React.FC = () => {
     { key: 'codigo_barras', label: 'Código' },
     { key: 'nombre', label: 'Nombre' },
     { key: 'descripcion', label: 'Descripción' },
+    { key: 'tipo_articulo', label: 'Tipo de Artículo' },
     { key: 'precio_costo', label: 'Precio Compra ($)' },
     { key: 'precio_venta', label: 'Precio Venta ($)' },
     { key: 'stock_actual', label: 'Existencia' },

@@ -12,7 +12,7 @@ router.use(authenticate);
 // Catálogo limitado para seleccionar aprobadores y receptores en Compras.
 router.get(
   '/catalogo-compras',
-  requireAnyPermission('compras.ver', 'requerimientos.firmar'),
+  requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'),
   empleadosController.getCatalogoCompras
 );
 

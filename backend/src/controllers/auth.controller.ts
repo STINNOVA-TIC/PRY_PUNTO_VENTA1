@@ -164,7 +164,7 @@ export const authController = {
            JOIN permiso p ON p.permiso_id = up.permiso_id
            WHERE up.usuario_id = $1
              AND p.permiso_estado = 'activo'
-             AND p.permiso_clave IN ('autoconsumo.crear', 'requerimientos.firmar')`,
+             AND p.permiso_clave IN ('autoconsumo.crear')`,
           [userId]
         );
         quickPermsRes.rows.forEach(({ permiso_clave, tipo }) => {
@@ -176,9 +176,6 @@ export const authController = {
 
       // Verificar si el colaborador tiene autorizado el autoconsumo
       const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
-
-      // Verificar si el colaborador tiene autorizado firmar requerimientos
-      const permitirFirmas = rolId === 1 || permisos.includes('requerimientos.firmar');
 
       // Generar Token JWT con el rol y el ID real/virtual
       const token = jwt.sign(
@@ -205,7 +202,6 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
-            permitir_firmas: permitirFirmas,
             empleado: {
               id: empleado.empleado_id,
               codigo_empleado: empleado.empleado_cedula,
@@ -316,9 +312,8 @@ export const authController = {
         }
       }
 
-      // Verificar permisos de autoconsumo y firmas
+      // Verificar permisos de autoconsumo.
       const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
-      const permitirFirmas = rol.rol_id === 1 || permisos.includes('requerimientos.firmar');
 
       // Generar Token JWT
       const token = jwt.sign(
@@ -344,7 +339,6 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
-            permitir_firmas: permitirFirmas,
             empleado
           }
         }
@@ -412,7 +406,6 @@ export const authController = {
       }
 
       const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
-      const permitirFirmas = req.user.rol_id === 1 || permisos.includes('requerimientos.firmar');
 
       res.json({
         success: true,
@@ -426,7 +419,6 @@ export const authController = {
             permisos
           },
           permitir_autoconsumo: permitirAutoconsumo,
-          permitir_firmas: permitirFirmas,
           empleado
         }
       });
@@ -494,9 +486,6 @@ export const authController = {
          // Verificar si el colaborador tiene autorizado el autoconsumo
          const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
 
-         // Verificar si el colaborador tiene autorizado firmar requerimientos
-         const permitirFirmas = rolId === 1 || permisos.includes('requerimientos.firmar');
-
          res.json({
            success: true,
            data: {
@@ -511,7 +500,6 @@ export const authController = {
                  permisos: permisos
                },
                permitir_autoconsumo: permitirAutoconsumo,
-               permitir_firmas: permitirFirmas,
                empleado: {
                  id: empleado.empleado_id,
                  codigo_empleado: empleado.empleado_cedula,
@@ -565,7 +553,6 @@ export const authController = {
       const permisos = await getPermisosForUsuario(user.usuario_id, decoded.rol_id);
 
       const permitirAutoconsumo = permisos.includes('autoconsumo.crear');
-      const permitirFirmas = decoded.rol_id === 1 || permisos.includes('requerimientos.firmar');
 
       res.json({
         success: true,
@@ -581,7 +568,6 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
-            permitir_firmas: permitirFirmas,
             empleado: empleadoData
           }
         }

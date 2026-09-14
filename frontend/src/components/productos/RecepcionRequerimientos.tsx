@@ -13,15 +13,12 @@ import {
   BsSearch, 
   BsFileEarmarkPdf, 
   BsDownload, 
-  BsPlus, 
   BsHourglassSplit, 
   BsFileEarmarkText 
 } from 'react-icons/bs';
 
 export const RecepcionRequerimientos: React.FC = () => {
-  const { user } = useAuth();
-  const rol = user?.rol.nombre?.toLowerCase();
-
+  const { hasPermission } = useAuth();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +35,7 @@ export const RecepcionRequerimientos: React.FC = () => {
 
   // Modal de Recepción
   const [selectedOrden, setSelectedOrden] = useState<any | null>(null);
-  const [facturasInputs, setFacturasInputs] = useState<string[]>(['']);
+  const [recepciones, setRecepciones] = useState<Record<number, { seleccionada: boolean; cantidad: string; factura: string }>>({});
   const [receptionLoading, setReceptionLoading] = useState(false);
   const [receptionError, setReceptionError] = useState('');
 
@@ -48,7 +45,7 @@ export const RecepcionRequerimientos: React.FC = () => {
   // Modal de impresión
   const [printOrden, setPrintOrden] = useState<any | null>(null);
 
-  const isAutorizado = rol && ['admin', 'guardia', 'inventario'].includes(rol);
+  const isAutorizado = !!hasPermission('compras.requerimientos.recibir');
 
   useEffect(() => {
     if (isAutorizado) {
@@ -85,43 +82,43 @@ export const RecepcionRequerimientos: React.FC = () => {
     }
   };
 
-  const handleOpenReceiveModal = (orden: any) => {
-    setSelectedOrden(orden);
-    setFacturasInputs(['']);
-    setReceptionError('');
-  };
-
-  const handleAddFacturaInput = () => {
-    setFacturasInputs([...facturasInputs, '']);
-  };
-
-  const handleRemoveFacturaInput = (index: number) => {
-    const nextInputs = facturasInputs.filter((_, idx) => idx !== index);
-    setFacturasInputs(nextInputs);
-  };
-
-  const handleFacturaInputChange = (index: number, val: string) => {
-    const nextInputs = [...facturasInputs];
-    nextInputs[index] = val;
-    setFacturasInputs(nextInputs);
+  const handleOpenReceiveModal = async (orden: any) => {
+    try {
+      const res = await ordenesAPI.getById(orden.id);
+      const ordenActual = res.data;
+      const estadoInicial: Record<number, { seleccionada: boolean; cantidad: string; factura: string }> = {};
+      (ordenActual.detalles || []).forEach((detalle: any) => {
+        const detalleId = detalle.orden_compra_detalle_id || detalle.id;
+        const solicitado = Number(detalle.orden_compra_detalle_cantidad || detalle.cantidad || 0);
+        const recibido = Number(detalle.cantidad_recibida || 0);
+        estadoInicial[detalleId] = { seleccionada: recibido < solicitado, cantidad: String(Math.max(0, solicitado - recibido)), factura: '' };
+      });
+      setSelectedOrden({ ...ordenActual, id: orden.id, codigo: orden.codigo });
+      setRecepciones(estadoInicial);
+      setReceptionError('');
+    } catch (_err) {
+      setError('No se pudo cargar el detalle actualizado del requerimiento.');
+    }
   };
 
   const handleConfirmReception = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrden) return;
 
-    const cleanFacturas = facturasInputs.map(f => f.trim()).filter(f => f.length > 0);
-    if (cleanFacturas.length === 0) {
-      setReceptionError('Debe ingresar al menos un código de factura válido.');
+    const lineas = Object.entries(recepciones)
+      .filter(([, value]) => value.seleccionada)
+      .map(([detalleId, value]) => ({ detalle_id: Number(detalleId), cantidad: Number(value.cantidad), factura_codigo: value.factura.trim() }));
+    if (lineas.length === 0 || lineas.some((linea) => !linea.cantidad || !linea.factura_codigo)) {
+      setReceptionError('Selecciona al menos un producto e ingresa cantidad y número de factura.');
       return;
     }
 
     try {
       setReceptionLoading(true);
       setReceptionError('');
-      await ordenesAPI.entregar(selectedOrden.id, cleanFacturas);
+      const resultado = await ordenesAPI.entregar(selectedOrden.id, lineas);
       
-      setSuccess(`Requerimiento ${selectedOrden.codigo} recibido y stock actualizado con éxito.`);
+      setSuccess(resultado.data?.completo ? `Requerimiento ${selectedOrden.codigo} recibido por completo.` : `Recepción parcial de ${selectedOrden.codigo} registrada.`);
       setSelectedOrden(null);
       cargarDatos();
       
@@ -225,6 +222,7 @@ export const RecepcionRequerimientos: React.FC = () => {
             <option value="pendiente">Pendiente</option>
             <option value="aprobada">Aprobada</option>
             <option value="comprada">Comprada</option>
+            <option value="recibida_parcial">Recibida parcialmente</option>
             <option value="recibida">Recibida</option>
             <option value="entregado">Entregado</option>
             <option value="cancelada">Cancelada</option>
@@ -272,13 +270,15 @@ export const RecepcionRequerimientos: React.FC = () => {
                       <span className={`text-[9px] uppercase font-extrabold tracking-wider px-2.5 py-1 rounded border ${
                         oc.estado === 'entregado'
                           ? 'bg-blue-50 text-blue-700 border-blue-100'
+                          : oc.estado === 'recibida_parcial'
+                            ? 'bg-violet-50 text-violet-700 border-violet-100'
                           : oc.estado === 'aprobada' || oc.estado === 'recibida'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                           : oc.estado === 'rechazada' || oc.estado === 'cancelada'
                           ? 'bg-red-50 text-red-700 border-red-100'
                           : 'bg-amber-50 text-amber-700 border-amber-100'
                       }`}>
-                        {oc.estado}
+                        {oc.estado === 'recibida_parcial' ? 'recibida parcialmente' : oc.estado}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -341,7 +341,7 @@ export const RecepcionRequerimientos: React.FC = () => {
       {/* MODAL: RECIBIR PRODUCTOS */}
       {selectedOrden && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in font-sans">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in font-sans">
             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-bold text-gray-900 uppercase">Recibir Requerimiento</h3>
@@ -370,64 +370,73 @@ export const RecepcionRequerimientos: React.FC = () => {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100 border-b border-gray-200 text-gray-500 font-semibold uppercase">
+                        <th className="px-4 py-2.5 text-center">Recibir</th>
                         <th className="px-4 py-2.5">Código</th>
                         <th className="px-4 py-2.5">Producto</th>
-                        <th className="px-4 py-2.5 text-center">Cant. Solicitada</th>
+                        <th className="px-4 py-2.5 text-center">Solicitada</th>
+                        <th className="px-4 py-2.5 text-center">Cantidad a recibir</th>
+                        <th className="px-4 py-2.5">Factura</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-150">
-                      {selectedOrden.detalles?.map((det: any) => (
-                        <tr key={det.id} className="text-gray-700">
+                      {selectedOrden.detalles?.map((det: any) => {
+                        const detalleId = det.orden_compra_detalle_id || det.id;
+                        const solicitada = Number(det.orden_compra_detalle_cantidad || det.cantidad || 0);
+                        const recibida = Number(det.cantidad_recibida || 0);
+                        const pendiente = Math.max(0, solicitada - recibida);
+                        const linea = recepciones[detalleId] || { seleccionada: false, cantidad: '', factura: '' };
+                        return (
+                        <tr key={detalleId} className="text-gray-700">
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={linea.seleccionada}
+                              disabled={pendiente === 0}
+                              onChange={(e) => setRecepciones((prev) => ({ ...prev, [detalleId]: { ...linea, seleccionada: e.target.checked } }))}
+                              className="h-4 w-4 accent-gray-800"
+                            />
+                          </td>
                           <td className="px-4 py-2.5 font-mono font-bold text-gray-500">{det.producto_codigo}</td>
-                          <td className="px-4 py-2.5 font-medium">{det.producto_nombre}</td>
-                          <td className="px-4 py-2.5 text-center font-bold text-gray-900">{det.cantidad}</td>
+                          <td className="px-4 py-2.5 font-medium">
+                            {det.producto_nombre || det.orden_compra_detalle_descripcion}
+                            {det.facturas_recepcion?.length > 0 && (
+                              <span className="mt-1 block text-[9px] font-mono font-normal text-gray-400">Facturas: {det.facturas_recepcion.join(', ')}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-center font-bold text-gray-900">{solicitada}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="number"
+                              min="1"
+                              max={pendiente}
+                              value={linea.cantidad}
+                              disabled={!linea.seleccionada || pendiente === 0}
+                              onChange={(e) => setRecepciones((prev) => ({ ...prev, [detalleId]: { ...linea, cantidad: e.target.value } }))}
+                              className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-xs disabled:bg-gray-100"
+                            />
+                            <span className="mt-1 block text-[9px] text-gray-400">Recibido: {recibida} · Pendiente: {pendiente}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="text"
+                              value={linea.factura}
+                              disabled={!linea.seleccionada || pendiente === 0}
+                              onChange={(e) => setRecepciones((prev) => ({ ...prev, [detalleId]: { ...linea, factura: e.target.value } }))}
+                              placeholder={pendiente === 0 ? 'Recibido' : 'Nro. factura'}
+                              className="w-full min-w-28 rounded border border-gray-300 px-2 py-1 text-xs font-mono disabled:bg-gray-100"
+                            />
+                          </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Ingreso de Facturas */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Facturas Asociadas</h4>
-                  <button
-                    type="button"
-                    onClick={handleAddFacturaInput}
-                    className="px-2.5 py-1 text-[10px] font-bold bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-750 rounded-lg transition flex items-center gap-1"
-                  >
-                    <BsPlus className="text-xs" /> Agregar Factura
-                  </button>
-                </div>
-                <p className="text-[11px] text-gray-400">Ingresa los códigos de las facturas que respaldan la recepción de estos bienes y/o servicios.</p>
-                
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {facturasInputs.map((fac, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <span className="text-[10px] text-gray-400 font-bold font-mono w-6">#{idx + 1}</span>
-                      <input
-                        type="text"
-                        value={fac}
-                        onChange={(e) => handleFacturaInputChange(idx, e.target.value)}
-                        placeholder="Ej. FAC-001-002-12345"
-                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-xl text-xs focus:ring-1 focus:ring-gray-800 focus:outline-none font-mono"
-                        required
-                      />
-                      {facturasInputs.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFacturaInput(idx)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition flex items-center justify-center"
-                          title="Eliminar"
-                        >
-                          <BsX className="text-base" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-[11px] text-blue-800">
+                Puedes recibir uno o varios productos ahora. Cada línea recibe su propia factura y solo incrementa el stock de la cantidad indicada.
+              </p>
 
               {/* Botones de Acción */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-150">
@@ -500,8 +509,10 @@ export const RecepcionRequerimientos: React.FC = () => {
                   <span className={`inline-block text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border mt-0.5 ${
                     detailOrden.estado === 'entregado'
                       ? 'bg-blue-50 text-blue-700 border-blue-100'
-                      : 'bg-gray-50 text-gray-700 border-gray-200'
-                  }`}>{detailOrden.estado}</span>
+                      : detailOrden.estado === 'recibida_parcial'
+                        ? 'bg-violet-50 text-violet-700 border-violet-100'
+                        : 'bg-gray-50 text-gray-700 border-gray-200'
+                  }`}>{detailOrden.estado === 'recibida_parcial' ? 'recibida parcialmente' : detailOrden.estado}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-gray-400 uppercase">Proveedor</span>
@@ -516,19 +527,6 @@ export const RecepcionRequerimientos: React.FC = () => {
                 </p>
               </div>
 
-              {detailOrden.facturas && detailOrden.facturas.length > 0 && (
-                <div>
-                  <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Facturas Asociadas</span>
-                  <div className="flex flex-wrap gap-2">
-                    {detailOrden.facturas.map((f: string, i: number) => (
-                      <span key={i} className="px-2.5 py-1 bg-gray-100 text-gray-755 border border-gray-200 rounded-lg font-mono text-xs font-bold flex items-center gap-1">
-                        <BsFileEarmarkText /> {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <h4 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wider">Detalle de Artículos</h4>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -537,21 +535,44 @@ export const RecepcionRequerimientos: React.FC = () => {
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
                         <th className="px-4 py-2.5">Código</th>
                         <th className="px-4 py-2.5">Artículo</th>
-                        <th className="px-4 py-2.5 text-center">Cantidad</th>
+                        <th className="px-4 py-2.5 text-center">Solicitada</th>
+                        <th className="px-4 py-2.5 text-center">Recibida</th>
+                        <th className="px-4 py-2.5 text-center">Pendiente</th>
+                        <th className="px-4 py-2.5">Factura del artículo</th>
                         <th className="px-4 py-2.5 text-right">Precio Unitario</th>
                         <th className="px-4 py-2.5 text-right">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-gray-700">
-                      {detailOrden.detalles?.map((det: any) => (
+                      {detailOrden.detalles?.map((det: any) => {
+                        const solicitada = Number(det.cantidad || 0);
+                        const recibida = Number(det.cantidad_recibida || 0);
+                        const pendiente = Math.max(0, solicitada - recibida);
+                        return (
                         <tr key={det.id}>
                           <td className="px-4 py-2.5 font-mono font-semibold text-gray-500">{det.producto_codigo}</td>
                           <td className="px-4 py-2.5 font-medium">{det.producto_nombre}</td>
-                          <td className="px-4 py-2.5 text-center font-bold">{det.cantidad}</td>
+                          <td className="px-4 py-2.5 text-center font-bold">{solicitada}</td>
+                          <td className="px-4 py-2.5 text-center font-bold text-emerald-700">{recibida}</td>
+                          <td className={`px-4 py-2.5 text-center font-bold ${pendiente > 0 ? 'text-amber-700' : 'text-gray-400'}`}>{pendiente}</td>
+                          <td className="px-4 py-2.5">
+                            {det.facturas_recepcion?.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {det.facturas_recepcion.map((factura: string, index: number) => (
+                                  <span key={`${factura}-${index}`} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-[10px] font-bold text-blue-700">
+                                    <BsFileEarmarkText /> {factura}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] italic text-gray-400">Sin factura</span>
+                            )}
+                          </td>
                           <td className="px-4 py-2.5 text-right">${Number(det.precio_unitario || 0).toFixed(2)}</td>
                           <td className="px-4 py-2.5 text-right font-semibold">${Number(det.subtotal || 0).toFixed(2)}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

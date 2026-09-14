@@ -32,20 +32,13 @@ function Home() {
     return <CarritoCompras />;
   }
 
-  // Empleados que solo firman o hacen solicitudes en módulo de firma
+  // Las sesiones por cédula siempre se dirigen a autoconsumo.
   if (user?.rol.nombre === 'empleado' || user?.rol.nombre === 'empleado_autorizado' || user?.rol.nombre === 'empleado_autorizado_firmar') {
-    return <Navigate to="/requerimientos" replace />;
+    return <CarritoCompras />;
   }
 
   // Para usuarios del sistema (admin, guardia, inventario, tthh, compras o cualquier nuevo rol creado)
   return <DashboardHome />;
-}
-
-function RequerimientosEntry() {
-  const { isSignatureSession } = useAuth();
-  return isSignatureSession
-    ? <PanelRequerimientos />
-    : <Navigate to="/compras/requerimientos" replace />;
 }
 
 function App() {
@@ -134,17 +127,16 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/requerimientos" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RequerimientosEntry />
-                </Layout>
-              </ProtectedRoute>
-            } />
+            <Route path="/requerimientos" element={<Navigate to="/compras/requerimientos" replace />} />
             <Route path="/compras" element={
               <ProtectedRoute>
                 <Layout>
-                  <PermissionGuard permiso="compras.ver">
+                  <PermissionGuard permisos={[
+                    'compras.ver',
+                    'compras.requerimientos.crear',
+                    'compras.requerimientos.aprobar',
+                    'compras.requerimientos.recibir',
+                  ]}>
                     <ComprasLayout />
                   </PermissionGuard>
                 </Layout>

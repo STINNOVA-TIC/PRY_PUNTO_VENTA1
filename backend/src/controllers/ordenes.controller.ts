@@ -3,26 +3,29 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import pool from '../config/db';
 import { AppError } from '../middleware/error.middleware';
-import { rolesData } from '../models/roles.data';
+import { getUsuarioPermisos } from '../middleware/permisos.middleware';
 
 
-const obtenerNombreResponsable = (responsableStr: string | null, fallback: string): string => {
-  if (!responsableStr) return fallback;
-  const parts = responsableStr.split(':');
-  const nombreCompleto = parts.length > 1 ? parts[1].trim() : responsableStr.trim();
-  
-  const nombreParts = nombreCompleto.split(/\s+/).filter(Boolean);
-  const primerNombre = nombreParts[0] || '';
-  let primerApellido = '';
-  if (nombreParts.length > 1) {
-    if (nombreParts.length >= 4) {
-      primerApellido = nombreParts[2];
-    } else {
-      primerApellido = nombreParts[1];
-    }
+async function getAlcanceHistorial(req: AuthRequest): Promise<{ verTodo: boolean; usuarioId: number; empleadoId: number | null }> {
+  const usuarioId = req.user?.id || 0;
+
+  // La sesión por cédula mantiene su alcance personal y nunca obtiene historial global.
+  if (req.empleado) {
+    return { verTodo: false, usuarioId, empleadoId: req.empleado.empleado_id };
   }
-  return `${primerNombre} ${primerApellido}`.trim() || fallback;
-};
+
+  const { permissions, isAdmin } = await getUsuarioPermisos(usuarioId, req.user?.rol_id || 3);
+  const empleadoRes = await pool.query(
+    'SELECT empleado_id FROM usuario WHERE usuario_id = $1',
+    [usuarioId]
+  );
+
+  return {
+    verTodo: isAdmin || permissions.has('compras.requerimientos.ver_todos'),
+    usuarioId,
+    empleadoId: empleadoRes.rows[0]?.empleado_id || null
+  };
+}
 
 export const ordenesController = {
   // Crear una nueva orden de compra (generada por el rol de Stock / Inventario / Admin)
@@ -107,7 +110,7 @@ export const ordenesController = {
         empleadoId = 1;
       }
 
-      // Validar si el usuario puede crear el requerimiento corporativo o firmarlo desde la bandeja rápida.
+      // Defensa adicional: la creación es exclusivamente una capacidad corporativa.
       const isUserAdmin = req.user?.rol_id === 1;
       if (!isUserAdmin) {
         const firmasCheck = await client.query(
@@ -123,7 +126,7 @@ export const ordenesController = {
                LEFT JOIN usuario_rol ur ON ur.usuario_id = u.usuario_id
                LEFT JOIN rol_permiso rp
                  ON rp.rol_id = ur.rol_id AND rp.permiso_id = p.permiso_id
-               WHERE p.permiso_clave IN ('requerimientos.firmar', 'compras.requerimientos.crear')
+               WHERE p.permiso_clave = 'compras.requerimientos.crear'
                  AND p.permiso_estado = 'activo'
                  AND (up.tipo = 'conceder' OR (rp.rol_permiso_id IS NOT NULL AND COALESCE(up.tipo, '') <> 'denegar'))
              )`,
@@ -208,18 +211,20 @@ export const ordenesController = {
         await client.query(
           `INSERT INTO orden_compra_detalle (
              orden_compra_id, producto_id, proveedor_id, orden_compra_detalle_descripcion, 
+             orden_compra_detalle_tipo_articulo,
              orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
              orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
              orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
              orden_compra_detalle_incluye_iva,
              orden_compra_detalle_comentario
            ) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [
             ocId,
             d.producto_id || null,
             d.proveedor_id || null,
             productoNombre || 'Artículo de Consumo',
+            d.tipo_articulo || 'OTROS',
             d.cantidad,
             d.unidad_medida || 'Unidad',
             d.precio_unitario || 0,
@@ -256,6 +261,7 @@ export const ordenesController = {
   getById: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
+      const alcance = await getAlcanceHistorial(req);
 
       const ocRes = await pool.query(
         `SELECT oc.*, 
@@ -288,12 +294,29 @@ export const ordenesController = {
       }
 
       const row = ocRes.rows[0];
+      const esOrdenPropiaOAsignada =
+        row.usuario_id === alcance.usuarioId ||
+        (alcance.empleadoId !== null && (
+          row.empleado_id === alcance.empleadoId ||
+          row.empleado_aprobador_id === alcance.empleadoId ||
+          row.empleado_receptor_id === alcance.empleadoId
+        ));
+
+      if (!alcance.verTodo && !esOrdenPropiaOAsignada) {
+        throw new AppError('No tienes permiso para ver este requerimiento', 403);
+      }
 
       const detailsRes = await pool.query(
-        `SELECT ocd.*, prod.producto_nombre, prod.producto_codigo, prod.producto_foto
+        `SELECT ocd.*, prod.producto_nombre, prod.producto_codigo, prod.producto_foto,
+                COALESCE(SUM(odr.cantidad_recibida), 0) AS cantidad_recibida,
+                COALESCE(array_agg(DISTINCT odr.factura_codigo) FILTER (WHERE odr.factura_codigo IS NOT NULL), '{}') AS facturas_recepcion,
+                prov_det.proveedor_nombre AS detalle_proveedor_nombre
          FROM orden_compra_detalle ocd
          LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
+         LEFT JOIN proveedor prov_det ON ocd.proveedor_id = prov_det.proveedor_id
+         LEFT JOIN orden_compra_detalle_recepcion odr ON odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
          WHERE ocd.orden_compra_id = $1
+         GROUP BY ocd.orden_compra_detalle_id, prod.producto_id, prov_det.proveedor_id
          ORDER BY ocd.orden_compra_detalle_id ASC`,
         [id]
       );
@@ -375,8 +398,23 @@ export const ordenesController = {
   },
 
   // Obtener todas las órdenes de compra
-  getAll: async (_req: AuthRequest, res: Response): Promise<void> => {
+  getAll: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
+      const alcance = await getAlcanceHistorial(req);
+      const filtros: string[] = [];
+      const params: Array<number | null> = [];
+
+      if (!alcance.verTodo) {
+        params.push(alcance.usuarioId);
+        params.push(alcance.empleadoId);
+        filtros.push(`(
+          oc.usuario_id = $1 OR
+          oc.empleado_id = $2 OR
+          oc.empleado_aprobador_id = $2 OR
+          oc.empleado_receptor_id = $2
+        )`);
+      }
+
       const ocRes = await pool.query(
         `SELECT oc.*, p.proveedor_nombre, u.usuario_nombre,
                 emp.empresa_nombre_comercial,
@@ -392,16 +430,22 @@ export const ordenesController = {
          LEFT JOIN empleado emp_req ON oc.empleado_id = emp_req.empleado_id
          LEFT JOIN empleado emp_aprob ON oc.empleado_aprobador_id = emp_aprob.empleado_id
          LEFT JOIN empleado emp_recib ON oc.empleado_receptor_id = emp_recib.empleado_id
-         ORDER BY oc.orden_compra_fecha_solicitud DESC`
+         ${filtros.length ? `WHERE ${filtros.join(' AND ')}` : ''}
+         ORDER BY oc.orden_compra_fecha_solicitud DESC`,
+        params
       );
 
       const items = [];
       for (const row of ocRes.rows) {
         const detailsRes = await pool.query(
-          `SELECT ocd.*, prod.producto_nombre, prod.producto_codigo
+          `SELECT ocd.*, prod.producto_nombre, prod.producto_codigo,
+                  COALESCE(SUM(odr.cantidad_recibida), 0) AS cantidad_recibida,
+                  COALESCE(array_agg(DISTINCT odr.factura_codigo) FILTER (WHERE odr.factura_codigo IS NOT NULL), '{}') AS facturas_recepcion
            FROM orden_compra_detalle ocd
            LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
-           WHERE ocd.orden_compra_id = $1`,
+           LEFT JOIN orden_compra_detalle_recepcion odr ON odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+           WHERE ocd.orden_compra_id = $1
+           GROUP BY ocd.orden_compra_detalle_id, prod.producto_id`,
           [row.orden_compra_id]
         );
 
@@ -439,6 +483,8 @@ export const ordenesController = {
             producto_nombre: d.producto_nombre || d.orden_compra_detalle_descripcion,
             producto_codigo: d.producto_codigo || 'N/A',
             cantidad: d.orden_compra_detalle_cantidad,
+            cantidad_recibida: Number(d.cantidad_recibida || 0),
+            facturas_recepcion: d.facturas_recepcion || [],
             precio_unitario: d.orden_compra_detalle_precio_unitario,
             subtotal: d.orden_compra_detalle_subtotal,
             incluye_iva: d.orden_compra_detalle_incluye_iva !== false
@@ -456,148 +502,116 @@ export const ordenesController = {
     }
   },
 
-  // Cambiar estado a entregado y actualizar stock e inventario
+  // Recibir productos por detalle, con factura y cantidades independientes.
   entregar: async (req: AuthRequest, res: Response): Promise<void> => {
     const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { facturas } = req.body;
+      const { recepciones } = req.body;
+      if (!req.user) throw new AppError('No autenticado', 401);
 
-      if (!req.user) {
-        throw new AppError('No autenticado', 401);
-      }
-
-      // 1. Validar rol del usuario (ADMIN, GUARDIA, INVENTARIO)
-      const userRole = rolesData.find(r => r.id === req.user!.rol_id);
-      if (!userRole || !['admin', 'guardia', 'inventario'].includes(userRole.nombre)) {
-        throw new AppError('No tienes permisos para realizar esta acción. Solo ADMIN, GUARDIA y INVENTARIO están autorizados.', 403);
-      }
-
-      if (!facturas || !Array.isArray(facturas) || facturas.length === 0) {
-        throw new AppError('Debe ingresar al menos un código de factura', 400);
-      }
-
-      // Validar que las facturas no estén vacías
-      const cleanFacturas = facturas.map((f: any) => String(f).trim()).filter(f => f.length > 0);
-      if (cleanFacturas.length === 0) {
-        throw new AppError('Los códigos de factura no pueden estar vacíos', 400);
+      if (!Array.isArray(recepciones) || recepciones.length === 0) {
+        throw new AppError('Selecciona al menos un producto e ingresa su factura.', 400);
       }
 
       await client.query('BEGIN');
-
-      // 2. Obtener el requerimiento
-      const ocRes = await client.query(
-        `SELECT * FROM orden_compra WHERE orden_compra_id = $1 FOR UPDATE`,
-        [id]
-      );
-
-      if (ocRes.rows.length === 0) {
-        throw new AppError('Requerimiento no encontrado', 404);
-      }
-
+      const ocRes = await client.query('SELECT * FROM orden_compra WHERE orden_compra_id = $1 FOR UPDATE', [id]);
+      if (ocRes.rows.length === 0) throw new AppError('Requerimiento no encontrado', 404);
       const oc = ocRes.rows[0];
+      if (oc.orden_compra_estado === 'entregado') throw new AppError('El requerimiento ya fue recibido por completo.', 400);
+      if (oc.orden_compra_estado === 'cancelada') throw new AppError('No se puede recibir un requerimiento cancelado.', 400);
 
-      if (oc.orden_compra_estado === 'entregado') {
-        throw new AppError('El requerimiento ya ha sido entregado', 400);
-      }
-
-      if (oc.orden_compra_estado === 'cancelada') {
-        throw new AppError('No se puede entregar un requerimiento cancelado', 400);
-      }
-
-      // 2.1. Validar que el requerimiento esté firmado por todas las partes
       if (!oc.orden_compra_firma_elaborador || !oc.orden_compra_firma_aprobador || !oc.orden_compra_firma_recibido) {
-        const faltantes = [];
-        if (!oc.orden_compra_firma_elaborador) {
-          faltantes.push(obtenerNombreResponsable(oc.orden_compra_elaborado_por, 'Elaborador'));
-        }
-        if (!oc.orden_compra_firma_aprobador) {
-          faltantes.push(obtenerNombreResponsable(oc.orden_compra_aprobado_por, 'Aprobador'));
-        }
-        if (!oc.orden_compra_firma_recibido) {
-          faltantes.push(obtenerNombreResponsable(oc.orden_compra_recibido_por, 'Receptor'));
-        }
-        throw new AppError(`El requerimiento no puede ser recibido: falta la firma de ${faltantes.join(', ')}.`, 400);
+        throw new AppError('El requerimiento debe contar con todas las firmas antes de recibir productos.', 400);
       }
 
-      // 3. Registrar códigos de factura
-      for (const facCodigo of cleanFacturas) {
-        await client.query(
-          `INSERT INTO orden_compra_factura (orden_compra_id, factura_codigo) VALUES ($1, $2)`,
-          [id, facCodigo]
+      for (const recepcion of recepciones) {
+        const detalleId = Number(recepcion.detalle_id);
+        const cantidad = Number(recepcion.cantidad);
+        const factura = String(recepcion.factura_codigo || '').trim();
+        if (!detalleId || !Number.isInteger(cantidad) || cantidad <= 0 || !factura) {
+          throw new AppError('Cada recepción debe tener producto, cantidad válida y número de factura.', 400);
+        }
+
+        const detalleRes = await client.query(
+          `SELECT ocd.*, COALESCE(SUM(r.cantidad_recibida), 0) AS cantidad_ya_recibida
+           FROM orden_compra_detalle ocd
+           LEFT JOIN orden_compra_detalle_recepcion r ON r.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+           WHERE ocd.orden_compra_detalle_id = $1 AND ocd.orden_compra_id = $2
+           GROUP BY ocd.orden_compra_detalle_id`,
+          [detalleId, id]
         );
-      }
+        const detalle = detalleRes.rows[0];
+        if (!detalle) throw new AppError('Uno de los productos no pertenece al requerimiento.', 400);
+        const pendiente = Number(detalle.orden_compra_detalle_cantidad) - Number(detalle.cantidad_ya_recibida);
+        if (cantidad > pendiente) throw new AppError(`La cantidad recibida supera el pendiente de ${detalle.orden_compra_detalle_descripcion}.`, 400);
 
-      // 4. Sumar los productos al stock del sistema y registrar movimientos de inventario
-      const detailsRes = await client.query(
-        `SELECT * FROM orden_compra_detalle WHERE orden_compra_id = $1`,
-        [id]
-      );
+        await client.query(
+          `INSERT INTO orden_compra_detalle_recepcion (orden_compra_detalle_id, factura_codigo, cantidad_recibida, usuario_receptor_id)
+           VALUES ($1, $2, $3, $4)`,
+          [detalleId, factura, cantidad, req.user.id || null]
+        );
+        await client.query(
+          `INSERT INTO orden_compra_factura (orden_compra_id, factura_codigo)
+           SELECT $1, $2::VARCHAR(100) WHERE NOT EXISTS (
+             SELECT 1 FROM orden_compra_factura WHERE orden_compra_id = $1 AND factura_codigo = $2::VARCHAR(100)
+           )`,
+          [id, factura]
+        );
 
-      for (const d of detailsRes.rows) {
-        if (d.producto_id) {
-          // Obtener el stock actual con bloqueo
-          const prodRes = await client.query(
-            `SELECT producto_stock FROM producto WHERE producto_id = $1 FOR UPDATE`,
-            [d.producto_id]
-          );
-
+        if (detalle.producto_id) {
+          const prodRes = await client.query('SELECT producto_stock FROM producto WHERE producto_id = $1 FOR UPDATE', [detalle.producto_id]);
           if (prodRes.rows.length > 0) {
-            const stockAnterior = prodRes.rows[0].producto_stock;
-            const stockNuevo = stockAnterior + d.orden_compra_detalle_cantidad;
-
-            // Actualizar stock del producto
+            const stockAnterior = Number(prodRes.rows[0].producto_stock);
+            const stockNuevo = stockAnterior + cantidad;
+            await client.query('UPDATE producto SET producto_stock = $1, producto_fecha_modificacion = CURRENT_TIMESTAMP WHERE producto_id = $2', [stockNuevo, detalle.producto_id]);
             await client.query(
-              `UPDATE producto SET producto_stock = $1, producto_fecha_modificacion = CURRENT_TIMESTAMP WHERE producto_id = $2`,
-              [stockNuevo, d.producto_id]
-            );
-
-            // Registrar movimiento de inventario
-            const obs = `Recepción de requerimiento ${oc.orden_compra_codigo} - Factura: ${cleanFacturas.join(', ')}`;
-            await client.query(
-              `INSERT INTO movimiento_inventario (
-                producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
-                movimiento_inventario_cantidad, movimiento_inventario_stock_anterior,
-                movimiento_inventario_stock_nuevo, movimiento_inventario_observacion,
-                orden_compra_id
-              ) VALUES ($1, $2, $3, 'orden_compra', $4, $5, $6, $7, $8)`,
-              [
-                d.producto_id,
-                oc.sucursal_id,
-                req.user.id && req.user.id !== 0 ? req.user.id : 1,
-                d.orden_compra_detalle_cantidad,
-                stockAnterior,
-                stockNuevo,
-                obs,
-                id
-              ]
+              `INSERT INTO movimiento_inventario (producto_id, sucursal_id, usuario_id, movimiento_inventario_tipo,
+                movimiento_inventario_cantidad, movimiento_inventario_stock_anterior, movimiento_inventario_stock_nuevo,
+                movimiento_inventario_observacion, orden_compra_id)
+               VALUES ($1, $2, $3, 'orden_compra', $4, $5, $6, $7, $8)`,
+              [detalle.producto_id, oc.sucursal_id, req.user.id || 1, cantidad, stockAnterior, stockNuevo,
+                `Recepción parcial de ${oc.orden_compra_codigo} - Factura: ${factura}`, id]
             );
           }
         }
       }
 
-      // 5. Actualizar estado del requerimiento
-      await client.query(
-        `UPDATE orden_compra 
-         SET orden_compra_estado = 'entregado', 
-             orden_compra_fecha_recepcion = CURRENT_TIMESTAMP,
-             usuario_receptor_id = $1,
-             orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
-         WHERE orden_compra_id = $2`,
-        [req.user.id && req.user.id !== 0 ? req.user.id : 1, id]
+      const pendientesRes = await client.query(
+        `SELECT COUNT(*)::int AS pendientes FROM orden_compra_detalle ocd
+         LEFT JOIN (SELECT orden_compra_detalle_id, SUM(cantidad_recibida) AS recibida FROM orden_compra_detalle_recepcion GROUP BY orden_compra_detalle_id) r
+           ON r.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+         WHERE ocd.orden_compra_id = $1 AND COALESCE(r.recibida, 0) < ocd.orden_compra_detalle_cantidad`, [id]
       );
-
+      const completo = pendientesRes.rows[0].pendientes === 0;
+      if (completo) {
+        await client.query(
+          `UPDATE orden_compra
+           SET orden_compra_estado = 'entregado',
+               orden_compra_fecha_recepcion = CURRENT_TIMESTAMP,
+               usuario_receptor_id = $1,
+               orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $2`,
+          [req.user.id || 1, id]
+        );
+      } else {
+        await client.query(
+          `UPDATE orden_compra
+           SET orden_compra_estado = 'recibida_parcial',
+               usuario_receptor_id = $1,
+               orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $2`,
+          [req.user.id || 1, id]
+        );
+      }
       await client.query('COMMIT');
-
-      res.json({
-        success: true,
-        message: 'Requerimiento recibido e inventario actualizado con éxito'
-      });
+      res.json({ success: true, data: { completo }, message: completo ? 'Recepción total registrada e inventario actualizado.' : 'Recepción parcial registrada. Quedan productos pendientes.' });
       return;
     } catch (error) {
       await client.query('ROLLBACK');
       if (error instanceof AppError) throw error;
-      throw new AppError('Error al procesar la entrega del requerimiento', 500);
+      console.error('Error al registrar recepción parcial de requerimiento:', error);
+      throw new AppError('Error al procesar la recepción parcial', 500);
     } finally {
       client.release();
     }
@@ -679,6 +693,14 @@ export const ordenesController = {
         throw new AppError('No estás autorizado para firmar este requerimiento.', 403);
       }
 
+      const { permissions, isAdmin } = await getUsuarioPermisos(req.user?.id || 0, req.user?.rol_id || 3);
+      if (!isAdmin && isAprobador && !permissions.has('compras.requerimientos.aprobar')) {
+        throw new AppError('No tienes permiso para aprobar requerimientos de compra.', 403);
+      }
+      if (!isAdmin && isReceptor && !permissions.has('compras.requerimientos.recibir')) {
+        throw new AppError('No tienes permiso para recibir requerimientos de compra.', 403);
+      }
+
       const signatureDate = new Date();
       const empleadoNombreCompleto = `${empleado.empleado_nombre} ${empleado.empleado_apellido}`;
 
@@ -725,10 +747,6 @@ export const ordenesController = {
   },
 
   update: async (req: AuthRequest, res: Response): Promise<void> => {
-    if (req.user?.rol_id !== 1) {
-      throw new AppError('No autorizado. Solo el Administrador puede editar requerimientos.', 403);
-    }
-
     const id = parseInt(req.params.id);
     const client = await pool.connect();
     try {
@@ -871,18 +889,20 @@ export const ordenesController = {
         await client.query(
           `INSERT INTO orden_compra_detalle (
              orden_compra_id, producto_id, proveedor_id, orden_compra_detalle_descripcion, 
+             orden_compra_detalle_tipo_articulo,
              orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
              orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
              orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
              orden_compra_detalle_incluye_iva,
              orden_compra_detalle_comentario
            ) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [
             id,
             d.producto_id || null,
             d.proveedor_id || null,
             productoNombre || 'Artículo de Consumo',
+            d.tipo_articulo || d.orden_compra_detalle_tipo_articulo || 'OTROS',
             d.cantidad || d.orden_compra_detalle_cantidad,
             d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
             d.precio_unitario || d.orden_compra_detalle_precio_unitario || 0,

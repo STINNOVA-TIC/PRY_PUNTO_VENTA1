@@ -18,7 +18,9 @@ const TABLE_WHITELIST = [
   'rol',
   'modulo',
   'permiso',
-  'rol_permiso'
+  'rol_permiso',
+  'formato_requerimiento_config',
+  'formato_requerimiento_cambio'
 ];
 
 export const adminController = {

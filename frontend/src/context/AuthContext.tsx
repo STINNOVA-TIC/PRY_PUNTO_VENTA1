@@ -8,10 +8,9 @@ interface AuthContextType {
   user: Usuario | null;
   loading: boolean;
   isShopSession: boolean;
-  isSignatureSession: boolean;
   setIsShopSession: (isShop: boolean) => void;
   login: (email: string, password: string) => Promise<void>;
-  loginByCedula: (cedula: string, isForSignatures?: boolean) => Promise<void>;
+  loginByCedula: (cedula: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permiso: Permiso) => boolean;
   hasAnyPermission: (...permisos: Permiso[]) => boolean;
@@ -26,8 +25,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
   const [isShopSession, setIsShopSession] = useState<boolean>(false);
-  const employeeRoles = ['empleado', 'empleado_autorizado', 'empleado_autorizado_firmar'];
-  const isSignatureSession = !isShopSession && !!user && employeeRoles.includes(user.rol.nombre);
   const lastActivity = useRef<number>(Date.now());
 
   const hasPermission = (permiso: Permiso): boolean => {
@@ -65,12 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginByCedula = async (cedula: string, isForSignatures: boolean = false) => {
+  const loginByCedula = async (cedula: string) => {
     try {
       const response = await authAPI.employeeLogin(cedula);
       const { token, usuario } = response.data;
       
-      const isShop = !isForSignatures;
+      const isShop = true;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(usuario));
       localStorage.setItem('isShopSession', isShop ? 'true' : 'false');
@@ -174,7 +171,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       loading,
       isShopSession,
-      isSignatureSession,
       setIsShopSession,
       login,
       loginByCedula,

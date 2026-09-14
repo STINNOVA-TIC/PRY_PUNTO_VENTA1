@@ -22,6 +22,14 @@ const authorizeCrud = async (req, _res, next) => {
         if (isAdmin) {
             return next();
         }
+        if (['formato_requerimiento_config', 'formato_requerimiento_cambio'].includes(table)) {
+            // El formato se consulta al imprimir un requerimiento; sus textos no contienen datos sensibles.
+            if (req.method === 'GET')
+                return next();
+            if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && permissions.has('configuracion.editar'))
+                return next();
+            throw new error_middleware_1.AppError('No tienes permisos para administrar el formato de requerimientos', 403);
+        }
         // Cualquier usuario autenticado puede LEER todas las tablas (para llenar desplegables)
         if (req.method === 'GET') {
             return next();
