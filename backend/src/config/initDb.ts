@@ -78,7 +78,10 @@ export const initDb = async () => {
       ALTER TABLE orden_compra_detalle
         ADD COLUMN IF NOT EXISTS orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE,
         ADD COLUMN IF NOT EXISTS orden_compra_detalle_tipo_articulo VARCHAR(50) NOT NULL DEFAULT 'OTROS'
-          CHECK (orden_compra_detalle_tipo_articulo IN ('MATERIA PRIMA', 'HERRAMIENTA', 'SERVICIO', 'MAQUINARIA O EQUIPO', 'SUMINISTROS/ CONSUMIBLES', 'OTROS'));
+          CHECK (orden_compra_detalle_tipo_articulo IN ('MATERIA PRIMA', 'HERRAMIENTA', 'SERVICIO', 'MAQUINARIA O EQUIPO', 'SUMINISTROS/ CONSUMIBLES', 'OTROS')),
+        ADD COLUMN IF NOT EXISTS orden_compra_detalle_tiempo_entrega VARCHAR(50) NULL,
+        ADD COLUMN IF NOT EXISTS orden_compra_detalle_dias_entrega INTEGER NULL
+          CHECK (orden_compra_detalle_dias_entrega IS NULL OR orden_compra_detalle_dias_entrega > 0);
     `);
 
     // 4.2.2 Recepciones parciales por detalle y factura de requerimiento.

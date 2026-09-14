@@ -377,6 +377,8 @@ CREATE TABLE orden_compra_detalle (
     orden_compra_detalle_subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
     orden_compra_detalle_foto VARCHAR(255) NULL,
     orden_compra_detalle_negociacion_previa VARCHAR(20) DEFAULT 'NO' CHECK (orden_compra_detalle_negociacion_previa IN ('SI', 'NO')),
+    orden_compra_detalle_tiempo_entrega VARCHAR(50) NULL,
+    orden_compra_detalle_dias_entrega INTEGER NULL CHECK (orden_compra_detalle_dias_entrega IS NULL OR orden_compra_detalle_dias_entrega > 0),
     orden_compra_detalle_incluye_iva BOOLEAN NOT NULL DEFAULT TRUE,
     orden_compra_detalle_comentario VARCHAR(255) NULL,
 

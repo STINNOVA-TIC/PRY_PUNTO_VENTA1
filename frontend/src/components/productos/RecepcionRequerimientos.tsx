@@ -47,6 +47,23 @@ export const RecepcionRequerimientos: React.FC = () => {
 
   const isAutorizado = !!hasPermission('compras.requerimientos.recibir');
 
+  const formatFechaRecepcion = (fecha: string) => new Date(fecha).toLocaleString('es-EC', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const formatTiempoLlegada = (fechaSolicitud: string, fechaRecepcion: string) => {
+    const inicio = new Date(fechaSolicitud).getTime();
+    const fin = new Date(fechaRecepcion).getTime();
+    if (!Number.isFinite(inicio) || !Number.isFinite(fin) || fin < inicio) return 'No disponible';
+    const horas = (fin - inicio) / 3600000;
+    if (horas < 24) return `${horas.toFixed(1)} horas`;
+    return `${(horas / 24).toFixed(1)} días`;
+  };
+
   useEffect(() => {
     if (isAutorizado) {
       cargarDatos();
@@ -529,7 +546,7 @@ export const RecepcionRequerimientos: React.FC = () => {
 
               <div>
                 <h4 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wider">Detalle de Artículos</h4>
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold uppercase">
@@ -538,7 +555,6 @@ export const RecepcionRequerimientos: React.FC = () => {
                         <th className="px-4 py-2.5 text-center">Solicitada</th>
                         <th className="px-4 py-2.5 text-center">Recibida</th>
                         <th className="px-4 py-2.5 text-center">Pendiente</th>
-                        <th className="px-4 py-2.5">Factura del artículo</th>
                         <th className="px-4 py-2.5 text-right">Precio Unitario</th>
                         <th className="px-4 py-2.5 text-right">Subtotal</th>
                       </tr>
@@ -555,19 +571,6 @@ export const RecepcionRequerimientos: React.FC = () => {
                           <td className="px-4 py-2.5 text-center font-bold">{solicitada}</td>
                           <td className="px-4 py-2.5 text-center font-bold text-emerald-700">{recibida}</td>
                           <td className={`px-4 py-2.5 text-center font-bold ${pendiente > 0 ? 'text-amber-700' : 'text-gray-400'}`}>{pendiente}</td>
-                          <td className="px-4 py-2.5">
-                            {det.facturas_recepcion?.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {det.facturas_recepcion.map((factura: string, index: number) => (
-                                  <span key={`${factura}-${index}`} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-[10px] font-bold text-blue-700">
-                                    <BsFileEarmarkText /> {factura}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-[10px] italic text-gray-400">Sin factura</span>
-                            )}
-                          </td>
                           <td className="px-4 py-2.5 text-right">${Number(det.precio_unitario || 0).toFixed(2)}</td>
                           <td className="px-4 py-2.5 text-right font-semibold">${Number(det.subtotal || 0).toFixed(2)}</td>
                         </tr>
@@ -577,6 +580,50 @@ export const RecepcionRequerimientos: React.FC = () => {
                   </table>
                 </div>
               </div>
+
+              {detailOrden.detalles?.some((det: any) => det.recepciones?.length > 0) && (
+                <div>
+                  <h4 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wider">Historial de Recepciones</h4>
+                  <div className="space-y-3">
+                    {detailOrden.detalles
+                      .filter((det: any) => det.recepciones?.length > 0)
+                      .map((det: any) => (
+                        <div key={`historial-${det.id}`} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] font-bold text-gray-500">{det.producto_codigo}</span>
+                              <span className="text-xs font-bold text-gray-800">{det.producto_nombre}</span>
+                            </div>
+                            <span className="text-[10px] font-semibold text-gray-500">
+                              Total recibido: <strong className="text-emerald-700">{Number(det.cantidad_recibida || 0)}</strong> de {Number(det.cantidad || 0)}
+                            </span>
+                          </div>
+                          <div className="grid gap-2 p-3 md:grid-cols-2">
+                            {det.recepciones.map((recepcion: any, index: number) => (
+                              <div key={`${recepcion.factura_codigo}-${recepcion.fecha_recepcion}-${index}`} className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-[10px] text-blue-800">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <span className="inline-flex items-center gap-1 font-mono text-xs font-bold">
+                                    <BsFileEarmarkText /> Factura {recepcion.factura_codigo}
+                                  </span>
+                                  <span className="rounded-full bg-white px-2 py-0.5 font-bold text-blue-700">
+                                    {recepcion.cantidad_recibida} unidad(es)
+                                  </span>
+                                </div>
+                                <div className="grid gap-1 text-blue-700 sm:grid-cols-2">
+                                  <span><strong>Recibido:</strong> {formatFechaRecepcion(recepcion.fecha_recepcion)}</span>
+                                  <span><strong>Tiempo de llegada:</strong> {formatTiempoLlegada(detailOrden.fecha_solicitud, recepcion.fecha_recepcion)}</span>
+                                  {recepcion.receptor_nombre && (
+                                    <span className="sm:col-span-2"><strong>Registrado por:</strong> {recepcion.receptor_nombre}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end pt-3">
                 <button

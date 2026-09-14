@@ -158,10 +158,11 @@ exports.ordenesController = {
              orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
              orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
              orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
+             orden_compra_detalle_tiempo_entrega, orden_compra_detalle_dias_entrega,
              orden_compra_detalle_incluye_iva,
              orden_compra_detalle_comentario
            ) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, [
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, [
                     ocId,
                     d.producto_id || null,
                     d.proveedor_id || null,
@@ -173,6 +174,8 @@ exports.ordenesController = {
                     d.subtotal || 0,
                     d.foto || null,
                     d.negociacion_previa || 'NO',
+                    d.tiempo_entrega || 'INMEDIATO',
+                    d.tiempo_entrega === 'INMEDIATO' ? (d.dias_entrega || null) : null,
                     d.incluye_iva === undefined ? true : !!d.incluye_iva,
                     d.comentario || null
                 ]);
@@ -239,11 +242,23 @@ exports.ordenesController = {
             const detailsRes = await db_1.default.query(`SELECT ocd.*, prod.producto_nombre, prod.producto_codigo, prod.producto_foto,
                 COALESCE(SUM(odr.cantidad_recibida), 0) AS cantidad_recibida,
                 COALESCE(array_agg(DISTINCT odr.factura_codigo) FILTER (WHERE odr.factura_codigo IS NOT NULL), '{}') AS facturas_recepcion,
+                COALESCE(
+                  jsonb_agg(
+                    jsonb_build_object(
+                      'factura_codigo', odr.factura_codigo,
+                      'cantidad_recibida', odr.cantidad_recibida,
+                      'fecha_recepcion', odr.fecha_recepcion,
+                      'receptor_nombre', usuario_recepcion.usuario_nombre
+                    ) ORDER BY odr.fecha_recepcion
+                  ) FILTER (WHERE odr.orden_compra_detalle_recepcion_id IS NOT NULL),
+                  '[]'::jsonb
+                ) AS recepciones,
                 prov_det.proveedor_nombre AS detalle_proveedor_nombre
          FROM orden_compra_detalle ocd
          LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
          LEFT JOIN proveedor prov_det ON ocd.proveedor_id = prov_det.proveedor_id
          LEFT JOIN orden_compra_detalle_recepcion odr ON odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+         LEFT JOIN usuario usuario_recepcion ON usuario_recepcion.usuario_id = odr.usuario_receptor_id
          WHERE ocd.orden_compra_id = $1
          GROUP BY ocd.orden_compra_detalle_id, prod.producto_id, prov_det.proveedor_id
          ORDER BY ocd.orden_compra_detalle_id ASC`, [id]);
@@ -346,10 +361,22 @@ exports.ordenesController = {
             for (const row of ocRes.rows) {
                 const detailsRes = await db_1.default.query(`SELECT ocd.*, prod.producto_nombre, prod.producto_codigo,
                   COALESCE(SUM(odr.cantidad_recibida), 0) AS cantidad_recibida,
-                  COALESCE(array_agg(DISTINCT odr.factura_codigo) FILTER (WHERE odr.factura_codigo IS NOT NULL), '{}') AS facturas_recepcion
+                  COALESCE(array_agg(DISTINCT odr.factura_codigo) FILTER (WHERE odr.factura_codigo IS NOT NULL), '{}') AS facturas_recepcion,
+                  COALESCE(
+                    jsonb_agg(
+                      jsonb_build_object(
+                        'factura_codigo', odr.factura_codigo,
+                        'cantidad_recibida', odr.cantidad_recibida,
+                        'fecha_recepcion', odr.fecha_recepcion,
+                        'receptor_nombre', usuario_recepcion.usuario_nombre
+                      ) ORDER BY odr.fecha_recepcion
+                    ) FILTER (WHERE odr.orden_compra_detalle_recepcion_id IS NOT NULL),
+                    '[]'::jsonb
+                  ) AS recepciones
            FROM orden_compra_detalle ocd
            LEFT JOIN producto prod ON ocd.producto_id = prod.producto_id
            LEFT JOIN orden_compra_detalle_recepcion odr ON odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+           LEFT JOIN usuario usuario_recepcion ON usuario_recepcion.usuario_id = odr.usuario_receptor_id
            WHERE ocd.orden_compra_id = $1
            GROUP BY ocd.orden_compra_detalle_id, prod.producto_id`, [row.orden_compra_id]);
                 const facturasRes = await db_1.default.query(`SELECT factura_codigo FROM orden_compra_factura WHERE orden_compra_id = $1`, [row.orden_compra_id]);
@@ -384,6 +411,7 @@ exports.ordenesController = {
                         cantidad: d.orden_compra_detalle_cantidad,
                         cantidad_recibida: Number(d.cantidad_recibida || 0),
                         facturas_recepcion: d.facturas_recepcion || [],
+                        recepciones: d.recepciones || [],
                         precio_unitario: d.orden_compra_detalle_precio_unitario,
                         subtotal: d.orden_compra_detalle_subtotal,
                         incluye_iva: d.orden_compra_detalle_incluye_iva !== false
@@ -709,10 +737,11 @@ exports.ordenesController = {
              orden_compra_detalle_cantidad, orden_compra_detalle_unidad_medida,
              orden_compra_detalle_precio_unitario, orden_compra_detalle_subtotal,
              orden_compra_detalle_foto, orden_compra_detalle_negociacion_previa,
+             orden_compra_detalle_tiempo_entrega, orden_compra_detalle_dias_entrega,
              orden_compra_detalle_incluye_iva,
              orden_compra_detalle_comentario
            ) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, [
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, [
                     id,
                     d.producto_id || null,
                     d.proveedor_id || null,
@@ -724,6 +753,10 @@ exports.ordenesController = {
                     d.subtotal || d.orden_compra_detalle_subtotal || 0,
                     d.foto || d.orden_compra_detalle_foto || null,
                     d.negociacion_previa || d.orden_compra_detalle_negociacion_previa || 'NO',
+                    d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO',
+                    (d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO') === 'INMEDIATO'
+                        ? (d.dias_entrega || d.orden_compra_detalle_dias_entrega || null)
+                        : null,
                     d.incluye_iva === undefined ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva) : !!d.incluye_iva,
                     d.comentario || d.orden_compra_detalle_comentario || null
                 ]);

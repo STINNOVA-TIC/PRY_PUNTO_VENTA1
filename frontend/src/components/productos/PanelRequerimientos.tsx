@@ -76,6 +76,7 @@ export const PanelRequerimientos: React.FC = () => {
   const [itemFormaPago, setItemFormaPago] = useState('CONTADO');
   const [itemPlazoPago, setItemPlazoPago] = useState('INMEDIATO');
   const [itemTiempoEntrega, setItemTiempoEntrega] = useState('INMEDIATO');
+  const [itemDiasEntrega, setItemDiasEntrega] = useState('');
   const [itemTipoArticulo, setItemTipoArticulo] = useState('OTROS');
   const [itemComentario, setItemComentario] = useState('');
   const [itemPrecioUnitario, setItemPrecioUnitario] = useState('');
@@ -91,7 +92,7 @@ export const PanelRequerimientos: React.FC = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Campos adicionales generales
-  const [lugarRecepcion, setLugarRecepcion] = useState('OTROS');
+  const [lugarRecepcion, setLugarRecepcion] = useState('TAMBILLO');
   const [requiereContrato, setRequiereContrato] = useState(false);
   const [requiereSeguro, setRequiereSeguro] = useState(false);
   const [requiereMantenimiento, setRequiereMantenimiento] = useState(false);
@@ -431,6 +432,11 @@ export const PanelRequerimientos: React.FC = () => {
       setError('La cantidad debe ser un número entero mayor a 0.');
       return;
     }
+    const diasEntrega = Number(itemDiasEntrega);
+    if (itemTiempoEntrega === 'INMEDIATO' && (!Number.isInteger(diasEntrega) || diasEntrega <= 0)) {
+      setError('Ingresa una cantidad válida de días para la entrega inmediata.');
+      return;
+    }
 
     const subtotal = qty * price;
 
@@ -453,6 +459,7 @@ export const PanelRequerimientos: React.FC = () => {
       forma_pago: itemFormaPago,
       plazo_pago: itemPlazoPago,
       tiempo_entrega: itemTiempoEntrega,
+      dias_entrega: itemTiempoEntrega === 'INMEDIATO' ? diasEntrega : null,
       tipo_articulo: itemTipoArticulo,
       comentario: finalComment,
       precio_unitario: price,
@@ -477,6 +484,7 @@ export const PanelRequerimientos: React.FC = () => {
     setProductDropdownOpen(false);
     setItemCantidad('1');
     setItemNegociacion('NO');
+    setItemDiasEntrega('');
     setItemTipoArticulo('OTROS');
     setItemComentario('');
     setItemPrecioUnitario('');
@@ -507,6 +515,7 @@ export const PanelRequerimientos: React.FC = () => {
     setItemFormaPago(item.forma_pago || 'CONTADO');
     setItemPlazoPago(item.plazo_pago || 'INMEDIATO');
     setItemTiempoEntrega(item.tiempo_entrega || 'INMEDIATO');
+    setItemDiasEntrega(item.dias_entrega ? String(item.dias_entrega) : '');
     setItemTipoArticulo(item.tipo_articulo || 'OTROS');
     setItemComentario(item.comentario || '');
     setItemPrecioUnitario(Number(item.precio_unitario || 0) > 0 ? Number(item.precio_unitario).toFixed(2) : '');
@@ -531,6 +540,7 @@ export const PanelRequerimientos: React.FC = () => {
       setProductDropdownOpen(false);
       setItemCantidad('1');
       setItemNegociacion('NO');
+      setItemDiasEntrega('');
       setItemTipoArticulo('OTROS');
       setItemComentario('');
       setItemPrecioUnitario('');
@@ -611,6 +621,7 @@ export const PanelRequerimientos: React.FC = () => {
         setAsignadoTrabajador(false);
         setTrabajadorAsignado('');
         setTipoCompra('LOCAL');
+        setLugarRecepcion('TAMBILLO');
         
         // Recargar el historial
         const ordRes = await ordenesAPI.getAll();
@@ -626,6 +637,7 @@ export const PanelRequerimientos: React.FC = () => {
           setAsignadoTrabajador(false);
           setTrabajadorAsignado('');
           setTipoCompra('LOCAL');
+          setLugarRecepcion('TAMBILLO');
           
           // Recargar el historial
           const ordRes = await ordenesAPI.getAll();
@@ -660,7 +672,7 @@ export const PanelRequerimientos: React.FC = () => {
       setCentroCostosId(oc.centro_costos_id || '');
       setJustificacion(oc.orden_compra_justificacion || '');
       setTipoCompra(oc.orden_compra_tipo_compra || 'LOCAL');
-      setLugarRecepcion(oc.orden_compra_lugar_recepcion || 'OTROS');
+      setLugarRecepcion(oc.orden_compra_lugar_recepcion || 'TAMBILLO');
       setRequiereContrato(!!oc.orden_compra_requiere_contrato);
       setRequiereSeguro(!!oc.orden_compra_requiere_seguro);
       setRequiereMantenimiento(!!oc.orden_compra_requiere_mantenimiento);
@@ -689,6 +701,8 @@ export const PanelRequerimientos: React.FC = () => {
         subtotal: Number(d.orden_compra_detalle_subtotal || d.subtotal || 0),
         foto: d.orden_compra_detalle_foto || d.foto || '',
         negociacion_previa: d.orden_compra_detalle_negociacion_previa || d.negociacion_previa || 'NO',
+        tiempo_entrega: d.orden_compra_detalle_tiempo_entrega || d.tiempo_entrega || 'INMEDIATO',
+        dias_entrega: d.orden_compra_detalle_dias_entrega || d.dias_entrega || null,
         tipo_articulo: d.orden_compra_detalle_tipo_articulo || d.tipo_articulo || 'OTROS',
         incluye_iva: d.orden_compra_detalle_incluye_iva === undefined ? (d.incluye_iva === undefined ? true : !!d.incluye_iva) : !!d.orden_compra_detalle_incluye_iva,
         comentario: d.orden_compra_detalle_comentario || d.comentario || ''
@@ -1249,7 +1263,10 @@ export const PanelRequerimientos: React.FC = () => {
               <label className="block text-xs font-semibold text-gray-600 mb-1">Tiempo de Entrega</label>
               <select
                 value={itemTiempoEntrega}
-                onChange={(e) => setItemTiempoEntrega(e.target.value)}
+                onChange={(e) => {
+                  setItemTiempoEntrega(e.target.value);
+                  if (e.target.value !== 'INMEDIATO') setItemDiasEntrega('');
+                }}
                 className="w-full px-3.5 h-10 border border-gray-300 rounded-xl text-sm bg-white text-gray-700"
               >
                 <option value="INMEDIATO">INMEDIATO</option>
@@ -1257,6 +1274,23 @@ export const PanelRequerimientos: React.FC = () => {
                 <option value="SEIS MESES">6 MESES</option>
                 <option value="DOCE MESES">12 MESES</option>
               </select>
+              {itemTiempoEntrega === 'INMEDIATO' && (
+                <div className="mt-2">
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Días para la entrega</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={itemDiasEntrega}
+                      onChange={(e) => setItemDiasEntrega(e.target.value)}
+                      placeholder="Ej. 3"
+                      className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3.5 pr-14 text-sm text-gray-700 focus:border-gray-500 focus:outline-none"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[10px] font-bold uppercase text-gray-400">días</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Foto URL (opcional) */}
@@ -1705,6 +1739,7 @@ export const PanelRequerimientos: React.FC = () => {
                 setAsignadoTrabajador(false);
                 setTrabajadorAsignado('');
                 setTipoCompra('LOCAL');
+                setLugarRecepcion('TAMBILLO');
                 setModuloActivo('historial');
               }}
               className="px-5 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl text-xs font-bold transition shadow-sm active:scale-95"

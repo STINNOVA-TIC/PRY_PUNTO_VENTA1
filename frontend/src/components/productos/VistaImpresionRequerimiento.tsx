@@ -483,7 +483,12 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                     </td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_forma_pago || 'CONTADO'}</td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_plazo_pago || 'INMEDIATO'}</td>
-                    <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO'}</td>
+                    <td className="border border-gray-400 p-0.5 uppercase">
+                      {d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO'}
+                      {(d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO') === 'INMEDIATO' && d.orden_compra_detalle_dias_entrega
+                        ? ` · ${d.orden_compra_detalle_dias_entrega} DÍAS`
+                        : ''}
+                    </td>
                     <td className="border border-gray-400 p-0.5 font-mono font-semibold uppercase">{centros}</td>
                     <td className="border border-gray-400 p-1 text-left text-gray-500 italic">
                       {comentario}
