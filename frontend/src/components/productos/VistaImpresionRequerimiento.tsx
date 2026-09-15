@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { useModal } from '../../context/ModalContext';
 import { BsHourglassSplit, BsDownload } from 'react-icons/bs';
 import { adminAPI } from '../../api/admin.api';
+import { ordenesAPI } from '../../api/ordenes.api';
 
 interface VistaImpresionRequerimientoProps {
   orden: any;
@@ -25,11 +26,34 @@ const separarCentrosYComentario = (comentario: unknown, centroGeneral?: string) 
   };
 };
 
-export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoProps> = ({ orden, empresas, onClose }) => {
+export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoProps> = ({ orden: ordenInicial, empresas, onClose }) => {
   const { showAlert } = useModal();
   const [downloading, setDownloading] = useState(false);
   const [formato, setFormato] = useState<any>(null);
   const [cambios, setCambios] = useState<any[]>([]);
+  const [ordenActualizada, setOrdenActualizada] = useState<any>(ordenInicial);
+  const [actualizandoOrden, setActualizandoOrden] = useState(false);
+  const orden = ordenActualizada || ordenInicial;
+
+  useEffect(() => {
+    setOrdenActualizada(ordenInicial);
+    const ordenId = ordenInicial?.orden_compra_id || ordenInicial?.id;
+    if (!ordenId) return;
+
+    setActualizandoOrden(true);
+    ordenesAPI.getById(ordenId)
+      .then((respuesta) => {
+        if (respuesta.success && respuesta.data) {
+          setOrdenActualizada(respuesta.data);
+        }
+      })
+      .catch((error) => {
+        console.error('Error actualizando datos para impresión:', error);
+      })
+      .finally(() => {
+        setActualizandoOrden(false);
+      });
+  }, [ordenInicial]);
 
   useEffect(() => {
     Promise.all([
@@ -238,10 +262,12 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
           <div className="flex gap-2">
             <button
                onClick={handleDownloadPDF}
-               disabled={downloading}
+               disabled={downloading || actualizandoOrden}
                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5 justify-center"
              >
-               {downloading ? (
+               {actualizandoOrden ? (
+                 <>Actualizando datos...</>
+               ) : downloading ? (
                  <>
                    <BsHourglassSplit className="animate-spin text-sm" /> Generando PDF...
                  </>

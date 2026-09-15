@@ -910,15 +910,115 @@ export const ordenesController = {
         ]
       );
 
-      await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
+      const detallesExistentesRes = await client.query(
+        `SELECT ocd.orden_compra_detalle_id, ocd.producto_id,
+                ocd.orden_compra_detalle_descripcion,
+                COALESCE((
+                  SELECT SUM(odr.cantidad_recibida)
+                  FROM orden_compra_detalle_recepcion odr
+                  WHERE odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+                ), 0)::int AS cantidad_recibida
+         FROM orden_compra_detalle ocd
+         WHERE ocd.orden_compra_id = $1
+         FOR UPDATE OF ocd`,
+        [id]
+      );
+      const detallesExistentes = new Map<number, any>(
+        detallesExistentesRes.rows.map((detalle: any) => [Number(detalle.orden_compra_detalle_id), detalle])
+      );
+      const idsConservados = new Set<number>();
 
       for (const d of detalles) {
+        const detalleIdRaw = d.orden_compra_detalle_id;
+        let detalleId = detalleIdRaw === undefined || detalleIdRaw === null || detalleIdRaw === ''
+          ? null
+          : Number(detalleIdRaw);
+
+        // Compatibilidad con formularios que fueron abiertos antes de actualizar el frontend:
+        // reconocer su línea original para no interpretar que fue eliminada.
+        if (detalleId === null) {
+          const productoIdEntrante = d.producto_id ? Number(d.producto_id) : null;
+          const descripcionEntrante = String(d.descripcion || d.orden_compra_detalle_descripcion || '')
+            .trim().toLocaleLowerCase();
+          const coincidencias = [...detallesExistentes.entries()].filter(([idExistente, existente]) => {
+            if (idsConservados.has(idExistente)) return false;
+            const productoIdExistente = existente.producto_id ? Number(existente.producto_id) : null;
+            if (productoIdEntrante !== null) return productoIdEntrante === productoIdExistente;
+            return productoIdExistente === null &&
+              descripcionEntrante !== '' &&
+              descripcionEntrante === String(existente.orden_compra_detalle_descripcion || '').trim().toLocaleLowerCase();
+          });
+          if (coincidencias.length === 1) detalleId = coincidencias[0][0];
+        }
+
+        if (detalleId !== null) {
+          if (!Number.isInteger(detalleId) || !detallesExistentes.has(detalleId)) {
+            throw new AppError('Uno de los artículos no pertenece a este requerimiento.', 400);
+          }
+          if (idsConservados.has(detalleId)) {
+            throw new AppError('Un artículo del requerimiento está duplicado.', 400);
+          }
+          idsConservados.add(detalleId);
+        }
+
         let productoNombre = d.descripcion || d.orden_compra_detalle_descripcion;
         if (d.producto_id) {
           const prodRes = await client.query('SELECT producto_nombre FROM producto WHERE producto_id = $1', [d.producto_id]);
           if (prodRes.rows.length > 0) {
             productoNombre = prodRes.rows[0].producto_nombre;
           }
+        }
+
+        const cantidad = Number(d.cantidad ?? d.orden_compra_detalle_cantidad);
+        if (!Number.isInteger(cantidad) || cantidad <= 0) {
+          throw new AppError(`La cantidad de ${productoNombre || 'un artículo'} debe ser mayor que cero.`, 400);
+        }
+
+        if (detalleId !== null) {
+          const existente = detallesExistentes.get(detalleId);
+          const cantidadRecibida = Number(existente.cantidad_recibida || 0);
+          if (cantidad < cantidadRecibida) {
+            throw new AppError(
+              `No puedes reducir ${productoNombre || 'el artículo'} a ${cantidad}: ya se recibieron ${cantidadRecibida} unidad(es).`,
+              400
+            );
+          }
+          const nuevoProductoId = d.producto_id ? Number(d.producto_id) : null;
+          const productoAnteriorId = existente.producto_id ? Number(existente.producto_id) : null;
+          if (cantidadRecibida > 0 && nuevoProductoId !== productoAnteriorId) {
+            throw new AppError(`No puedes cambiar el producto de una línea que ya tiene recepciones registradas.`, 400);
+          }
+
+          await client.query(
+            `UPDATE orden_compra_detalle
+             SET producto_id = $1, proveedor_id = $2, orden_compra_detalle_descripcion = $3,
+                 orden_compra_detalle_tipo_articulo = $4, orden_compra_detalle_cantidad = $5,
+                 orden_compra_detalle_unidad_medida = $6, orden_compra_detalle_precio_unitario = $7,
+                 orden_compra_detalle_subtotal = $8, orden_compra_detalle_foto = $9,
+                 orden_compra_detalle_negociacion_previa = $10,
+                 orden_compra_detalle_tiempo_entrega = $11, orden_compra_detalle_dias_entrega = $12,
+                 orden_compra_detalle_incluye_iva = $13, orden_compra_detalle_comentario = $14,
+                 orden_compra_detalle_fecha_modificacion = CURRENT_TIMESTAMP
+             WHERE orden_compra_detalle_id = $15 AND orden_compra_id = $16`,
+            [
+              d.producto_id || null, d.proveedor_id || null, productoNombre || 'Artículo de Consumo',
+              d.tipo_articulo || d.orden_compra_detalle_tipo_articulo || 'OTROS', cantidad,
+              d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
+              d.precio_unitario ?? d.orden_compra_detalle_precio_unitario ?? 0,
+              d.subtotal ?? d.orden_compra_detalle_subtotal ?? 0,
+              d.foto || d.orden_compra_detalle_foto || null,
+              d.negociacion_previa || d.orden_compra_detalle_negociacion_previa || 'NO',
+              d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO',
+              (d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO') === 'INMEDIATO'
+                ? (d.dias_entrega || d.orden_compra_detalle_dias_entrega || null) : null,
+              d.incluye_iva === undefined
+                ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva)
+                : !!d.incluye_iva,
+              d.comentario || d.orden_compra_detalle_comentario || null,
+              detalleId, id
+            ]
+          );
+          continue;
         }
 
         await client.query(
@@ -939,7 +1039,7 @@ export const ordenesController = {
             d.proveedor_id || null,
             productoNombre || 'Artículo de Consumo',
             d.tipo_articulo || d.orden_compra_detalle_tipo_articulo || 'OTROS',
-            d.cantidad || d.orden_compra_detalle_cantidad,
+            cantidad,
             d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
             d.precio_unitario || d.orden_compra_detalle_precio_unitario || 0,
             d.subtotal || d.orden_compra_detalle_subtotal || 0,
@@ -952,6 +1052,39 @@ export const ordenesController = {
             d.incluye_iva === undefined ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva) : !!d.incluye_iva,
             d.comentario || d.orden_compra_detalle_comentario || null
           ]
+        );
+      }
+
+      for (const [detalleId, existente] of detallesExistentes) {
+        if (idsConservados.has(detalleId)) continue;
+        if (Number(existente.cantidad_recibida || 0) > 0) {
+          throw new AppError('No puedes eliminar un artículo que ya tiene recepciones registradas.', 400);
+        }
+        await client.query(
+          'DELETE FROM orden_compra_detalle WHERE orden_compra_detalle_id = $1 AND orden_compra_id = $2',
+          [detalleId, id]
+        );
+      }
+
+      const estadoRecepcionRes = await client.query(
+        `SELECT COALESCE(SUM(recibida.cantidad), 0)::int AS total_recibido,
+                COUNT(*) FILTER (WHERE COALESCE(recibida.cantidad, 0) < ocd.orden_compra_detalle_cantidad)::int AS lineas_pendientes
+         FROM orden_compra_detalle ocd
+         LEFT JOIN (
+           SELECT orden_compra_detalle_id, SUM(cantidad_recibida)::int AS cantidad
+           FROM orden_compra_detalle_recepcion
+           GROUP BY orden_compra_detalle_id
+         ) recibida ON recibida.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+         WHERE ocd.orden_compra_id = $1`,
+        [id]
+      );
+      const estadoRecepcion = estadoRecepcionRes.rows[0];
+      if (Number(estadoRecepcion.total_recibido) > 0) {
+        await client.query(
+          `UPDATE orden_compra
+           SET orden_compra_estado = $1, orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $2`,
+          [Number(estadoRecepcion.lineas_pendientes) > 0 ? 'recibida_parcial' : 'entregado', id]
         );
       }
 

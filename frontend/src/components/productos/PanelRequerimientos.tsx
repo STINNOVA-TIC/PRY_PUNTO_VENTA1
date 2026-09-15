@@ -477,7 +477,8 @@ export const PanelRequerimientos: React.FC = () => {
 
     if (editingIndex !== null) {
       const updated = [...detallesLocales];
-      updated[editingIndex] = nuevoItem;
+      // Conservar el id de la línea para que el backend mantenga sus recepciones y facturas.
+      updated[editingIndex] = { ...updated[editingIndex], ...nuevoItem };
       setDetallesLocales(updated);
       setEditingIndex(null);
     } else {
@@ -699,6 +700,7 @@ export const PanelRequerimientos: React.FC = () => {
       
       // Cargar detalles
       const parsedDetalles = (oc.detalles || []).map((d: any) => ({
+        orden_compra_detalle_id: d.orden_compra_detalle_id,
         producto_id: d.producto_id || null,
         proveedor_id: d.proveedor_id || null,
         descripcion: d.orden_compra_detalle_descripcion || d.descripcion || '',
