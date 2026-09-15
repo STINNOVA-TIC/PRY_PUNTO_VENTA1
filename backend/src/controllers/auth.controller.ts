@@ -7,7 +7,7 @@ import pool from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { GruposPermisos } from '../types/permisos';
 import { rolesData } from '../models/roles.data';
-import { isValidEmail, isValidPassword, isValidCedulaEcuatoriana } from '../utils/validators';
+import { isValidEmail, isValidPassword, PASSWORD_REQUIREMENTS, isValidCedulaEcuatoriana } from '../utils/validators';
 
 interface LoginRequest {
   email: string;
@@ -241,8 +241,8 @@ export const authController = {
         throw new AppError('Formato de correo electrónico inválido', 400);
       }
 
-      if (!isValidPassword(password)) {
-        throw new AppError('La contraseña debe tener al menos 6 caracteres', 400);
+      if (password.length < 6) {
+        throw new AppError('La contraseña debe tener al menos 6 caracteres.', 400);
       }
 
       // Buscar usuario en PostgreSQL
@@ -283,6 +283,10 @@ export const authController = {
       if (!tieneRolCorporativo) {
         throw new AppError('Acceso denegado. Este usuario solo puede ingresar mediante el acceso por cédula.', 403);
       }
+
+      const passwordVencida = !user.usuario_password_fecha_cambio ||
+        new Date(user.usuario_password_fecha_cambio).getTime() <= Date.now() - (180 * 24 * 60 * 60 * 1000);
+      const requiereCambioPassword = !!user.usuario_requiere_cambio_password || passwordVencida;
 
       // Mapear permisos según rol y personalización híbrida del usuario
       const rolNombre = rol.rol_nombre;
@@ -344,6 +348,7 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
+            requiere_cambio_password: requiereCambioPassword,
             empleado
           }
         }
@@ -581,6 +586,9 @@ export const authController = {
               permisos
             },
             permitir_autoconsumo: permitirAutoconsumo,
+            requiere_cambio_password: !!user.usuario_requiere_cambio_password ||
+              !user.usuario_password_fecha_cambio ||
+              new Date(user.usuario_password_fecha_cambio).getTime() <= Date.now() - (180 * 24 * 60 * 60 * 1000),
             empleado: empleadoData
           }
         }
@@ -597,11 +605,12 @@ export const authController = {
       if (!nombre || !email || !password || !rol_id) {
         throw new AppError('Datos incompletos para el registro', 400);
       }
+      if (!isValidPassword(password)) throw new AppError(PASSWORD_REQUIREMENTS, 400);
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       const userRes = await pool.query(
-        `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado) 
-         VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`,
+        `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+         VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`,
         [nombre, email, hashedPassword, empleado_id || null]
       );
       const userId = userRes.rows[0].usuario_id;
@@ -641,10 +650,19 @@ export const authController = {
 
       const isMatch = await bcrypt.compare(currentPassword, user.usuario_password);
       if (!isMatch) throw new AppError('Contraseña actual incorrecta', 400);
+      if (!isValidPassword(newPassword || '')) throw new AppError(PASSWORD_REQUIREMENTS, 400);
+      if (await bcrypt.compare(newPassword, user.usuario_password)) {
+        throw new AppError('La nueva contraseña no puede ser igual a la contraseña actual.', 400);
+      }
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
-      await pool.query('UPDATE usuario SET usuario_password = $1 WHERE usuario_id = $2', [hashedPassword, req.user.id]);
+      await pool.query(
+        `UPDATE usuario SET usuario_password = $1, usuario_password_fecha_cambio = CURRENT_TIMESTAMP,
+         usuario_requiere_cambio_password = FALSE, usuario_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE usuario_id = $2`,
+        [hashedPassword, req.user.id]
+      );
 
       res.json({ success: true, message: 'Contraseña cambiada exitosamente' });
     } catch (error) {

@@ -286,8 +286,8 @@ export const empleadosController = {
           );
         } else {
           const userRes = await client.query(
-            `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-             VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`,
+            `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+             VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`,
             [
               `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
               usuarioEmail,
@@ -386,8 +386,8 @@ export const empleadosController = {
       } else if (permitir_autoconsumo) {
         // Crear usuario nuevo para el colaborador
         const userRes = await pool.query(
-          `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-           VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`,
+          `INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+           VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`,
           [
             `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
             empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,

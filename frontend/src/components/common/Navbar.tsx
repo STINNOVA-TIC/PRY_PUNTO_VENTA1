@@ -2,11 +2,11 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor, BsKey } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const { user, logout, isShopSession, hasPermission } = useAuth();
+  const { user, logout, isShopSession, hasPermission, openChangePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -117,6 +117,14 @@ export const Navbar: React.FC = () => {
               <span className="font-semibold text-gray-800">{user?.nombre}</span>
               <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px] mt-0.5">{user?.rol.nombre}</span>
             </div>
+            <button
+              onClick={openChangePassword}
+              title="Cambiar contraseña"
+              aria-label="Cambiar contraseña"
+              className="hidden sm:flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-50 text-gray-600 transition"
+            >
+              <BsKey className="h-4 w-4" />
+            </button>
             <button
               onClick={handleLogout}
               className="px-4 py-2 rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-55 text-gray-600 hover:text-gray-800 text-xs font-semibold transition flex items-center gap-1.5"

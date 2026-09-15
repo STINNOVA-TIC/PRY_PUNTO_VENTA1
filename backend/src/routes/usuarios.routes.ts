@@ -15,6 +15,7 @@ router.get('/roles', requireAnyPermission('usuarios.ver', 'usuarios.crear'), usu
 // Crear, editar y eliminar operadores
 router.post('/', requirePermission('usuarios.crear'), usuariosController.create);
 router.put('/:id', requirePermission('usuarios.editar'), usuariosController.update);
+router.patch('/:id/requerir-cambio-password', requirePermission('usuarios.editar'), usuariosController.requirePasswordChange);
 router.delete('/:id', requirePermission('usuarios.eliminar'), usuariosController.delete);
 
 // Permisos individuales por usuario

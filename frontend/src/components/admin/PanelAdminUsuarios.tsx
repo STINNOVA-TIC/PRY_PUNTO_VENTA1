@@ -275,6 +275,16 @@ export const PanelAdminUsuarios: React.FC = () => {
     }
   };
 
+  const handleRequerirCambioPassword = async (u: UsuarioOperador) => {
+    try {
+      await usuariosAPI.requirePasswordChange(u.id);
+      setMensaje(`Se exigirá a ${u.nombre} cambiar su contraseña en el próximo inicio de sesión.`);
+      await cargarDatos();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo exigir el cambio de contraseña.');
+    }
+  };
+
   // Módulos únicos para filtrar dentro del modal de permisos
   const modulosDisponibles = React.useMemo(() => {
     const setMod = new Set<string>();
@@ -430,6 +440,17 @@ export const PanelAdminUsuarios: React.FC = () => {
                           <BsKey className="h-3.5 w-3.5" />
                           Permisos
                         </button>
+                      )}
+                      {(user?.rol?.nombre === 'admin' || hasPermission('usuarios.editar')) && (
+                        !u.requiere_cambio_password && (
+                          <button
+                            onClick={() => handleRequerirCambioPassword(u)}
+                            title="Exigir cambio de contraseña"
+                            className="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold"
+                          >
+                            Exigir clave
+                          </button>
+                        )
                       )}
                       {(user?.rol?.nombre === 'admin' || hasPermission('usuarios.editar')) && (
                         <BotonAccion

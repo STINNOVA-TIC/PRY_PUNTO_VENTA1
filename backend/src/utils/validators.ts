@@ -4,8 +4,14 @@ export const isValidEmail = (email: string): boolean => {
 };
 
 export const isValidPassword = (password: string): boolean => {
-  return password.length >= 6;
+  return password.length >= 6 &&
+    /[A-ZÁÉÍÓÚÑ]/.test(password) &&
+    /[a-záéíóúñ]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-zÁÉÍÓÚáéíóúÑñ\d\s]/.test(password);
 };
+
+export const PASSWORD_REQUIREMENTS = 'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula, un número y un símbolo.';
 
 export const isValidCedulaEcuatoriana = (cedula: string): boolean => {
   const clean = cedula.trim();

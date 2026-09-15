@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { authAPI } from '../api/auth.api';
 import { Permiso } from '../types/permisos';
 import { Usuario } from '../types';
+import { CambioPasswordModal } from '../components/auth/CambioPasswordModal';
 
 interface AuthContextType {
   user: Usuario | null;
@@ -16,6 +17,7 @@ interface AuthContextType {
   hasAnyPermission: (...permisos: Permiso[]) => boolean;
   hasAllPermissions: (...permisos: Permiso[]) => boolean;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  openChangePassword: () => void;
   isAuthenticated: boolean;
 }
 
@@ -25,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
   const [isShopSession, setIsShopSession] = useState<boolean>(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const lastActivity = useRef<number>(Date.now());
 
   const hasPermission = (permiso: Permiso): boolean => {
@@ -55,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('isShopSession', 'false');
       setUser(usuario);
       setIsShopSession(false);
+      setShowChangePassword(!!usuario.requiere_cambio_password);
       lastActivity.current = Date.now();
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
@@ -90,6 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
     await authAPI.changePassword(currentPassword, newPassword);
+    if (user) {
+      const updatedUser = { ...user, requiere_cambio_password: false };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    setShowChangePassword(false);
   };
 
   const verifyToken = async () => {
@@ -105,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const freshUser = verifyRes.data.user;
           localStorage.setItem('user', JSON.stringify(freshUser));
           setUser(freshUser);
+          setShowChangePassword(!!freshUser.requiere_cambio_password);
         } else {
           const userData = JSON.parse(storedUser);
           setUser(userData);
@@ -179,6 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hasAnyPermission,
       hasAllPermissions,
       changePassword,
+      openChangePassword: () => setShowChangePassword(true),
       isAuthenticated
     }}>
       {children}
@@ -209,6 +221,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             </div>
           </div>
         </div>
+      )}
+      {showChangePassword && user && (
+        <CambioPasswordModal
+          obligatorio={!!user.requiere_cambio_password}
+          onClose={() => setShowChangePassword(false)}
+        />
       )}
     </AuthContext.Provider>
   );

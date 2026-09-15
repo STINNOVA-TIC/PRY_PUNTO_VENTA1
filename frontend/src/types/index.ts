@@ -11,6 +11,7 @@ export interface Usuario {
     permisos: Permiso[];
   };
   permitir_autoconsumo?: boolean;
+  requiere_cambio_password?: boolean;
   empleado?: {
     id: number;
     codigo_empleado: string;

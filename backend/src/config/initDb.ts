@@ -4,6 +4,13 @@ export const initDb = async () => {
   try {
     console.log('🔄 Iniciando migración y verificación de base de datos...');
 
+    // Seguridad de contraseñas: primer acceso, cambio forzado por administrador y vencimiento semestral.
+    await pool.query(`
+      ALTER TABLE usuario
+        ADD COLUMN IF NOT EXISTS usuario_password_fecha_cambio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS usuario_requiere_cambio_password BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
     // 1. Crear tabla de autoconsumo
     await pool.query(`
       CREATE TABLE IF NOT EXISTS autoconsumo (

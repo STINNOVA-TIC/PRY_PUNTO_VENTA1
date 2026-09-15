@@ -171,6 +171,8 @@ CREATE TABLE usuario (
     usuario_nombre VARCHAR(100) NOT NULL,
     usuario_email VARCHAR(100) UNIQUE NOT NULL,
     usuario_password VARCHAR(255) NOT NULL,
+    usuario_password_fecha_cambio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    usuario_requiere_cambio_password BOOLEAN NOT NULL DEFAULT TRUE,
     usuario_estado VARCHAR(20) DEFAULT 'activo' CHECK (usuario_estado IN ('activo', 'inactivo')),
     usuario_fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

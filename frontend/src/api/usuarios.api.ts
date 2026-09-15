@@ -5,6 +5,7 @@ export interface UsuarioOperador {
   nombre: string;
   email: string;
   activo: boolean;
+  requiere_cambio_password?: boolean;
   empleado: {
     id: number;
     nombre: string;
@@ -78,6 +79,11 @@ export const usuariosAPI = {
 
   delete: async (id: number) => {
     const response = await api.delete(`/usuarios/${id}`);
+    return response.data;
+  },
+
+  requirePasswordChange: async (id: number) => {
+    const response = await api.patch(`/usuarios/${id}/requerir-cambio-password`);
     return response.data;
   }
 };

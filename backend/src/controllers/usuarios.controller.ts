@@ -4,13 +4,15 @@ import bcrypt from 'bcryptjs';
 import { AuthRequest } from '../middleware/auth.middleware';
 import pool from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { isValidPassword, PASSWORD_REQUIREMENTS } from '../utils/validators';
 
 export const usuariosController = {
   // Obtener todos los operadores del sistema
   getAll: async (_req: AuthRequest, res: Response): Promise<void> => {
     try {
       const query = `
-        SELECT u.usuario_id, u.usuario_nombre, u.usuario_email, u.usuario_estado, 
+        SELECT u.usuario_id, u.usuario_nombre, u.usuario_email, u.usuario_estado,
+               u.usuario_requiere_cambio_password,
                u.empleado_id, e.empleado_nombre, e.empleado_apellido,
                COALESCE(
                  json_agg(
@@ -22,7 +24,8 @@ export const usuariosController = {
         LEFT JOIN usuario_rol ur ON u.usuario_id = ur.usuario_id
         LEFT JOIN rol r ON ur.rol_id = r.rol_id
         GROUP BY u.usuario_id, u.usuario_nombre, u.usuario_email, u.usuario_estado, 
-                 u.empleado_id, e.empleado_nombre, e.empleado_apellido
+               u.empleado_id, e.empleado_nombre, e.empleado_apellido,
+               u.usuario_requiere_cambio_password
         ORDER BY u.usuario_nombre ASC
       `;
       const resUsers = await pool.query(query);
@@ -36,6 +39,7 @@ export const usuariosController = {
           nombre: row.usuario_nombre,
           email: row.usuario_email,
           activo: row.usuario_estado === 'activo',
+          requiere_cambio_password: !!row.usuario_requiere_cambio_password,
           empleado: row.empleado_id ? {
             id: row.empleado_id,
             nombre: `${row.empleado_nombre} ${row.empleado_apellido}`
@@ -80,6 +84,7 @@ export const usuariosController = {
       if (!nombre || !email || !password || !rol_id || !empleado_id) {
         throw new AppError('Los campos nombre, email, contraseña, rol y colaborador son requeridos', 400);
       }
+      if (!isValidPassword(password)) throw new AppError(PASSWORD_REQUIREMENTS, 400);
 
       // Validar duplicados
       const dupRes = await client.query('SELECT usuario_id FROM usuario WHERE usuario_email = $1', [email.trim().toLowerCase()]);
@@ -106,8 +111,8 @@ export const usuariosController = {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       const userRes = await client.query(
-        `INSERT INTO usuario (empleado_id, usuario_nombre, usuario_email, usuario_password, usuario_estado)
-         VALUES ($1, $2, $3, $4, $5) RETURNING usuario_id`,
+        `INSERT INTO usuario (empleado_id, usuario_nombre, usuario_email, usuario_password, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`,
         [
           empleado_id,
           nombre.trim(), 
@@ -181,10 +186,13 @@ export const usuariosController = {
       let queryParams = [];
 
       if (password) {
+        if (!isValidPassword(password)) throw new AppError(PASSWORD_REQUIREMENTS, 400);
         const hashedPassword = await bcrypt.hash(password, 10);
         updateQuery = `
           UPDATE usuario 
-          SET empleado_id = $1, usuario_nombre = $2, usuario_email = $3, usuario_password = $4, usuario_estado = $5, usuario_fecha_modificacion = CURRENT_TIMESTAMP
+          SET empleado_id = $1, usuario_nombre = $2, usuario_email = $3, usuario_password = $4, usuario_estado = $5,
+              usuario_password_fecha_cambio = CURRENT_TIMESTAMP, usuario_requiere_cambio_password = TRUE,
+              usuario_fecha_modificacion = CURRENT_TIMESTAMP
           WHERE usuario_id = $6
           RETURNING *
         `;
@@ -222,6 +230,17 @@ export const usuariosController = {
     } finally {
       client.release();
     }
+  },
+
+  requirePasswordChange: async (req: AuthRequest, res: Response): Promise<void> => {
+    const id = parseInt(req.params.id, 10);
+    const result = await pool.query(
+      `UPDATE usuario SET usuario_requiere_cambio_password = TRUE, usuario_fecha_modificacion = CURRENT_TIMESTAMP
+       WHERE usuario_id = $1 RETURNING usuario_id`,
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError('Usuario no encontrado', 404);
+    res.json({ success: true, message: 'Se exigirá el cambio de contraseña en el próximo inicio de sesión.' });
   },
 
   // Eliminar un operador
