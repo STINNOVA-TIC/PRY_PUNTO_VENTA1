@@ -984,21 +984,39 @@ export const PanelRequerimientos: React.FC = () => {
 
             {/* Secuencial Preview */}
             <div>
-              <label className="block text-xs font-semibold text-amber-600 mb-1">Vista previa del secuencial</label>
-              <div className="w-full px-3.5 py-2 border border-amber-250 bg-amber-50/50 text-amber-800 font-mono font-bold rounded-xl text-sm">
+              <label className="block text-xs font-semibold text-gray-550 mb-1">Vista previa del secuencial</label>
+              <div className="w-full px-3.5 py-2 border border-gray-250 bg-gray-50 text-gray-550 font-mono font-bold rounded-xl text-sm">
                 {secuencialPreview}
               </div>
               {canEditSecuencial && (
-                <div className="mt-2 space-y-2 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
-                  <label className="block text-[11px] font-semibold text-amber-800">Número de secuencial (opcional)
-                    <input type="number" min="1" value={secuencialNumero} onChange={e => setSecuencialNumero(e.target.value)} placeholder="Automático" className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm" />
-                  </label>
-                  {secuencialNumero && <label className="block text-[11px] font-semibold text-amber-800">Después de usar este número
-                    <select value={secuencialContinuidad} onChange={e => setSecuencialContinuidad(e.target.value as 'hueco' | 'nuevo')} className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm">
-                      <option value="hueco">Continuar con la secuencia pendiente</option>
-                      <option value="nuevo">Continuar desde este nuevo punto</option>
-                    </select>
-                  </label>}
+                <div className="mt-2 space-y-2 rounded-xl border border-gray-250 bg-gray-50/40 p-3">
+                  <div className="flex flex-row gap-3 items-end">
+                    <label className="flex-1 block text-[11px] font-semibold text-gray-550">
+                      Número de secuencial (opcional)
+                      <input
+                        type="number"
+                        min="1"
+                        value={secuencialNumero}
+                        onChange={e => setSecuencialNumero(e.target.value)}
+                        placeholder="Automático"
+                        className="mt-1 w-full rounded-lg border border-gray-250 bg-white px-3 py-2 text-sm"
+                      />
+                    </label>
+
+                    {secuencialNumero && (
+                      <label className="flex-1 block text-[11px] font-semibold text-gray-550">
+                        Después de usar este número
+                        <select
+                          value={secuencialContinuidad}
+                          onChange={e => setSecuencialContinuidad(e.target.value as 'hueco' | 'nuevo')}
+                          className="mt-1 w-full rounded-lg border border-gray-250 bg-white px-3 py-2 text-sm"
+                        >
+                          <option value="hueco">Continuar con la secuencia pendiente</option>
+                          <option value="nuevo">Continuar desde este nuevo punto</option>
+                        </select>
+                      </label>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
