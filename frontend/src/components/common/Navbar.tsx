@@ -31,7 +31,7 @@ export const Navbar: React.FC = () => {
       <Link
         to={to}
         key={to}
-        className={`relative px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 ${
+        className={`relative shrink-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 ${
           active
             ? 'bg-gray-900 text-white shadow-sm ring-1 ring-gray-900'
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -56,8 +56,8 @@ export const Navbar: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           
-          <div className="flex items-center space-x-6">
-            <Link to="/" className="flex items-center select-none">
+          <div className="flex min-w-0 flex-1 items-center space-x-4 lg:space-x-6">
+            <Link to="/" className="flex shrink-0 items-center select-none">
               <img 
                 src={logoEmpresa} 
                 alt="Logotipo Oficial" 
@@ -65,7 +65,7 @@ export const Navbar: React.FC = () => {
               />
             </Link>
             
-            <div className="hidden md:flex items-center space-x-1.5">
+            <div className="menu-scrollbar-hidden hidden min-w-0 flex-1 items-center space-x-1 overflow-x-auto pb-1 md:flex">
               {!isShopSession && <>
               {/* Inicio / Dashboard */}
               {renderNavLink('/', 'Inicio', <BsHouseDoor />)}
@@ -112,8 +112,8 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="hidden sm:flex flex-col items-end text-xs">
+          <div className="ml-3 flex shrink-0 items-center space-x-2 lg:space-x-4">
+            <div className="hidden max-w-[130px] flex-col items-end text-xs lg:flex">
               <span className="font-semibold text-gray-800">{user?.nombre}</span>
               <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px] mt-0.5">{user?.rol.nombre}</span>
             </div>
@@ -121,13 +121,13 @@ export const Navbar: React.FC = () => {
               onClick={openChangePassword}
               title="Cambiar contraseña"
               aria-label="Cambiar contraseña"
-              className="hidden sm:flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-50 text-gray-600 transition"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-50 text-gray-600 transition sm:flex"
             >
               <BsKey className="h-4 w-4" />
             </button>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 rounded-lg border border-gray-300 hover:border-gray-500 hover:bg-gray-55 text-gray-600 hover:text-gray-800 text-xs font-semibold transition flex items-center gap-1.5"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-gray-500 hover:bg-gray-50 hover:text-gray-800 lg:px-4"
             >
               <BsBoxArrowRight className="h-4 w-4" />
               Cerrar Sesión

@@ -21,6 +21,7 @@ const TABLE_WHITELIST = [
   'rol_permiso',
   'formato_requerimiento_config',
   'formato_requerimiento_cambio'
+  ,'secuencial_config'
 ];
 
 export const adminController = {

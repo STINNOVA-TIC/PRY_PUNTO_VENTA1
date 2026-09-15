@@ -57,7 +57,9 @@ export const ordenesController = {
         empleado_aprobador_id,
         empleado_receptor_id,
         detalles,
-        tipo_compra
+        tipo_compra,
+        secuencial_numero,
+        secuencial_continuidad
       } = req.body;
 
       if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
@@ -76,10 +78,13 @@ export const ordenesController = {
 
       const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
       const empCode = empRes.rows[0].empresa_codigo || 'GEN';
-      const year = new Date().getFullYear();
+      const configSecuenciaRes = await client.query('SELECT secuencial_prefijo, secuencial_numero_inicial, secuencial_proximo_numero, secuencial_anio FROM secuencial_config WHERE secuencial_config_id = 1');
+      const configSecuencia = configSecuenciaRes.rows[0] || { secuencial_prefijo: 'DCS', secuencial_numero_inicial: 1, secuencial_proximo_numero: 1, secuencial_anio: new Date().getFullYear() };
+      const secuencialPrefijo = String(configSecuencia.secuencial_prefijo || 'DCS').trim().toUpperCase();
+      const year = Number(configSecuencia.secuencial_anio) || new Date().getFullYear();
 
       // 2. Calcular secuencial único y progresivo: [num]-DCS-[dept_code]-[empresa_code]-[year]
-      const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+      const pattern = `%-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
       const seqQuery = await client.query(
         `SELECT orden_compra_codigo 
          FROM orden_compra 
@@ -96,9 +101,16 @@ export const ordenesController = {
         }
       });
 
-      const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+      const numeroInicial = Math.max(1, Number(configSecuencia.secuencial_numero_inicial) || 1);
+      const numeroAutomatico = Math.max(numeroInicial, Number(configSecuencia.secuencial_proximo_numero) || maxSeq + 1, maxSeq + 1);
+      const puedeEditarSecuencia = req.user?.rol_id === 1 || (await client.query(`SELECT EXISTS (SELECT 1 FROM usuario_permiso up JOIN permiso p ON p.permiso_id=up.permiso_id WHERE up.usuario_id=$1 AND up.tipo='conceder' AND p.permiso_clave='configuracion.secuencial_editar') OR EXISTS (SELECT 1 FROM usuario_rol ur JOIN rol_permiso rp ON rp.rol_id=ur.rol_id JOIN permiso p ON p.permiso_id=rp.permiso_id WHERE ur.usuario_id=$1 AND p.permiso_clave='configuracion.secuencial_editar') AS permitido`, [req.user?.id || 0])).rows[0].permitido;
+      const nextSeqNum = secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '' ? Number(secuencial_numero) : numeroAutomatico;
+      if (!Number.isInteger(nextSeqNum) || nextSeqNum < 1) throw new AppError('El secuencial debe ser un número entero mayor que cero.', 400);
+      if (secuencial_numero !== undefined && !puedeEditarSecuencia) throw new AppError('No tienes permiso para editar el secuencial.', 403);
       const seqStr = String(nextSeqNum).padStart(3, '0');
-      const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+      const codigoOC = `${seqStr}-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
+      const duplicateSeq = await client.query('SELECT 1 FROM orden_compra WHERE orden_compra_codigo = $1', [codigoOC]);
+      if (duplicateSeq.rows.length > 0) throw new AppError(`El secuencial ${codigoOC} ya existe y no puede sobreponerse.`, 409);
 
       // Obtener el empleado del usuario actual (Elaborador)
       let empleadoId = req.empleado?.empleado_id;
@@ -203,6 +215,8 @@ export const ordenesController = {
           fechaFirmaElaborador
         ]
       );
+      const siguienteConfigurado = secuencial_continuidad === 'nuevo' ? nextSeqNum + 1 : numeroAutomatico;
+      await client.query('UPDATE secuencial_config SET secuencial_proximo_numero = $1, secuencial_fecha_modificacion = CURRENT_TIMESTAMP WHERE secuencial_config_id = 1', [siguienteConfigurado]);
       const ocId = ocRes.rows[0].orden_compra_id;
 
       // 4. Insertar los detalles
@@ -382,8 +396,11 @@ export const ordenesController = {
 
       const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
       const empCode = empRes.rows[0].empresa_codigo || 'GEN';
-      const year = new Date().getFullYear();
-      const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+      const configSecuenciaRes = await pool.query('SELECT secuencial_prefijo, secuencial_numero_inicial, secuencial_anio FROM secuencial_config WHERE secuencial_config_id = 1');
+      const configSecuencia = configSecuenciaRes.rows[0] || { secuencial_prefijo: 'DCS', secuencial_numero_inicial: 1, secuencial_anio: new Date().getFullYear() };
+      const secuencialPrefijo = String(configSecuencia.secuencial_prefijo || 'DCS').trim().toUpperCase();
+      const year = Number(configSecuencia.secuencial_anio) || new Date().getFullYear();
+      const pattern = `%-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
 
       const seqQuery = await pool.query(
         `SELECT orden_compra_codigo 
@@ -401,9 +418,10 @@ export const ordenesController = {
         }
       });
 
-      const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+      const numeroInicial = Math.max(1, Number(configSecuencia.secuencial_numero_inicial) || 1);
+      const nextSeqNum = Math.max(numeroInicial, maxSeq + 1);
       const seqStr = String(nextSeqNum).padStart(3, '0');
-      const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+      const codigoOC = `${seqStr}-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
 
       res.json({
         success: true,
@@ -809,7 +827,9 @@ export const ordenesController = {
         empleado_aprobador_id,
         empleado_receptor_id,
         detalles,
-        tipo_compra
+        tipo_compra,
+        secuencial_numero,
+        secuencial_continuidad
       } = req.body;
 
       if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
@@ -819,7 +839,7 @@ export const ordenesController = {
       await client.query('BEGIN');
 
       const checkRes = await client.query(
-        `SELECT empleado_aprobador_id, empleado_receptor_id, 
+        `SELECT orden_compra_codigo, empleado_aprobador_id, empleado_receptor_id,
                 orden_compra_firma_aprobador, orden_compra_fecha_firma_aprobador,
                 orden_compra_firma_recibido, orden_compra_fecha_firma_recibido,
                 orden_compra_estado 
@@ -831,6 +851,16 @@ export const ordenesController = {
       }
 
       const ocDb = checkRes.rows[0];
+      let codigoSecuencial = ocDb.orden_compra_codigo;
+      if (secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '') {
+        const secNum = Number(secuencial_numero);
+        if (!Number.isInteger(secNum) || secNum < 1) throw new AppError('El secuencial debe ser un número entero mayor que cero.', 400);
+        const permitido = req.user?.rol_id === 1 || (await client.query(`SELECT EXISTS (SELECT 1 FROM usuario_permiso up JOIN permiso p ON p.permiso_id=up.permiso_id WHERE up.usuario_id=$1 AND up.tipo='conceder' AND p.permiso_clave='configuracion.secuencial_editar') OR EXISTS (SELECT 1 FROM usuario_rol ur JOIN rol_permiso rp ON rp.rol_id=ur.rol_id JOIN permiso p ON p.permiso_id=rp.permiso_id WHERE ur.usuario_id=$1 AND p.permiso_clave='configuracion.secuencial_editar') AS permitido`, [req.user?.id || 0])).rows[0].permitido;
+        if (!permitido) throw new AppError('No tienes permiso para editar el secuencial.', 403);
+        codigoSecuencial = String(codigoSecuencial).replace(/^\d+/, String(secNum).padStart(3, '0'));
+        const duplicate = await client.query('SELECT 1 FROM orden_compra WHERE orden_compra_codigo = $1 AND orden_compra_id <> $2', [codigoSecuencial, id]);
+        if (duplicate.rows.length > 0) throw new AppError(`El secuencial ${codigoSecuencial} ya existe y no puede sobreponerse.`, 409);
+      }
 
       const oldAprobadorId = ocDb.empleado_aprobador_id ? Number(ocDb.empleado_aprobador_id) : null;
       const oldReceptorId = ocDb.empleado_receptor_id ? Number(ocDb.empleado_receptor_id) : null;
@@ -870,13 +900,13 @@ export const ordenesController = {
              orden_compra_tiempo_entrega = $11, orden_compra_lugar_recepcion = $12, orden_compra_requiere_contrato = $13, 
              orden_compra_requiere_seguro = $14, orden_compra_requiere_mantenimiento = $15, orden_compra_asignado_trabajador = $16, 
              orden_compra_trabajador_asignado = $17, orden_compra_caracteristicas = $18, orden_compra_tipo_compra = $19,
-             empleado_aprobador_id = $20, empleado_receptor_id = $21,
+             empleado_aprobador_id = $20, empleado_receptor_id = $21, orden_compra_codigo = $29,
              orden_compra_aprobado_por = $22, orden_compra_recibido_por = $23,
              orden_compra_firma_aprobador = $24, orden_compra_fecha_firma_aprobador = $25,
              orden_compra_firma_recibido = $26, orden_compra_fecha_firma_recibido = $27,
              orden_compra_estado = $28,
              orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
-         WHERE orden_compra_id = $29`,
+         WHERE orden_compra_id = $30`,
         [
           empresa_id,
           sucursal_id,
@@ -906,9 +936,13 @@ export const ordenesController = {
           newFirmaRecibido,
           newFechaFirmaRecibido,
           newEstado,
+          codigoSecuencial,
           id
         ]
       );
+      if (secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '' && secuencial_continuidad === 'nuevo') {
+        await client.query('UPDATE secuencial_config SET secuencial_proximo_numero = GREATEST(secuencial_proximo_numero, $1), secuencial_fecha_modificacion = CURRENT_TIMESTAMP WHERE secuencial_config_id = 1', [Number(secuencial_numero) + 1]);
+      }
 
       const detallesExistentesRes = await client.query(
         `SELECT ocd.orden_compra_detalle_id, ocd.producto_id,

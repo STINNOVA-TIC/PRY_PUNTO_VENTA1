@@ -28,6 +28,7 @@ export const PanelRequerimientos: React.FC = () => {
   const isEmployeeRole = user?.rol?.nombre === 'empleado';
   const canCreateRequirement = hasPermission('compras.requerimientos.crear');
   const canEditRequirement = hasPermission('compras.requerimientos.editar');
+  const canEditSecuencial = hasPermission('configuracion.secuencial_editar' as any);
 
   // Datos del sistema
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -67,6 +68,8 @@ export const PanelRequerimientos: React.FC = () => {
   const [centroCostosId, setCentroCostosId] = useState<number | ''>('');
   const [justificacion, setJustificacion] = useState('');
   const [secuencialPreview, setSecuencialPreview] = useState('Cargando...');
+  const [secuencialNumero, setSecuencialNumero] = useState('');
+  const [secuencialContinuidad, setSecuencialContinuidad] = useState<'hueco' | 'nuevo'>('hueco');
   const [tipoCompra, setTipoCompra] = useState('LOCAL');
 
   // Formulario de ítem local
@@ -237,7 +240,7 @@ export const PanelRequerimientos: React.FC = () => {
     } else {
       setSecuencialPreview('[Selecciona Empresa y Departamento]');
     }
-  }, [departamentoId, empresaId]);
+  }, [departamentoId, empresaId, secuencialNumero]);
 
   // Actualizar elaboradoPor y preseleccionar departamento/centro de costos cuando carguen los datos del usuario
   useEffect(() => {
@@ -396,7 +399,8 @@ export const PanelRequerimientos: React.FC = () => {
     try {
       const res = await ordenesAPI.getSiguienteSecuencial(depId, empId);
       if (res.success && res.data) {
-        setSecuencialPreview(res.data.codigo);
+        const codigo = secuencialNumero ? res.data.codigo.replace(/^\d+/, String(Number(secuencialNumero)).padStart(3, '0')) : res.data.codigo;
+        setSecuencialPreview(codigo);
       }
     } catch (err) {
       setSecuencialPreview('Error de secuencial');
@@ -617,6 +621,8 @@ export const PanelRequerimientos: React.FC = () => {
         empleado_receptor_id: empleadoReceptorId ? Number(empleadoReceptorId) : null,
         detalles: detallesLocales,
         tipo_compra: tipoCompra
+        ,secuencial_numero: canEditSecuencial && secuencialNumero ? Number(secuencialNumero) : undefined
+        ,secuencial_continuidad: canEditSecuencial && secuencialNumero ? secuencialContinuidad : undefined
       };
 
       if (editingOrdenId) {
@@ -672,6 +678,8 @@ export const PanelRequerimientos: React.FC = () => {
       
       const oc = res.data;
       setEditingOrdenId(oc.orden_compra_id);
+      const codigoActual = String(oc.orden_compra_codigo || '');
+      setSecuencialNumero(codigoActual.match(/^\d+/)?.[0]?.replace(/^0+/, '') || '');
       
       // Cargar metadatos
       setEmpresaId(oc.empresa_id || '');
@@ -980,6 +988,19 @@ export const PanelRequerimientos: React.FC = () => {
               <div className="w-full px-3.5 py-2 border border-amber-250 bg-amber-50/50 text-amber-800 font-mono font-bold rounded-xl text-sm">
                 {secuencialPreview}
               </div>
+              {canEditSecuencial && (
+                <div className="mt-2 space-y-2 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+                  <label className="block text-[11px] font-semibold text-amber-800">Número de secuencial (opcional)
+                    <input type="number" min="1" value={secuencialNumero} onChange={e => setSecuencialNumero(e.target.value)} placeholder="Automático" className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm" />
+                  </label>
+                  {secuencialNumero && <label className="block text-[11px] font-semibold text-amber-800">Después de usar este número
+                    <select value={secuencialContinuidad} onChange={e => setSecuencialContinuidad(e.target.value as 'hueco' | 'nuevo')} className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm">
+                      <option value="hueco">Continuar con la secuencia pendiente</option>
+                      <option value="nuevo">Continuar desde este nuevo punto</option>
+                    </select>
+                  </label>}
+                </div>
+              )}
             </div>
 
             {/* Tipo de Compra */}

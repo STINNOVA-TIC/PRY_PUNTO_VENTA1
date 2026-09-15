@@ -51,6 +51,7 @@ export type Permiso =
   | 'configuracion.ver'
   | 'configuracion.editar'
   | 'configuracion.ver_logs'
+  | 'configuracion.secuencial_editar'
   
   // ============ AUTOCONSUMO ============
   | 'autoconsumo.ver'

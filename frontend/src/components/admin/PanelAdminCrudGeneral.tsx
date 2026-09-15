@@ -143,6 +143,16 @@ const SCHEMAS: TableSchema[] = [
     ]
   },
   {
+    table: 'secuencial_config',
+    label: 'Secuenciales de Requerimientos',
+    fields: [
+      { key: 'secuencial_prefijo', label: 'Prefijo', type: 'text', required: true },
+      { key: 'secuencial_numero_inicial', label: 'Número inicial', type: 'number', required: true },
+      { key: 'secuencial_proximo_numero', label: 'Próximo número automático', type: 'number', required: true },
+      { key: 'secuencial_anio', label: 'Año', type: 'number', required: true },
+    ]
+  },
+  {
     table: 'formato_requerimiento_config',
     label: 'Formato de Requerimiento',
     fields: [
@@ -187,8 +197,8 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     if (user?.rol.nombre === 'inventario') {
       return ['producto', 'proveedor', 'categoria'].includes(s.table);
     }
-    if (hasPermission('configuracion.ver')) {
-      return ['formato_requerimiento_config', 'formato_requerimiento_cambio'].includes(s.table);
+    if (hasPermission('configuracion.ver') || hasPermission('configuracion.secuencial_editar' as any)) {
+      return ['formato_requerimiento_config', 'formato_requerimiento_cambio', 'secuencial_config'].includes(s.table);
     }
     return false;
   });
@@ -244,6 +254,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
 
   // Funciones de validación de permisos para las tablas maestras
   const canCreateInTable = (table: string) => {
+    if (table === 'secuencial_config') return false;
     if (table === 'formato_requerimiento_config') return false;
     if (table === 'formato_requerimiento_cambio') return user?.rol?.nombre === 'admin' || hasPermission('configuracion.editar');
     if (user?.rol?.nombre === 'admin') return true;
@@ -263,6 +274,7 @@ export const PanelAdminCrudGeneral: React.FC = () => {
     if (table === 'proveedor') return hasPermission('proveedores.editar' as any);
     if (table === 'categoria') return hasPermission('categorias.editar' as any);
     if (['formato_requerimiento_config', 'formato_requerimiento_cambio'].includes(table)) return hasPermission('configuracion.editar');
+    if (table === 'secuencial_config') return hasPermission('configuracion.secuencial_editar' as any);
     return false;
   };
 

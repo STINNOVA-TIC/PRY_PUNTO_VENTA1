@@ -4,6 +4,32 @@ export const initDb = async () => {
   try {
     console.log('🔄 Iniciando migración y verificación de base de datos...');
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS secuencial_config (
+        secuencial_config_id SERIAL PRIMARY KEY,
+        secuencial_prefijo VARCHAR(20) NOT NULL DEFAULT 'DCS',
+        secuencial_numero_inicial INTEGER NOT NULL DEFAULT 1 CHECK (secuencial_numero_inicial > 0),
+        secuencial_proximo_numero INTEGER NOT NULL DEFAULT 1 CHECK (secuencial_proximo_numero > 0),
+        secuencial_anio INTEGER NOT NULL DEFAULT EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER,
+        secuencial_fecha_modificacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE secuencial_config ADD COLUMN IF NOT EXISTS secuencial_proximo_numero INTEGER NOT NULL DEFAULT 1;
+      INSERT INTO secuencial_config (secuencial_config_id, secuencial_prefijo, secuencial_numero_inicial, secuencial_proximo_numero, secuencial_anio)
+      VALUES (1, 'DCS', 1, 1, EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER)
+      ON CONFLICT (secuencial_config_id) DO NOTHING;
+      UPDATE secuencial_config sc
+      SET secuencial_proximo_numero = GREATEST(
+        sc.secuencial_proximo_numero,
+        sc.secuencial_numero_inicial,
+        COALESCE((
+          SELECT MAX((regexp_match(oc.orden_compra_codigo, '^([0-9]+)-'))[1]::INTEGER) + 1
+          FROM orden_compra oc
+          WHERE oc.orden_compra_codigo LIKE '%-' || sc.secuencial_prefijo || '-%' || sc.secuencial_anio::TEXT
+        ), 1)
+      )
+      WHERE sc.secuencial_config_id = 1;
+    `);
+
     // Seguridad de contraseñas: primer acceso, cambio forzado por administrador y vencimiento semestral.
     await pool.query(`
       ALTER TABLE usuario
@@ -367,6 +393,7 @@ export const initDb = async () => {
       (10, 'Ver Configuración', 'Permite consultar parámetros de sistema', 'configuracion.ver', 'activo'),
       (10, 'Editar Configuración', 'Permite modificar parámetros maestros', 'configuracion.editar', 'activo'),
       (10, 'Ver Logs Auditoría', 'Permite ver bitácoras y registros de seguridad', 'configuracion.ver_logs', 'activo'),
+      (10, 'Editar Secuenciales', 'Permite modificar el prefijo, número inicial y año de los requerimientos', 'configuracion.secuencial_editar', 'activo'),
       (11, 'Ver Autoconsumos', 'Permite ver requerimientos y solicitudes de autoconsumo', 'autoconsumo.ver', 'activo'),
       (11, 'Crear Autoconsumo', 'Permite solicitar insumos y bienes para áreas internas', 'autoconsumo.crear', 'activo'),
       (11, 'Aprobar Autoconsumo', 'Permite autorizar solicitudes de consumo interno', 'autoconsumo.aprobar', 'activo'),

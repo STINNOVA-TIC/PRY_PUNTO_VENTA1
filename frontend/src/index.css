@@ -15,3 +15,13 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* El menú conserva el desplazamiento en pantallas estrechas sin mostrar flechas de scrollbar. */
+.menu-scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.menu-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
