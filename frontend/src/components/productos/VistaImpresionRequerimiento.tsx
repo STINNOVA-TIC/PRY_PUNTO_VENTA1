@@ -487,7 +487,11 @@ export const VistaImpresionRequerimiento: React.FC<VistaImpresionRequerimientoPr
                   <tr key={d.id}>
                     <td className="border border-gray-400 p-0.5 font-bold">{d.orden_compra_detalle_cantidad}</td>
                     <td className="border border-gray-400 p-0.5 uppercase">{d.orden_compra_detalle_unidad_medida}</td>
-                    <td className="border border-gray-400 p-1 text-left">{d.orden_compra_detalle_descripcion}</td>
+                    <td className="border border-gray-400 p-1 text-left">
+                      {d.producto_codigo && d.producto_codigo !== 'N/A'
+                        ? `${d.producto_codigo} - ${d.orden_compra_detalle_descripcion || d.producto_nombre}`
+                        : d.orden_compra_detalle_descripcion}
+                    </td>
                     <td className="border border-gray-400 p-0.5 font-semibold uppercase">{d.orden_compra_detalle_tipo_articulo || 'OTROS'}</td>
                     <td className="border border-gray-400 p-0.5">
                       {d.orden_compra_detalle_foto || d.producto_foto ? (
