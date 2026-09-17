@@ -70,6 +70,9 @@ export const PanelRequerimientos: React.FC = () => {
   const [secuencialPreview, setSecuencialPreview] = useState('Cargando...');
   const [secuencialNumero, setSecuencialNumero] = useState('');
   const [secuencialContinuidad, setSecuencialContinuidad] = useState<'hueco' | 'nuevo'>('hueco');
+  // Código real del requerimiento en edición; sirve de base fija para que el sufijo
+  // (departamento-empresa-año) NUNCA cambie al editar solo el número del secuencial.
+  const [ordenCodigoEditBase, setOrdenCodigoEditBase] = useState('');
   const [tipoCompra, setTipoCompra] = useState('LOCAL');
 
   // Formulario de ítem local
@@ -399,7 +402,12 @@ export const PanelRequerimientos: React.FC = () => {
     try {
       const res = await ordenesAPI.getSiguienteSecuencial(depId, empId);
       if (res.success && res.data) {
-        const codigo = secuencialNumero ? res.data.codigo.replace(/^\d+/, String(Number(secuencialNumero)).padStart(3, '0')) : res.data.codigo;
+        // Al editar, la base es el código real del requerimiento (su sufijo no debe variar por el número).
+        // En creación se usa el siguiente código sugerido por el backend para la empresa/departamento actuales.
+        const base = ordenCodigoEditBase || res.data.codigo;
+        const codigo = secuencialNumero
+          ? String(base).replace(/^\d+/, String(Number(secuencialNumero)).padStart(3, '0'))
+          : res.data.codigo;
         setSecuencialPreview(codigo);
       }
     } catch (err) {
@@ -629,6 +637,7 @@ export const PanelRequerimientos: React.FC = () => {
         await ordenesAPI.update(editingOrdenId, payload);
         setSuccess('¡Requerimiento actualizado exitosamente!');
         setEditingOrdenId(null);
+        setOrdenCodigoEditBase('');
         setJustificacion('');
         setDetallesLocales([]);
         setCaracteristicas('');
@@ -645,6 +654,7 @@ export const PanelRequerimientos: React.FC = () => {
         const res = await ordenesAPI.crear(payload);
         if (res.success) {
           setSuccess(`¡Requerimiento creado exitosamente con el código: ${res.data.codigo}!`);
+          setOrdenCodigoEditBase('');
           setJustificacion('');
           setDetallesLocales([]);
           setCaracteristicas('');
@@ -680,6 +690,7 @@ export const PanelRequerimientos: React.FC = () => {
       setEditingOrdenId(oc.orden_compra_id);
       const codigoActual = String(oc.orden_compra_codigo || '');
       setSecuencialNumero(codigoActual.match(/^\d+/)?.[0]?.replace(/^0+/, '') || '');
+      setOrdenCodigoEditBase(codigoActual);
       
       // Cargar metadatos
       setEmpresaId(oc.empresa_id || '');
@@ -1781,6 +1792,7 @@ export const PanelRequerimientos: React.FC = () => {
               type="button"
               onClick={() => {
                 setEditingOrdenId(null);
+                setOrdenCodigoEditBase('');
                 setJustificacion('');
                 setDetallesLocales([]);
                 setCaracteristicas('');
