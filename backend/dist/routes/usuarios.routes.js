@@ -13,6 +13,7 @@ router.get('/roles', (0, permisos_middleware_1.requireAnyPermission)('usuarios.v
 // Crear, editar y eliminar operadores
 router.post('/', (0, permisos_middleware_1.requirePermission)('usuarios.crear'), usuarios_controller_1.usuariosController.create);
 router.put('/:id', (0, permisos_middleware_1.requirePermission)('usuarios.editar'), usuarios_controller_1.usuariosController.update);
+router.patch('/:id/requerir-cambio-password', (0, permisos_middleware_1.requirePermission)('usuarios.editar'), usuarios_controller_1.usuariosController.requirePasswordChange);
 router.delete('/:id', (0, permisos_middleware_1.requirePermission)('usuarios.eliminar'), usuarios_controller_1.usuariosController.delete);
 // Permisos individuales por usuario
 router.get('/:id/permisos', (0, permisos_middleware_1.requireAnyPermission)('roles.ver', 'roles.crear', 'usuarios.editar'), usuarios_controller_1.usuariosController.getUserPermissions);

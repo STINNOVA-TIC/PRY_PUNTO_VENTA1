@@ -11,6 +11,8 @@ router.use(authenticate);
 router.get('/', requirePermission('productos.ver'), productosController.getAll);
 router.get('/categorias', requirePermission('productos.ver'), productosController.getCategorias);
 router.get('/proveedores', requireAnyPermission('productos.ver', 'compras.ver'), productosController.getProveedores);
+router.get('/vencimientos', requireAnyPermission('productos.ver', 'compras.ver'), productosController.getVencimientos);
+router.patch('/vencimientos/:recepcionId', requireAnyPermission('compras.requerimientos.recibir', 'productos.editar'), productosController.actualizarVencimiento);
 router.get('/:id', requirePermission('productos.ver'), productosController.getById);
 router.post('/', requirePermission('productos.crear'), productosController.create);
 router.patch('/:id/stock', requirePermission('inventario.ajustar_stock'), productosController.updateStock);

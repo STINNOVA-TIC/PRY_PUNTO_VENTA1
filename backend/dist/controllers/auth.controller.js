@@ -197,8 +197,8 @@ exports.authController = {
             if (!(0, validators_1.isValidEmail)(email)) {
                 throw new error_middleware_1.AppError('Formato de correo electrónico inválido', 400);
             }
-            if (!(0, validators_1.isValidPassword)(password)) {
-                throw new error_middleware_1.AppError('La contraseña debe tener al menos 6 caracteres', 400);
+            if (password.length < 6) {
+                throw new error_middleware_1.AppError('La contraseña debe tener al menos 6 caracteres.', 400);
             }
             // Buscar usuario en PostgreSQL
             const userRes = await db_1.default.query("SELECT * FROM usuario WHERE usuario_email = $1 AND usuario_estado = 'activo'", [email.trim().toLowerCase()]);
@@ -226,6 +226,9 @@ exports.authController = {
             if (!tieneRolCorporativo) {
                 throw new error_middleware_1.AppError('Acceso denegado. Este usuario solo puede ingresar mediante el acceso por cédula.', 403);
             }
+            const passwordVencida = !user.usuario_password_fecha_cambio ||
+                new Date(user.usuario_password_fecha_cambio).getTime() <= Date.now() - (180 * 24 * 60 * 60 * 1000);
+            const requiereCambioPassword = !!user.usuario_requiere_cambio_password || passwordVencida;
             // Mapear permisos según rol y personalización híbrida del usuario
             const rolNombre = rol.rol_nombre;
             const permisos = await (0, exports.getPermisosForUsuario)(user.usuario_id, rol.rol_id);
@@ -275,6 +278,7 @@ exports.authController = {
                             permisos
                         },
                         permitir_autoconsumo: permitirAutoconsumo,
+                        requiere_cambio_password: requiereCambioPassword,
                         empleado
                     }
                 }
@@ -485,6 +489,9 @@ exports.authController = {
                             permisos
                         },
                         permitir_autoconsumo: permitirAutoconsumo,
+                        requiere_cambio_password: !!user.usuario_requiere_cambio_password ||
+                            !user.usuario_password_fecha_cambio ||
+                            new Date(user.usuario_password_fecha_cambio).getTime() <= Date.now() - (180 * 24 * 60 * 60 * 1000),
                         empleado: empleadoData
                     }
                 }
@@ -501,10 +508,12 @@ exports.authController = {
             if (!nombre || !email || !password || !rol_id) {
                 throw new error_middleware_1.AppError('Datos incompletos para el registro', 400);
             }
+            if (!(0, validators_1.isValidPassword)(password))
+                throw new error_middleware_1.AppError(validators_1.PASSWORD_REQUIREMENTS, 400);
             const salt = await bcryptjs_1.default.genSalt(10);
             const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-            const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado) 
-         VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [nombre, email, hashedPassword, empleado_id || null]);
+            const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+         VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`, [nombre, email, hashedPassword, empleado_id || null]);
             const userId = userRes.rows[0].usuario_id;
             await db_1.default.query(`INSERT INTO usuario_rol (usuario_id, rol_id) VALUES ($1, $2)`, [userId, rol_id]);
             res.status(201).json({ success: true, message: 'Usuario registrado exitosamente' });
@@ -537,9 +546,16 @@ exports.authController = {
             const isMatch = await bcryptjs_1.default.compare(currentPassword, user.usuario_password);
             if (!isMatch)
                 throw new error_middleware_1.AppError('Contraseña actual incorrecta', 400);
+            if (!(0, validators_1.isValidPassword)(newPassword || ''))
+                throw new error_middleware_1.AppError(validators_1.PASSWORD_REQUIREMENTS, 400);
+            if (await bcryptjs_1.default.compare(newPassword, user.usuario_password)) {
+                throw new error_middleware_1.AppError('La nueva contraseña no puede ser igual a la contraseña actual.', 400);
+            }
             const salt = await bcryptjs_1.default.genSalt(10);
             const hashedPassword = await bcryptjs_1.default.hash(newPassword, salt);
-            await db_1.default.query('UPDATE usuario SET usuario_password = $1 WHERE usuario_id = $2', [hashedPassword, req.user.id]);
+            await db_1.default.query(`UPDATE usuario SET usuario_password = $1, usuario_password_fecha_cambio = CURRENT_TIMESTAMP,
+         usuario_requiere_cambio_password = FALSE, usuario_fecha_modificacion = CURRENT_TIMESTAMP
+         WHERE usuario_id = $2`, [hashedPassword, req.user.id]);
             res.json({ success: true, message: 'Contraseña cambiada exitosamente' });
         }
         catch (error) {

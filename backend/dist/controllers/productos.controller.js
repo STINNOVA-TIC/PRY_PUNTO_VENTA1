@@ -36,6 +36,86 @@ exports.productosController = {
             throw new error_middleware_1.AppError('Error al obtener productos', 500);
         }
     },
+    // Log de vencimientos: cada recepción de un requerimiento es un lote.
+    // Vencimiento = fecha editada por el usuario, o fecha de ingreso + DIAS_VIDA_UTIL.
+    getVencimientos: async (_req, res) => {
+        const DIAS_VIDA_UTIL = 35; // 5 semanas
+        try {
+            const result = await db_1.default.query(`
+        SELECT
+          COALESCE('R-' || r.orden_compra_detalle_recepcion_id,
+                   'D-' || d.orden_compra_detalle_id)                        AS id,
+          r.orden_compra_detalle_recepcion_id                                AS recepcion_id,
+          COALESCE(p.producto_codigo, '')                                    AS producto_codigo,
+          COALESCE(p.producto_nombre, d.orden_compra_detalle_descripcion)    AS producto_nombre,
+          COALESCE(c.categoria_nombre, 'Sin categoría')                      AS categoria,
+          COALESCE(r.cantidad_recibida, d.orden_compra_detalle_cantidad)     AS cantidad,
+          TO_CHAR(COALESCE(r.fecha_recepcion, oc.orden_compra_fecha_recepcion), 'YYYY-MM-DD') AS fecha_ingreso,
+          TO_CHAR(
+            COALESCE(
+              r.fecha_vencimiento,
+              COALESCE(r.fecha_recepcion, oc.orden_compra_fecha_recepcion)::date + $1::int
+            ), 'YYYY-MM-DD')                                                 AS fecha_vencimiento,
+          (r.fecha_vencimiento IS NOT NULL)                                  AS vencimiento_manual,
+          oc.orden_compra_codigo                                             AS referencia,
+          r.factura_codigo                                                   AS factura
+        FROM orden_compra_detalle d
+        JOIN orden_compra oc                       ON oc.orden_compra_id = d.orden_compra_id
+        LEFT JOIN orden_compra_detalle_recepcion r ON r.orden_compra_detalle_id = d.orden_compra_detalle_id
+        LEFT JOIN producto p                       ON p.producto_id = d.producto_id
+        LEFT JOIN categoria c                      ON c.categoria_id = p.categoria_id
+        WHERE d.orden_compra_detalle_tipo_articulo <> 'SERVICIO'
+          AND COALESCE(r.fecha_recepcion, oc.orden_compra_fecha_recepcion) IS NOT NULL
+        ORDER BY fecha_vencimiento
+        `, [DIAS_VIDA_UTIL]);
+            res.json({ success: true, data: result.rows });
+            return;
+        }
+        catch (error) {
+            console.error('Error al obtener vencimientos:', error);
+            throw new error_middleware_1.AppError('Error al obtener el log de vencimientos', 500);
+        }
+    },
+    // Editar (o restablecer con null) la fecha de vencimiento de un lote recibido
+    actualizarVencimiento: async (req, res) => {
+        const recepcionId = Number(req.params.recepcionId);
+        const { fecha_vencimiento } = req.body;
+        if (!Number.isInteger(recepcionId) || recepcionId <= 0) {
+            throw new error_middleware_1.AppError('Lote inválido.', 400);
+        }
+        // null = volver a la fecha calculada (ingreso + 35 días)
+        const fecha = fecha_vencimiento ? String(fecha_vencimiento) : null;
+        if (fecha) {
+            const valida = /^\d{4}-\d{2}-\d{2}$/.test(fecha) &&
+                new Date(`${fecha}T00:00:00Z`).toISOString().slice(0, 10) === fecha;
+            if (!valida)
+                throw new error_middleware_1.AppError('La fecha debe tener formato AAAA-MM-DD y ser válida.', 400);
+        }
+        try {
+            const actual = await db_1.default.query(`SELECT TO_CHAR(fecha_recepcion, 'YYYY-MM-DD') AS fecha_ingreso
+         FROM orden_compra_detalle_recepcion
+         WHERE orden_compra_detalle_recepcion_id = $1`, [recepcionId]);
+            if (actual.rows.length === 0)
+                throw new error_middleware_1.AppError('Lote no encontrado.', 404);
+            if (fecha && fecha < actual.rows[0].fecha_ingreso) {
+                throw new error_middleware_1.AppError('La fecha de vencimiento no puede ser anterior a la fecha de ingreso.', 400);
+            }
+            await db_1.default.query(`UPDATE orden_compra_detalle_recepcion
+         SET fecha_vencimiento = $1
+         WHERE orden_compra_detalle_recepcion_id = $2`, [fecha, recepcionId]);
+            res.json({
+                success: true,
+                message: fecha ? 'Fecha de vencimiento actualizada.' : 'Fecha restablecida a la calculada.'
+            });
+            return;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.AppError)
+                throw error;
+            console.error('Error al actualizar vencimiento:', error);
+            throw new error_middleware_1.AppError('Error al actualizar la fecha de vencimiento', 500);
+        }
+    },
     // Obtener producto por ID
     getById: async (req, res) => {
         try {
@@ -171,5 +251,5 @@ exports.productosController = {
         catch (error) {
             throw new error_middleware_1.AppError('Error al obtener proveedores', 500);
         }
-    }
+    },
 };

@@ -30,6 +30,11 @@ const authorizeCrud = async (req, _res, next) => {
                 return next();
             throw new error_middleware_1.AppError('No tienes permisos para administrar el formato de requerimientos', 403);
         }
+        if (table === 'secuencial_config') {
+            if (req.method === 'GET' || permissions.has('configuracion.secuencial_editar'))
+                return next();
+            throw new error_middleware_1.AppError('No tienes permiso para modificar los secuenciales', 403);
+        }
         // Cualquier usuario autenticado puede LEER todas las tablas (para llenar desplegables)
         if (req.method === 'GET') {
             return next();

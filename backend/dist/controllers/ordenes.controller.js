@@ -26,7 +26,7 @@ exports.ordenesController = {
     crear: async (req, res) => {
         const client = await db_1.default.connect();
         try {
-            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, empleado_aprobador_id, empleado_receptor_id, detalles, tipo_compra } = req.body;
+            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, elaborado_por, aprobado_por, recibido_por, empleado_aprobador_id, empleado_receptor_id, detalles, tipo_compra, secuencial_numero, secuencial_continuidad } = req.body;
             if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
                 throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
             }
@@ -39,9 +39,12 @@ exports.ordenesController = {
             }
             const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
             const empCode = empRes.rows[0].empresa_codigo || 'GEN';
-            const year = new Date().getFullYear();
+            const configSecuenciaRes = await client.query('SELECT secuencial_prefijo, secuencial_numero_inicial, secuencial_proximo_numero, secuencial_anio FROM secuencial_config WHERE secuencial_config_id = 1');
+            const configSecuencia = configSecuenciaRes.rows[0] || { secuencial_prefijo: 'DCS', secuencial_numero_inicial: 1, secuencial_proximo_numero: 1, secuencial_anio: new Date().getFullYear() };
+            const secuencialPrefijo = String(configSecuencia.secuencial_prefijo || 'DCS').trim().toUpperCase();
+            const year = Number(configSecuencia.secuencial_anio) || new Date().getFullYear();
             // 2. Calcular secuencial único y progresivo: [num]-DCS-[dept_code]-[empresa_code]-[year]
-            const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+            const pattern = `%-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
             const seqQuery = await client.query(`SELECT orden_compra_codigo 
          FROM orden_compra 
          WHERE orden_compra_codigo LIKE $1`, [pattern]);
@@ -53,9 +56,19 @@ exports.ordenesController = {
                     maxSeq = num;
                 }
             });
-            const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+            const numeroInicial = Math.max(1, Number(configSecuencia.secuencial_numero_inicial) || 1);
+            const numeroAutomatico = Math.max(numeroInicial, Number(configSecuencia.secuencial_proximo_numero) || maxSeq + 1, maxSeq + 1);
+            const puedeEditarSecuencia = req.user?.rol_id === 1 || (await client.query(`SELECT EXISTS (SELECT 1 FROM usuario_permiso up JOIN permiso p ON p.permiso_id=up.permiso_id WHERE up.usuario_id=$1 AND up.tipo='conceder' AND p.permiso_clave='configuracion.secuencial_editar') OR EXISTS (SELECT 1 FROM usuario_rol ur JOIN rol_permiso rp ON rp.rol_id=ur.rol_id JOIN permiso p ON p.permiso_id=rp.permiso_id WHERE ur.usuario_id=$1 AND p.permiso_clave='configuracion.secuencial_editar') AS permitido`, [req.user?.id || 0])).rows[0].permitido;
+            const nextSeqNum = secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '' ? Number(secuencial_numero) : numeroAutomatico;
+            if (!Number.isInteger(nextSeqNum) || nextSeqNum < 1)
+                throw new error_middleware_1.AppError('El secuencial debe ser un número entero mayor que cero.', 400);
+            if (secuencial_numero !== undefined && !puedeEditarSecuencia)
+                throw new error_middleware_1.AppError('No tienes permiso para editar el secuencial.', 403);
             const seqStr = String(nextSeqNum).padStart(3, '0');
-            const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+            const codigoOC = `${seqStr}-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
+            const duplicateSeq = await client.query('SELECT 1 FROM orden_compra WHERE orden_compra_codigo = $1', [codigoOC]);
+            if (duplicateSeq.rows.length > 0)
+                throw new error_middleware_1.AppError(`El secuencial ${codigoOC} ya existe y no puede sobreponerse.`, 409);
             // Obtener el empleado del usuario actual (Elaborador)
             let empleadoId = req.empleado?.empleado_id;
             if (!empleadoId && req.user?.id) {
@@ -146,6 +159,8 @@ exports.ordenesController = {
                 firmaElaborador,
                 fechaFirmaElaborador
             ]);
+            const siguienteConfigurado = secuencial_continuidad === 'nuevo' ? nextSeqNum + 1 : numeroAutomatico;
+            await client.query('UPDATE secuencial_config SET secuencial_proximo_numero = $1, secuencial_fecha_modificacion = CURRENT_TIMESTAMP WHERE secuencial_config_id = 1', [siguienteConfigurado]);
             const ocId = ocRes.rows[0].orden_compra_id;
             // 4. Insertar los detalles
             for (const d of detalles) {
@@ -298,8 +313,11 @@ exports.ordenesController = {
             }
             const deptCode = deptRes.rows[0].departamento_codigo || 'GEN';
             const empCode = empRes.rows[0].empresa_codigo || 'GEN';
-            const year = new Date().getFullYear();
-            const pattern = `%-DCS-${deptCode}-${empCode}-${year}`;
+            const configSecuenciaRes = await db_1.default.query('SELECT secuencial_prefijo, secuencial_numero_inicial, secuencial_anio FROM secuencial_config WHERE secuencial_config_id = 1');
+            const configSecuencia = configSecuenciaRes.rows[0] || { secuencial_prefijo: 'DCS', secuencial_numero_inicial: 1, secuencial_anio: new Date().getFullYear() };
+            const secuencialPrefijo = String(configSecuencia.secuencial_prefijo || 'DCS').trim().toUpperCase();
+            const year = Number(configSecuencia.secuencial_anio) || new Date().getFullYear();
+            const pattern = `%-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
             const seqQuery = await db_1.default.query(`SELECT orden_compra_codigo 
          FROM orden_compra 
          WHERE orden_compra_codigo LIKE $1`, [pattern]);
@@ -311,9 +329,10 @@ exports.ordenesController = {
                     maxSeq = num;
                 }
             });
-            const nextSeqNum = maxSeq === 0 ? 1 : maxSeq + 1;
+            const numeroInicial = Math.max(1, Number(configSecuencia.secuencial_numero_inicial) || 1);
+            const nextSeqNum = Math.max(numeroInicial, maxSeq + 1);
             const seqStr = String(nextSeqNum).padStart(3, '0');
-            const codigoOC = `${seqStr}-DCS-${deptCode}-${empCode}-${year}`;
+            const codigoOC = `${seqStr}-${secuencialPrefijo}-${deptCode}-${empCode}-${year}`;
             res.json({
                 success: true,
                 data: {
@@ -643,12 +662,12 @@ exports.ordenesController = {
         const id = parseInt(req.params.id);
         const client = await db_1.default.connect();
         try {
-            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, aprobado_por, recibido_por, empleado_aprobador_id, empleado_receptor_id, detalles, tipo_compra } = req.body;
+            const { empresa_id, sucursal_id, departamento_id, centro_costos_id, proveedor_id, justificacion, tipo_articulo, negociacion_previa, forma_pago, plazo_pago, tiempo_entrega, lugar_recepcion, requiere_contrato, requiere_seguro, requiere_mantenimiento, asignado_trabajador, trabajador_asignado, caracteristicas, aprobado_por, recibido_por, empleado_aprobador_id, empleado_receptor_id, detalles, tipo_compra, secuencial_numero, secuencial_continuidad } = req.body;
             if (!justificacion || !detalles || !detalles.length || !empresa_id || !sucursal_id || !departamento_id || !centro_costos_id) {
                 throw new error_middleware_1.AppError('Datos de orden de compra incompletos', 400);
             }
             await client.query('BEGIN');
-            const checkRes = await client.query(`SELECT empleado_aprobador_id, empleado_receptor_id, 
+            const checkRes = await client.query(`SELECT orden_compra_codigo, empleado_aprobador_id, empleado_receptor_id,
                 orden_compra_firma_aprobador, orden_compra_fecha_firma_aprobador,
                 orden_compra_firma_recibido, orden_compra_fecha_firma_recibido,
                 orden_compra_estado 
@@ -657,6 +676,19 @@ exports.ordenesController = {
                 throw new error_middleware_1.AppError('Requerimiento no encontrado', 404);
             }
             const ocDb = checkRes.rows[0];
+            let codigoSecuencial = ocDb.orden_compra_codigo;
+            if (secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '') {
+                const secNum = Number(secuencial_numero);
+                if (!Number.isInteger(secNum) || secNum < 1)
+                    throw new error_middleware_1.AppError('El secuencial debe ser un número entero mayor que cero.', 400);
+                const permitido = req.user?.rol_id === 1 || (await client.query(`SELECT EXISTS (SELECT 1 FROM usuario_permiso up JOIN permiso p ON p.permiso_id=up.permiso_id WHERE up.usuario_id=$1 AND up.tipo='conceder' AND p.permiso_clave='configuracion.secuencial_editar') OR EXISTS (SELECT 1 FROM usuario_rol ur JOIN rol_permiso rp ON rp.rol_id=ur.rol_id JOIN permiso p ON p.permiso_id=rp.permiso_id WHERE ur.usuario_id=$1 AND p.permiso_clave='configuracion.secuencial_editar') AS permitido`, [req.user?.id || 0])).rows[0].permitido;
+                if (!permitido)
+                    throw new error_middleware_1.AppError('No tienes permiso para editar el secuencial.', 403);
+                codigoSecuencial = String(codigoSecuencial).replace(/^\d+/, String(secNum).padStart(3, '0'));
+                const duplicate = await client.query('SELECT 1 FROM orden_compra WHERE orden_compra_codigo = $1 AND orden_compra_id <> $2', [codigoSecuencial, id]);
+                if (duplicate.rows.length > 0)
+                    throw new error_middleware_1.AppError(`El secuencial ${codigoSecuencial} ya existe y no puede sobreponerse.`, 409);
+            }
             const oldAprobadorId = ocDb.empleado_aprobador_id ? Number(ocDb.empleado_aprobador_id) : null;
             const oldReceptorId = ocDb.empleado_receptor_id ? Number(ocDb.empleado_receptor_id) : null;
             const valNewAprobadorId = empleado_aprobador_id ? Number(empleado_aprobador_id) : null;
@@ -689,13 +721,13 @@ exports.ordenesController = {
              orden_compra_tiempo_entrega = $11, orden_compra_lugar_recepcion = $12, orden_compra_requiere_contrato = $13, 
              orden_compra_requiere_seguro = $14, orden_compra_requiere_mantenimiento = $15, orden_compra_asignado_trabajador = $16, 
              orden_compra_trabajador_asignado = $17, orden_compra_caracteristicas = $18, orden_compra_tipo_compra = $19,
-             empleado_aprobador_id = $20, empleado_receptor_id = $21,
+             empleado_aprobador_id = $20, empleado_receptor_id = $21, orden_compra_codigo = $29,
              orden_compra_aprobado_por = $22, orden_compra_recibido_por = $23,
              orden_compra_firma_aprobador = $24, orden_compra_fecha_firma_aprobador = $25,
              orden_compra_firma_recibido = $26, orden_compra_fecha_firma_recibido = $27,
              orden_compra_estado = $28,
              orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
-         WHERE orden_compra_id = $29`, [
+         WHERE orden_compra_id = $30`, [
                 empresa_id,
                 sucursal_id,
                 departamento_id,
@@ -724,16 +756,106 @@ exports.ordenesController = {
                 newFirmaRecibido,
                 newFechaFirmaRecibido,
                 newEstado,
+                codigoSecuencial,
                 id
             ]);
-            await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_id = $1', [id]);
+            if (secuencial_numero !== undefined && secuencial_numero !== null && secuencial_numero !== '' && secuencial_continuidad === 'nuevo') {
+                await client.query('UPDATE secuencial_config SET secuencial_proximo_numero = GREATEST(secuencial_proximo_numero, $1), secuencial_fecha_modificacion = CURRENT_TIMESTAMP WHERE secuencial_config_id = 1', [Number(secuencial_numero) + 1]);
+            }
+            const detallesExistentesRes = await client.query(`SELECT ocd.orden_compra_detalle_id, ocd.producto_id,
+                ocd.orden_compra_detalle_descripcion,
+                COALESCE((
+                  SELECT SUM(odr.cantidad_recibida)
+                  FROM orden_compra_detalle_recepcion odr
+                  WHERE odr.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+                ), 0)::int AS cantidad_recibida
+         FROM orden_compra_detalle ocd
+         WHERE ocd.orden_compra_id = $1
+         FOR UPDATE OF ocd`, [id]);
+            const detallesExistentes = new Map(detallesExistentesRes.rows.map((detalle) => [Number(detalle.orden_compra_detalle_id), detalle]));
+            const idsConservados = new Set();
             for (const d of detalles) {
+                const detalleIdRaw = d.orden_compra_detalle_id;
+                let detalleId = detalleIdRaw === undefined || detalleIdRaw === null || detalleIdRaw === ''
+                    ? null
+                    : Number(detalleIdRaw);
+                // Compatibilidad con formularios que fueron abiertos antes de actualizar el frontend:
+                // reconocer su línea original para no interpretar que fue eliminada.
+                if (detalleId === null) {
+                    const productoIdEntrante = d.producto_id ? Number(d.producto_id) : null;
+                    const descripcionEntrante = String(d.descripcion || d.orden_compra_detalle_descripcion || '')
+                        .trim().toLocaleLowerCase();
+                    const coincidencias = [...detallesExistentes.entries()].filter(([idExistente, existente]) => {
+                        if (idsConservados.has(idExistente))
+                            return false;
+                        const productoIdExistente = existente.producto_id ? Number(existente.producto_id) : null;
+                        if (productoIdEntrante !== null)
+                            return productoIdEntrante === productoIdExistente;
+                        return productoIdExistente === null &&
+                            descripcionEntrante !== '' &&
+                            descripcionEntrante === String(existente.orden_compra_detalle_descripcion || '').trim().toLocaleLowerCase();
+                    });
+                    if (coincidencias.length === 1)
+                        detalleId = coincidencias[0][0];
+                }
+                if (detalleId !== null) {
+                    if (!Number.isInteger(detalleId) || !detallesExistentes.has(detalleId)) {
+                        throw new error_middleware_1.AppError('Uno de los artículos no pertenece a este requerimiento.', 400);
+                    }
+                    if (idsConservados.has(detalleId)) {
+                        throw new error_middleware_1.AppError('Un artículo del requerimiento está duplicado.', 400);
+                    }
+                    idsConservados.add(detalleId);
+                }
                 let productoNombre = d.descripcion || d.orden_compra_detalle_descripcion;
                 if (d.producto_id) {
                     const prodRes = await client.query('SELECT producto_nombre FROM producto WHERE producto_id = $1', [d.producto_id]);
                     if (prodRes.rows.length > 0) {
                         productoNombre = prodRes.rows[0].producto_nombre;
                     }
+                }
+                const cantidad = Number(d.cantidad ?? d.orden_compra_detalle_cantidad);
+                if (!Number.isInteger(cantidad) || cantidad <= 0) {
+                    throw new error_middleware_1.AppError(`La cantidad de ${productoNombre || 'un artículo'} debe ser mayor que cero.`, 400);
+                }
+                if (detalleId !== null) {
+                    const existente = detallesExistentes.get(detalleId);
+                    const cantidadRecibida = Number(existente.cantidad_recibida || 0);
+                    if (cantidad < cantidadRecibida) {
+                        throw new error_middleware_1.AppError(`No puedes reducir ${productoNombre || 'el artículo'} a ${cantidad}: ya se recibieron ${cantidadRecibida} unidad(es).`, 400);
+                    }
+                    const nuevoProductoId = d.producto_id ? Number(d.producto_id) : null;
+                    const productoAnteriorId = existente.producto_id ? Number(existente.producto_id) : null;
+                    if (cantidadRecibida > 0 && nuevoProductoId !== productoAnteriorId) {
+                        throw new error_middleware_1.AppError(`No puedes cambiar el producto de una línea que ya tiene recepciones registradas.`, 400);
+                    }
+                    await client.query(`UPDATE orden_compra_detalle
+             SET producto_id = $1, proveedor_id = $2, orden_compra_detalle_descripcion = $3,
+                 orden_compra_detalle_tipo_articulo = $4, orden_compra_detalle_cantidad = $5,
+                 orden_compra_detalle_unidad_medida = $6, orden_compra_detalle_precio_unitario = $7,
+                 orden_compra_detalle_subtotal = $8, orden_compra_detalle_foto = $9,
+                 orden_compra_detalle_negociacion_previa = $10,
+                 orden_compra_detalle_tiempo_entrega = $11, orden_compra_detalle_dias_entrega = $12,
+                 orden_compra_detalle_incluye_iva = $13, orden_compra_detalle_comentario = $14,
+                 orden_compra_detalle_fecha_modificacion = CURRENT_TIMESTAMP
+             WHERE orden_compra_detalle_id = $15 AND orden_compra_id = $16`, [
+                        d.producto_id || null, d.proveedor_id || null, productoNombre || 'Artículo de Consumo',
+                        d.tipo_articulo || d.orden_compra_detalle_tipo_articulo || 'OTROS', cantidad,
+                        d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
+                        d.precio_unitario ?? d.orden_compra_detalle_precio_unitario ?? 0,
+                        d.subtotal ?? d.orden_compra_detalle_subtotal ?? 0,
+                        d.foto || d.orden_compra_detalle_foto || null,
+                        d.negociacion_previa || d.orden_compra_detalle_negociacion_previa || 'NO',
+                        d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO',
+                        (d.tiempo_entrega || d.orden_compra_detalle_tiempo_entrega || 'INMEDIATO') === 'INMEDIATO'
+                            ? (d.dias_entrega || d.orden_compra_detalle_dias_entrega || null) : null,
+                        d.incluye_iva === undefined
+                            ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva)
+                            : !!d.incluye_iva,
+                        d.comentario || d.orden_compra_detalle_comentario || null,
+                        detalleId, id
+                    ]);
+                    continue;
                 }
                 await client.query(`INSERT INTO orden_compra_detalle (
              orden_compra_id, producto_id, proveedor_id, orden_compra_detalle_descripcion, 
@@ -751,7 +873,7 @@ exports.ordenesController = {
                     d.proveedor_id || null,
                     productoNombre || 'Artículo de Consumo',
                     d.tipo_articulo || d.orden_compra_detalle_tipo_articulo || 'OTROS',
-                    d.cantidad || d.orden_compra_detalle_cantidad,
+                    cantidad,
                     d.unidad_medida || d.orden_compra_detalle_unidad_medida || 'Unidad',
                     d.precio_unitario || d.orden_compra_detalle_precio_unitario || 0,
                     d.subtotal || d.orden_compra_detalle_subtotal || 0,
@@ -764,6 +886,29 @@ exports.ordenesController = {
                     d.incluye_iva === undefined ? (d.orden_compra_detalle_incluye_iva === undefined ? true : !!d.orden_compra_detalle_incluye_iva) : !!d.incluye_iva,
                     d.comentario || d.orden_compra_detalle_comentario || null
                 ]);
+            }
+            for (const [detalleId, existente] of detallesExistentes) {
+                if (idsConservados.has(detalleId))
+                    continue;
+                if (Number(existente.cantidad_recibida || 0) > 0) {
+                    throw new error_middleware_1.AppError('No puedes eliminar un artículo que ya tiene recepciones registradas.', 400);
+                }
+                await client.query('DELETE FROM orden_compra_detalle WHERE orden_compra_detalle_id = $1 AND orden_compra_id = $2', [detalleId, id]);
+            }
+            const estadoRecepcionRes = await client.query(`SELECT COALESCE(SUM(recibida.cantidad), 0)::int AS total_recibido,
+                COUNT(*) FILTER (WHERE COALESCE(recibida.cantidad, 0) < ocd.orden_compra_detalle_cantidad)::int AS lineas_pendientes
+         FROM orden_compra_detalle ocd
+         LEFT JOIN (
+           SELECT orden_compra_detalle_id, SUM(cantidad_recibida)::int AS cantidad
+           FROM orden_compra_detalle_recepcion
+           GROUP BY orden_compra_detalle_id
+         ) recibida ON recibida.orden_compra_detalle_id = ocd.orden_compra_detalle_id
+         WHERE ocd.orden_compra_id = $1`, [id]);
+            const estadoRecepcion = estadoRecepcionRes.rows[0];
+            if (Number(estadoRecepcion.total_recibido) > 0) {
+                await client.query(`UPDATE orden_compra
+           SET orden_compra_estado = $1, orden_compra_fecha_modificacion = CURRENT_TIMESTAMP
+           WHERE orden_compra_id = $2`, [Number(estadoRecepcion.lineas_pendientes) > 0 ? 'recibida_parcial' : 'entregado', id]);
             }
             await client.query('COMMIT');
             res.json({

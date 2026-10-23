@@ -1,15 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isValidCedulaEcuatoriana = exports.isValidPassword = exports.isValidEmail = void 0;
+exports.isValidCedulaEcuatoriana = exports.PASSWORD_REQUIREMENTS = exports.isValidPassword = exports.isValidEmail = void 0;
 const isValidEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
 };
 exports.isValidEmail = isValidEmail;
 const isValidPassword = (password) => {
-    return password.length >= 6;
+    return password.length >= 6 &&
+        /[A-ZÁÉÍÓÚÑ]/.test(password) &&
+        /[a-záéíóúñ]/.test(password) &&
+        /\d/.test(password) &&
+        /[^A-Za-zÁÉÍÓÚáéíóúÑñ\d\s]/.test(password);
 };
 exports.isValidPassword = isValidPassword;
+exports.PASSWORD_REQUIREMENTS = 'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula, un número y un símbolo.';
 const isValidCedulaEcuatoriana = (cedula) => {
     const clean = cedula.trim();
     if (!/^\d{10}$/.test(clean)) {

@@ -41,5 +41,13 @@ export const productosAPI = {
   getProveedores: async (): Promise<{ data: { id: number; nombre: string }[] }> => {
     const response = await api.get('/productos/proveedores');
     return response.data;
+  },
+    getVencimientos: async () => {
+    const response = await api.get('/productos/vencimientos');
+    return response.data;
+  },
+  actualizarVencimiento: async (recepcionId: number, fecha_vencimiento: string | null) => {
+    const response = await api.patch(`/productos/vencimientos/${recepcionId}`, { fecha_vencimiento });
+    return response.data;
   }
 };

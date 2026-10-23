@@ -251,8 +251,8 @@ exports.empleadosController = {
                     await client.query(`UPDATE usuario SET empleado_id = $1, usuario_fecha_modificacion = CURRENT_TIMESTAMP WHERE usuario_id = $2`, [empleado.empleado_id, userId]);
                 }
                 else {
-                    const userRes = await client.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-             VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
+                    const userRes = await client.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+             VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`, [
                         `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
                         usuarioEmail,
                         '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',
@@ -330,8 +330,8 @@ exports.empleadosController = {
             }
             else if (permitir_autoconsumo) {
                 // Crear usuario nuevo para el colaborador
-                const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado)
-           VALUES ($1, $2, $3, $4, 'activo') RETURNING usuario_id`, [
+                const userRes = await db_1.default.query(`INSERT INTO usuario (usuario_nombre, usuario_email, usuario_password, empleado_id, usuario_estado, usuario_password_fecha_cambio, usuario_requiere_cambio_password)
+           VALUES ($1, $2, $3, $4, 'activo', CURRENT_TIMESTAMP, TRUE) RETURNING usuario_id`, [
                     `${empleado.empleado_nombre} ${empleado.empleado_apellido}`,
                     empleado.empleado_email || `colaborador_${empleado.empleado_cedula}@empresa.local`,
                     '$2b$10$Un9uYn.H5.d2fHpxkUexl.ZtZexGvS2P1g2T9Dq0aFvU8ZqBlyR82',

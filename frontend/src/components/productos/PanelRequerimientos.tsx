@@ -20,6 +20,7 @@ import {
 } from 'react-icons/bs';
 import { Paginacion } from '../common/Paginacion';
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
+import { LogVencimientos } from './LogVencimientos';
 
 export const PanelRequerimientos: React.FC = () => {
   const { user, hasPermission } = useAuth();
@@ -48,7 +49,8 @@ export const PanelRequerimientos: React.FC = () => {
   const [ccSearch, setCcSearch] = useState('');
   const [showFotoTooltip, setShowFotoTooltip] = useState(false);
   const [itemCentrosCostoIds, setItemCentrosCostoIds] = useState<number[]>([]);
-  const [moduloActivo, setModuloActivo] = useState<'requerimiento' | 'historial'>('requerimiento');
+  // const [moduloActivo, setModuloActivo] = useState<'requerimiento' | 'historial'>('requerimiento');
+  const [moduloActivo, setModuloActivo] = useState<'requerimiento' | 'historial' | 'vencimientos'>('requerimiento');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [historialBusqueda, setHistorialBusqueda] = useState('');
@@ -907,6 +909,17 @@ export const PanelRequerimientos: React.FC = () => {
           }`}
         >
           Historial de Órdenes de Reabastecimiento y Requerimientos
+        </button>
+                <button
+          type="button"
+          onClick={() => setModuloActivo('vencimientos')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+            moduloActivo === 'vencimientos'
+              ? 'border-gray-800 text-gray-800'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Log de Vencimientos
         </button>
       </div>
 
@@ -2048,6 +2061,8 @@ export const PanelRequerimientos: React.FC = () => {
       </div>
       </>
       )}
+            {/* SUBMODULO 3: VENCIMIENTOS */}
+      {moduloActivo === 'vencimientos' && <LogVencimientos />}
 
       {/* MODAL DE IMPRESIÓN */}
       {selectedOrdenForPrint && (
