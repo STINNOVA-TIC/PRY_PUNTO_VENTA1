@@ -5,7 +5,7 @@ import { BsX } from 'react-icons/bs';
 export interface CampoFormulario {
   name: string;
   label: string;
-  tipo: 'texto' | 'email' | 'password' | 'numero' | 'select' | 'textarea' | 'checkbox' | 'foto';
+  tipo: 'texto' | 'email' | 'password' | 'numero' | 'fecha' | 'select' | 'textarea' | 'checkbox' | 'foto';
   placeholder?: string;
   opciones?: { value: string | number; label: string }[];
   required?: boolean;
@@ -30,6 +30,7 @@ const TIPOS_COMUNES = {
   email: 'email',
   password: 'password',
   numero: 'number',
+  fecha: 'date',
 } as const;
 
 export const ModalFormulario: React.FC<ModalFormularioProps> = ({

@@ -87,7 +87,12 @@ export type Permiso =
   | 'compras.requerimientos.editar'
   | 'compras.requerimientos.aprobar'
   | 'compras.requerimientos.recibir'
-  | 'compras.requerimientos.eliminar';
+  | 'compras.requerimientos.eliminar'
+
+  // ============ ACTIVOS TI ============
+  | 'activos_ti.ver'
+  | 'activos_ti.importar'
+  | 'activos_ti.gestionar';
 
 // Grupos de permisos para facilitar la asignación
 export const GruposPermisos = {
@@ -113,7 +118,8 @@ export const GruposPermisos = {
     'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
     'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar',
     'compras.ver', 'compras.requerimientos.ver_todos', 'compras.requerimientos.crear', 'compras.requerimientos.editar',
-    'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar'
+    'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar',
+    'activos_ti.ver', 'activos_ti.importar', 'activos_ti.gestionar'
   ] as Permiso[],
 
   // GUARDIA: Solo entregas y verificación

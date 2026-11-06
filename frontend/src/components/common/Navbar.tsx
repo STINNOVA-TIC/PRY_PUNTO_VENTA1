@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoEmpresa from '../../assets/logo.png';
-import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor, BsKey } from 'react-icons/bs';
+import { BsList, BsX, BsBoxSeam, BsCartCheck, BsBoxes, BsBarChart, BsPeople, BsPersonGear, BsGrid1X2Fill, BsBoxArrowRight, BsHouseDoor, BsKey, BsLaptop } from 'react-icons/bs';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -18,9 +18,22 @@ export const Navbar: React.FC = () => {
   const rol = user?.rol.nombre;
 
   // Determinar si una ruta está activa
+  // const isRouteActive = (basePath: string) => {
+  //   if (basePath === '/') return location.pathname === '/';
+  //   return location.pathname.startsWith(basePath);
+  // };
+    // Determinar si una ruta está activa (exacta o subruta: /compras y /compras/recepcion,
+  // pero /inventario NO se activa en /inventario-ti)
+  // const isRouteActive = (basePath: string) => {
+  //   if (basePath === '/') return location.pathname === '/';
+  //   return location.pathname === basePath || location.pathname.startsWith(`${basePath}/`);
+  // };
+
+    // Determinar si una ruta está activa (exacta o subruta: /compras y /compras/recepcion,
+  // pero /inventario NO se activa en /inventario-ti)
   const isRouteActive = (basePath: string) => {
     if (basePath === '/') return location.pathname === '/';
-    return location.pathname.startsWith(basePath);
+    return location.pathname === basePath || location.pathname.startsWith(`${basePath}/`);
   };
 
   // Renderizador de enlaces de navegación con señal interactiva / nube indicadora
@@ -91,6 +104,9 @@ export const Navbar: React.FC = () => {
                     </>
                   )}
                 </>
+              )}
+                            {hasPermission('activos_ti.ver') && (
+                renderNavLink('/inventario-ti', 'Inventario TI', <BsLaptop />)
               )}
 
               {/* TTHH / Admin */}
@@ -196,7 +212,7 @@ export const Navbar: React.FC = () => {
                 className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
               >
                 <BsBoxes className="h-4 w-4 text-gray-400" />
-                Inventario
+                Tienda
               </Link>
               {(rol === 'inventario' || rol === 'admin') && (
                 <>
@@ -246,6 +262,16 @@ export const Navbar: React.FC = () => {
             >
               <BsPersonGear className="h-4 w-4 text-gray-400" />
               Operadores
+            </Link>
+          )}
+          {(rol === 'admin' || hasPermission('usuarios.ver') || hasPermission('usuarios.crear')) && (
+            <Link
+              to="/admin/usuarios"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <BsPersonGear className="h-4 w-4 text-gray-400" />
+              Activos TI 
             </Link>
           )}
           {(rol === 'admin' || hasPermission('roles.ver') || hasPermission('roles.crear') || hasPermission('configuracion.ver')) && (

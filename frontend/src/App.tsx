@@ -22,6 +22,7 @@ import { PanelRequerimientos } from './components/productos/PanelRequerimientos'
 import { RecepcionRequerimientos } from './components/productos/RecepcionRequerimientos';
 import { ComprasLayout } from './components/compras/ComprasLayout';
 import { DashboardHome } from './components/dashboard/DashboardHome';
+import { InventarioTI } from './components/activosTi/InventarioTI';
 
 import { useAuth } from './context/AuthContext';
 
@@ -172,6 +173,15 @@ function App() {
                 <Layout>
                   <PermissionGuard permisos={['usuarios.ver', 'usuarios.crear']}>
                     <PanelAdminUsuarios />
+                  </PermissionGuard>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/inventario-ti" element={
+              <ProtectedRoute>
+                <Layout>
+                  <PermissionGuard permiso="activos_ti.ver">
+                    <InventarioTI />
                   </PermissionGuard>
                 </Layout>
               </ProtectedRoute>

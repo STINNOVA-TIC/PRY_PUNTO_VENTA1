@@ -319,6 +319,54 @@ export const initDb = async () => {
       SELECT setval('rol_rol_id_seq', COALESCE((SELECT MAX(rol_id)+1 FROM rol), 1), false);
     `);
 
+        // 5.9 Activos TI: copia fiel del Excel de inventario de TIC (fase inicial)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS activo_ti_registro (
+        activo_ti_registro_id SERIAL PRIMARY KEY,
+        acta_numero INTEGER NULL,
+        responsable_nombre VARCHAR(200) NULL,
+        responsable_cedula VARCHAR(20) NULL,
+        empleado_id INTEGER NULL REFERENCES empleado(empleado_id) ON DELETE SET NULL,
+        material VARCHAR(255) NULL,
+        area_responsable VARCHAR(100) NULL,
+        condicion VARCHAR(50) NULL,
+        existencia VARCHAR(10) NULL,
+        equipo_tipo VARCHAR(150) NULL,
+        total INTEGER NULL,
+        ingresados INTEGER NULL,
+        salidos INTEGER NULL,
+        descripcion TEXT NULL,
+        serial_marca  VARCHAR(150) NULL,
+        fecha_acta DATE NULL,
+        origen VARCHAR(20) NOT NULL DEFAULT 'EXCEL',
+        importado_por INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_activo_ti_registro_cedula ON activo_ti_registro(responsable_cedula);
+      CREATE INDEX IF NOT EXISTS idx_activo_ti_registro_empleado ON activo_ti_registro(empleado_id);
+      ALTER TABLE activo_ti_registro
+      ADD COLUMN IF NOT EXISTS estado VARCHAR(20) NOT NULL DEFAULT 'activo',
+      ADD COLUMN IF NOT EXISTS fecha_modificacion TIMESTAMP NULL;
+    `);
+
+        // 5.11 Compras: documentos PDF adjuntos por requerimiento (máx. 6, baja lógica)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orden_compra_documento (
+        orden_compra_documento_id SERIAL PRIMARY KEY,
+        orden_compra_id INTEGER NOT NULL REFERENCES orden_compra(orden_compra_id) ON DELETE CASCADE,
+        documento_tipo VARCHAR(30) NOT NULL DEFAULT 'OTRO',
+        documento_nombre_original VARCHAR(255) NOT NULL,
+        documento_archivo VARCHAR(255) NOT NULL,
+        documento_tamano_bytes INTEGER NOT NULL DEFAULT 0,
+        usuario_id INTEGER NULL REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+        documento_estado VARCHAR(20) NOT NULL DEFAULT 'activo',
+        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fecha_desactivacion TIMESTAMP NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_oc_documento_orden ON orden_compra_documento(orden_compra_id);
+    `);
+    
+
     // 6. Migración Segura: Sembrar Módulos del Sistema (idempotente)
     await pool.query(`
       INSERT INTO modulo (modulo_id, modulo_nombre, modulo_descripcion, modulo_icono, modulo_estado) VALUES
@@ -333,7 +381,8 @@ export const initDb = async () => {
       (9, 'Nómina', 'Descuentos y cierres salariales', 'DollarSign', 'activo'),
       (10, 'Configuración', 'Parámetros del sistema y auditoría', 'Settings', 'activo'),
       (11, 'Autoconsumo', 'Solicitudes de bienes internos para áreas de la empresa', 'ClipboardCheck', 'activo'),
-      (12, 'Compras', 'Requerimientos, aprobaciones y recepción de compras corporativas', 'CartCheck', 'activo')
+      (12, 'Compras', 'Requerimientos, aprobaciones y recepción de compras corporativas', 'CartCheck', 'activo'),
+      (13, 'Activos TI', 'Inventario de activos tecnológicos y actas de entrega-recepción', 'Laptop', 'activo')
       ON CONFLICT (modulo_nombre) DO NOTHING;
       SELECT setval('modulo_modulo_id_seq', COALESCE((SELECT MAX(modulo_id)+1 FROM modulo), 1), false);
     `);
@@ -412,7 +461,13 @@ export const initDb = async () => {
       (12, 'Editar Requerimientos de Compra', 'Permite editar requerimientos corporativos', 'compras.requerimientos.editar', 'activo'),
       (12, 'Aprobar Requerimientos de Compra', 'Permite aprobar y firmar requerimientos corporativos', 'compras.requerimientos.aprobar', 'activo'),
       (12, 'Recibir Compras', 'Permite registrar la recepción de bienes comprados', 'compras.requerimientos.recibir', 'activo'),
-      (12, 'Eliminar Requerimientos de Compra', 'Permite eliminar requerimientos corporativos', 'compras.requerimientos.eliminar', 'activo')
+      (12, 'Eliminar Requerimientos de Compra', 'Permite eliminar requerimientos corporativos', 'compras.requerimientos.eliminar', 'activo'),
+      (13, 'Ver Activos TI', 'Permite consultar el inventario de activos tecnológicos', 'activos_ti.ver', 'activo'),
+      (13, 'Importar Activos TI', 'Permite cargar el inventario de activos desde Excel', 'activos_ti.importar', 'activo'),
+      (13, 'Ver Activos TI', 'Permite consultar el inventario de activos tecnológicos', 'activos_ti.ver', 'activo'),
+      (13, 'Importar Activos TI', 'Permite cargar el inventario de activos desde Excel', 'activos_ti.importar', 'activo'),
+      (13, 'Gestionar Activos TI', 'Permite crear, editar y dar de baja activos tecnológicos', 'activos_ti.gestionar', 'activo')
+      ON CONFLICT (permiso_nombre) DO NOTHING;
       ON CONFLICT (permiso_nombre) DO NOTHING;
       UPDATE permiso
       SET modulo_id = 12, permiso_descripcion = 'Permiso legado migrado a Compras'

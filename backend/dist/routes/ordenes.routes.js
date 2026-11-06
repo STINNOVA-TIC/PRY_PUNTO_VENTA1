@@ -1,8 +1,25 @@
 "use strict";
+// backend/src/routes/ordenes.routes.ts
+// import { Router } from 'express';
+// import { ordenesController } from '../controllers/ordenes.controller';
+// import { authenticate } from '../middleware/auth.middleware';
+// import { requireAnyPermission, requirePermission } from '../middleware/permisos.middleware';
 Object.defineProperty(exports, "__esModule", { value: true });
+// const router = Router();
+// router.use(authenticate);
+// router.post('/', requirePermission('compras.requerimientos.crear'), ordenesController.crear);
+// router.get('/', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getAll);
+// router.get('/secuencial/siguiente', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getSiguienteSecuencial);
+// router.get('/:id', requireAnyPermission('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.getById);
+// router.put('/:id/entregar', requirePermission('compras.requerimientos.recibir'), ordenesController.entregar);
+// router.put('/:id/firmar', requireAnyPermission('compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenesController.firmar);
+// router.put('/:id', requirePermission('compras.requerimientos.editar'), ordenesController.update);
+// router.delete('/:id', requirePermission('compras.requerimientos.eliminar'), ordenesController.eliminar);
+// export default router;
 // backend/src/routes/ordenes.routes.ts
 const express_1 = require("express");
 const ordenes_controller_1 = require("../controllers/ordenes.controller");
+const documentosOrden_controller_1 = require("../controllers/documentosOrden.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const permisos_middleware_1 = require("../middleware/permisos.middleware");
 const router = (0, express_1.Router)();
@@ -10,6 +27,12 @@ router.use(auth_middleware_1.authenticate);
 router.post('/', (0, permisos_middleware_1.requirePermission)('compras.requerimientos.crear'), ordenes_controller_1.ordenesController.crear);
 router.get('/', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenes_controller_1.ordenesController.getAll);
 router.get('/secuencial/siguiente', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenes_controller_1.ordenesController.getSiguienteSecuencial);
+// Documentos PDF adjuntos (rutas fijas antes de '/:id')
+router.get('/documentos/conteo', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.recibir'), documentosOrden_controller_1.documentosOrdenController.conteo);
+router.get('/:id/documentos', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.recibir'), documentosOrden_controller_1.documentosOrdenController.listar);
+router.get('/:id/documentos/:docId/archivo', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.recibir'), documentosOrden_controller_1.documentosOrdenController.ver);
+router.post('/:id/documentos', (0, permisos_middleware_1.requirePermission)('compras.requerimientos.recibir'), documentosOrden_controller_1.subirPdfMiddleware, documentosOrden_controller_1.documentosOrdenController.subir);
+router.delete('/:id/documentos/:docId', (0, permisos_middleware_1.requirePermission)('compras.requerimientos.recibir'), documentosOrden_controller_1.documentosOrdenController.eliminar);
 router.get('/:id', (0, permisos_middleware_1.requireAnyPermission)('compras.ver', 'compras.requerimientos.crear', 'compras.requerimientos.editar', 'compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenes_controller_1.ordenesController.getById);
 router.put('/:id/entregar', (0, permisos_middleware_1.requirePermission)('compras.requerimientos.recibir'), ordenes_controller_1.ordenesController.entregar);
 router.put('/:id/firmar', (0, permisos_middleware_1.requireAnyPermission)('compras.requerimientos.aprobar', 'compras.requerimientos.recibir'), ordenes_controller_1.ordenesController.firmar);

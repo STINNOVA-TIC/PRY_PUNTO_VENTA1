@@ -25,6 +25,7 @@ const usuarios_routes_1 = __importDefault(require("./routes/usuarios.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
 const autoconsumo_routes_1 = __importDefault(require("./routes/autoconsumo.routes"));
+const activosTi_routes_1 = __importDefault(require("./routes/activosTi.routes"));
 const error_middleware_1 = require("./middleware/error.middleware");
 const index_1 = require("./sockets/index");
 const initDb_1 = require("./config/initDb");
@@ -83,7 +84,7 @@ app.use((0, cors_1.default)({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use((0, morgan_1.default)('dev'));
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '10mb' }));
 app.use('/img', express_1.default.static(path_1.default.join(__dirname, '../img')));
 // Configurar Socket.IO
 (0, index_1.setupSocket)(io);
@@ -105,6 +106,7 @@ app.use('/api/usuarios', usuarios_routes_1.default);
 app.use('/api/admin/crud', admin_routes_1.default);
 app.use('/api/upload', upload_routes_1.default);
 app.use('/api/autoconsumos', autoconsumo_routes_1.default);
+app.use('/api/activos-ti', activosTi_routes_1.default);
 // Health check
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });

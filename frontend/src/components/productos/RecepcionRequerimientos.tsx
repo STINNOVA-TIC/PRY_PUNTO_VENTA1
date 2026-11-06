@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ordenesAPI } from '../../api/ordenes.api';
+import { ordenesAPI, MAX_DOCUMENTOS_ORDEN } from '../../api/ordenes.api';
+import { ModalDocumentosRequerimiento } from './ModalDocumentosRequerimiento';
 import { useAuth } from '../../context/AuthContext';
 import { VistaImpresionRequerimiento } from './VistaImpresionRequerimiento';
 import { adminAPI } from '../../api/admin.api';
@@ -14,7 +15,8 @@ import {
   BsFileEarmarkPdf, 
   BsDownload, 
   BsHourglassSplit, 
-  BsFileEarmarkText 
+  BsFileEarmarkText,
+  BsPaperclip
 } from 'react-icons/bs';
 
 export const RecepcionRequerimientos: React.FC = () => {
@@ -44,6 +46,10 @@ export const RecepcionRequerimientos: React.FC = () => {
 
   // Modal de impresión
   const [printOrden, setPrintOrden] = useState<any | null>(null);
+
+    // Modal de documentos adjuntos
+  const [docsOrden, setDocsOrden] = useState<{ id: number; codigo: string } | null>(null);
+  const [conteoDocs, setConteoDocs] = useState<Record<string, number>>({});
 
   const isAutorizado = !!hasPermission('compras.requerimientos.recibir');
 
@@ -80,6 +86,12 @@ export const RecepcionRequerimientos: React.FC = () => {
       ]);
       setOrdenes(ordRes.data || []);
       setEmpresas((empRes.data || []).filter((emp: any) => emp.empresa_estado === 'activo'));
+      try {
+        const conteoRes = await ordenesAPI.getConteoDocumentos();
+        setConteoDocs(conteoRes.data || {});
+      } catch (errDocs) {
+        console.error('No se pudo cargar el conteo de documentos:', errDocs);
+      }
     } catch (err: any) {
       console.error('Error al cargar órdenes de compra:', err);
       setError('No se pudieron cargar los requerimientos del sistema.');
@@ -327,6 +339,13 @@ export const RecepcionRequerimientos: React.FC = () => {
                           title="Descargar PDF"
                         >
                           <BsFileEarmarkPdf className="shrink-0" /> PDF
+                        </button>
+                        <button
+                          onClick={() => setDocsOrden({ id: oc.id, codigo: oc.codigo })}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg font-bold text-[10px] shadow-sm transition flex items-center gap-1"
+                          title="Documentos adjuntos"
+                        >
+                          <BsPaperclip className="shrink-0" /> Adjuntos ({conteoDocs[String(oc.id)] || 0}/{MAX_DOCUMENTOS_ORDEN})
                         </button>
 
                         {oc.estado !== 'entregado' && oc.estado !== 'cancelada' && (
@@ -637,6 +656,14 @@ export const RecepcionRequerimientos: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL: DOCUMENTOS ADJUNTOS */}
+      <ModalDocumentosRequerimiento
+        orden={docsOrden}
+        puedeGestionar={isAutorizado}
+        onClose={() => setDocsOrden(null)}
+        onCambio={(ordenId, total) => setConteoDocs((prev) => ({ ...prev, [String(ordenId)]: total }))}
+      />
 
       {/* MODAL: IMPRESIÓN REQUERIMIENTO */}
       {printOrden && (

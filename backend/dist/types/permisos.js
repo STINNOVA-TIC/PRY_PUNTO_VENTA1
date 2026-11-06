@@ -26,7 +26,8 @@ exports.GruposPermisos = {
         'configuracion.ver', 'configuracion.editar', 'configuracion.ver_logs',
         'autoconsumo.ver', 'autoconsumo.crear', 'autoconsumo.aprobar', 'autoconsumo.entregar', 'autoconsumo.eliminar',
         'compras.ver', 'compras.requerimientos.ver_todos', 'compras.requerimientos.crear', 'compras.requerimientos.editar',
-        'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar'
+        'compras.requerimientos.aprobar', 'compras.requerimientos.recibir', 'compras.requerimientos.eliminar',
+        'activos_ti.ver', 'activos_ti.importar', 'activos_ti.gestionar'
     ],
     // GUARDIA: Solo entregas y verificación
     GUARDIA: [

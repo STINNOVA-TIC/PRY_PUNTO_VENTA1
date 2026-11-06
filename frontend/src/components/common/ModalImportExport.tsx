@@ -139,11 +139,26 @@ export const ModalImportExport: React.FC<ModalImportExportProps> = ({
         }
 
         // Mapear cabeceras traducidas (labels) de vuelta a las propiedades internas del sistema (keys)
+        // const mappedRows = rawRows.map((rawRow) => {
+        //   const systemRow: any = {};
+        //   columns.forEach((col) => {
+        //     if (rawRow[col.label] !== undefined) {
+        //       systemRow[col.key] = rawRow[col.label];
+        //     }
+        //   });
+        //   return systemRow;
+        // });
+                // Se ignoran espacios sobrantes en los encabezados (ej. "Ingresados ")
         const mappedRows = rawRows.map((rawRow) => {
+          const filaNormalizada: any = {};
+          Object.keys(rawRow).forEach((encabezado) => {
+            filaNormalizada[encabezado.trim()] = rawRow[encabezado];
+          });
           const systemRow: any = {};
           columns.forEach((col) => {
-            if (rawRow[col.label] !== undefined) {
-              systemRow[col.key] = rawRow[col.label];
+            const valor = filaNormalizada[col.label.trim()];
+            if (valor !== undefined) {
+              systemRow[col.key] = valor;
             }
           });
           return systemRow;

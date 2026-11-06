@@ -10,6 +10,9 @@ import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
 
 import { SearchAndFilterBar } from '../common/SearchAndFilterBar';
+import { BsLaptop } from 'react-icons/bs';
+import { activosTiAPI } from '../../api/activosTi.api';
+import { ModalActivosColaborador } from '../activosTi/ModalActivosColaborador';
 
 export const PanelAdminEmpleados: React.FC = () => {
   const { hasPermission } = useAuth();
@@ -30,6 +33,11 @@ export const PanelAdminEmpleados: React.FC = () => {
   const [editingEmpleado, setEditingEmpleado] = useState<any>(null);
 
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+    // Activos TI por colaborador
+  const puedeVerActivos = hasPermission('activos_ti.ver');
+  const [resumenActivos, setResumenActivos] = useState<Record<string, { en_poder: number; registros: number }>>({});
+  const [colaboradorActivos, setColaboradorActivos] = useState<{ cedula: string; nombre: string } | null>(null);
+  const resumenDe = (cedula: any) => resumenActivos[String(cedula ?? '').trim()];
 
   // Estados de búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,6 +68,18 @@ export const PanelAdminEmpleados: React.FC = () => {
 
       const ccRes = await empleadosAPI.getCentrosCostos();
       setCentrosCostos(ccRes.data);
+            if (puedeVerActivos) {
+        try {
+          const resumenRes = await activosTiAPI.getResumenColaboradores();
+          const mapa: Record<string, { en_poder: number; registros: number }> = {};
+          (resumenRes.data || []).forEach((r) => {
+            mapa[String(r.cedula).trim()] = { en_poder: Number(r.en_poder), registros: Number(r.registros) };
+          });
+          setResumenActivos(mapa);
+        } catch (errActivos) {
+          console.error('No se pudo cargar el resumen de activos TI:', errActivos);
+        }
+      }
     } catch (err) {
       console.error('Error cargando empleados:', err);
       setError('No se pudo cargar la lista de colaboradores.');
@@ -260,6 +280,7 @@ export const PanelAdminEmpleados: React.FC = () => {
     );
   }
 
+
   return (
     <div className="font-sans space-y-6">
       
@@ -408,13 +429,14 @@ export const PanelAdminEmpleados: React.FC = () => {
                       <th className="px-5 py-3.5">Cédula</th>
                       <th className="px-5 py-3.5">Cargo / Dpto</th>
                       <th className="px-5 py-3.5">Estado</th>
+                      <th className="px-5 py-3.5">Activos TI</th>
                       <th className="px-5 py-3.5 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-5 py-8 text-center text-gray-400 font-medium">
+                        <td colSpan={6} className="px-5 py-8 text-center text-gray-400 font-medium">
                           No se encontraron colaboradores que coincidan con los filtros.
                         </td>
                       </tr>
@@ -453,6 +475,31 @@ export const PanelAdminEmpleados: React.FC = () => {
                             >
                               {emp.activo ? 'Activo' : 'Inactivo'}
                             </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            {puedeVerActivos ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setColaboradorActivos({
+                                    cedula: String(emp.codigo_empleado ?? '').trim(),
+                                    nombre: `${emp.nombre} ${emp.apellido}`,
+                                  })
+                                }
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition ${
+                                  resumenDe(emp.codigo_empleado)
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                                    : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                }`}
+                              >
+                                <BsLaptop className="h-3.5 w-3.5" />
+                                {resumenDe(emp.codigo_empleado)
+                                  ? `${resumenDe(emp.codigo_empleado).en_poder} en su poder`
+                                  : 'Sin activos'}
+                              </button>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-5 py-4 text-right">
                             <div className="flex gap-2 justify-end">
@@ -509,6 +556,20 @@ export const PanelAdminEmpleados: React.FC = () => {
         onGuardar={handleGuardarColaborador}
         botonGuardarLabel="Guardar Colaborador"
       />
+      <ModalActivosColaborador
+        isOpen={colaboradorActivos !== null}
+        onClose={() => setColaboradorActivos(null)}
+        cedula={colaboradorActivos?.cedula || ''}
+        nombre={colaboradorActivos?.nombre || ''}
+      />
     </div>
   );
 };
+
+
+
+<ModalActivosColaborador
+isOpen={colaboradorActivo !==null}
+  onclose={()=>setColaboradoresActivos(null)}
+  cedula={colaboradorActivos?.cedula || ''}
+  nombre={colaboradorActivos?.nombre || '' }/>

@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: password123
       POSTGRES_DB: pointofsale
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pos_db_data:/var/lib/postgresql/data
       # Iniciar la base de datos con el esquema y datos semilla automáticamente
@@ -39,6 +39,8 @@ services:
       - ./backend/img:/usr/src/app/img
       # Directorio compartido para respaldos de la base de datos
       - pos_backups_data:/backups
+      # Documentos PDF adjuntos de Compras (privados)
+      - ./backend/uploads:/usr/src/app/uploads
     depends_on:
       - db
 

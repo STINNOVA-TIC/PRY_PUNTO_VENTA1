@@ -69,4 +69,8 @@ export type Permiso =
   | 'compras.requerimientos.editar'
   | 'compras.requerimientos.aprobar'
   | 'compras.requerimientos.recibir'
-  | 'compras.requerimientos.eliminar';
+  | 'compras.requerimientos.eliminar'
+    // ============ ACTIVOS TI ============
+  | 'activos_ti.ver'
+  | 'activos_ti.importar'
+  | 'activos_ti.gestionar';

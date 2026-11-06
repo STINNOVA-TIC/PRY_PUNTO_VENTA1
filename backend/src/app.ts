@@ -21,9 +21,11 @@ import usuariosRoutes from './routes/usuarios.routes';
 import adminRoutes from './routes/admin.routes';
 import uploadRoutes from './routes/upload.routes';
 import autoconsumoRoutes from './routes/autoconsumo.routes';
+import activosTiRoutes from './routes/activosTi.routes';
 import { errorHandler } from './middleware/error.middleware';
 import { setupSocket } from './sockets/index';
 import { initDb } from './config/initDb';
+
 
 dotenv.config();
 
@@ -87,7 +89,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use('/img', express.static(path.join(__dirname, '../img')));
 
 // Configurar Socket.IO
@@ -112,6 +114,7 @@ app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/admin/crud', adminRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/autoconsumos', autoconsumoRoutes);
+app.use('/api/activos-ti', activosTiRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
