@@ -77,6 +77,7 @@ export const ordenesAPI = {
     });
     return response.data;
   },
+
   //descargar el token de sesion pdf
    verDocumento: async (id: number | string, docId: number): Promise<Blob> => {
     const response = await api.get(`/ordenes-compra/${id}/documentos/${docId}/archivo`, { responseType: 'blob' });
@@ -87,3 +88,4 @@ export const ordenesAPI = {
     return response.data;
   }
 };
+

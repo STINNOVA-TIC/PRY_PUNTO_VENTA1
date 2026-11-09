@@ -121,6 +121,7 @@ export const RecepcionRequerimientos: React.FC = () => {
         const solicitado = Number(detalle.orden_compra_detalle_cantidad || detalle.cantidad || 0);
         const recibido = Number(detalle.cantidad_recibida || 0);
         estadoInicial[detalleId] = { seleccionada: recibido < solicitado, cantidad: String(Math.max(0, solicitado - recibido)), factura: '' };
+      
       });
       setSelectedOrden({ ...ordenActual, id: orden.id, codigo: orden.codigo });
       setRecepciones(estadoInicial);
