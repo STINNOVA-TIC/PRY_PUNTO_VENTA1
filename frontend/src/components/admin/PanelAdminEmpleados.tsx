@@ -565,11 +565,3 @@ export const PanelAdminEmpleados: React.FC = () => {
     </div>
   );
 };
-
-
-
-<ModalActivosColaborador
-isOpen={colaboradorActivo !==null}
-  onclose={()=>setColaboradoresActivos(null)}
-  cedula={colaboradorActivos?.cedula || ''}
-  nombre={colaboradorActivos?.nombre || '' }/>
